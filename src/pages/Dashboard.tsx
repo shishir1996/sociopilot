@@ -5,7 +5,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ContentCard } from "@/components/ContentCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, LogOut, Building2, CalendarDays, Sparkles } from "lucide-react";
+import { Plus, LogOut, Building2, CalendarDays, Sparkles, Settings, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface Business {
   id: string;
@@ -38,17 +39,24 @@ interface ContentItem {
   posting_time: string;
   why_it_matters: string;
   status: string;
+  caption: string;
+  hashtags: string[];
+  image_prompt: string;
+  visual_style: string;
+  repurposing_suggestion: string;
 }
 
 export default function Dashboard() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [selectedBusiness, setSelectedBusiness] = useState<string | null>(null);
   const [plans, setPlans] = useState<ContentPlan[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [items, setItems] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
     fetchBusinesses();
@@ -93,46 +101,29 @@ export default function Dashboard() {
     setItems(data || []);
   };
 
-  const createSamplePlan = async () => {
+  const generateAIPlan = async () => {
     if (!selectedBusiness || !user) return;
-    setLoading(true);
+    setGenerating(true);
     try {
-      const { data: plan, error: planError } = await supabase
-        .from("content_plans")
-        .insert({
-          business_id: selectedBusiness,
-          user_id: user.id,
-          week_start: new Date().toISOString().split("T")[0],
-          week_number: plans.length + 1,
-          strategy_summary: "This week focuses on brand awareness, trust building, and lead generation through diverse content formats.",
-          status: "draft",
-        } as any)
-        .select()
-        .single();
-      if (planError) throw planError;
-
-      const sampleItems = [
-        { day_number: 1, content_theme: "Educational", content_goal: "Awareness", primary_platform: "Instagram", secondary_platforms: ["Facebook"], content_type: "Carousel", topic: "5 Common Mistakes in Your Industry", hook: "Stop making these costly mistakes...", pain_point: "Customers waste time and money on avoidable errors", core_message: "Expert guidance saves you from common pitfalls", cta: "Save this post for later →", posting_time: "10:00 AM", why_it_matters: "Educational content builds authority", status: "draft" },
-        { day_number: 2, content_theme: "Trust Building", content_goal: "Trust", primary_platform: "LinkedIn", secondary_platforms: ["Facebook"], content_type: "Text", topic: "Behind the Scenes: How We Work", hook: "Here's what happens before you see the final result...", pain_point: "Clients wonder if they can trust the process", core_message: "Transparency builds lasting relationships", cta: "What would you like to see behind the scenes?", posting_time: "8:30 AM", why_it_matters: "Humanizes the brand", status: "draft" },
-        { day_number: 3, content_theme: "Engagement", content_goal: "Engagement", primary_platform: "Instagram", secondary_platforms: ["X (Twitter)"], content_type: "Reel", topic: "Quick Tip: One Change That Makes a Difference", hook: "This one trick changed everything for our clients...", pain_point: "People want quick, actionable solutions", core_message: "Small changes create big results", cta: "Follow for more tips like this!", posting_time: "12:00 PM", why_it_matters: "Reels drive maximum reach", status: "draft" },
-        { day_number: 4, content_theme: "Authority", content_goal: "Authority", primary_platform: "LinkedIn", secondary_platforms: ["Google Business Profile"], content_type: "Image", topic: "Industry Insight: What's Changing in 2026", hook: "The industry is shifting. Are you ready?", pain_point: "Fear of falling behind on trends", core_message: "Stay ahead with expert insights", cta: "Share your thoughts in the comments", posting_time: "9:00 AM", why_it_matters: "Positions as thought leader", status: "draft" },
-        { day_number: 5, content_theme: "Lead Generation", content_goal: "Leads", primary_platform: "Facebook", secondary_platforms: ["Instagram"], content_type: "Image", topic: "Limited Offer: Free Consultation", hook: "This week only — free strategy session", pain_point: "Prospects need a low-risk entry point", core_message: "Take the first step at no cost", cta: "DM 'FREE' to get started", posting_time: "11:00 AM", why_it_matters: "Direct lead generation", status: "draft" },
-        { day_number: 6, content_theme: "Local Visibility", content_goal: "Local Reach", primary_platform: "Google Business Profile", secondary_platforms: ["Facebook"], content_type: "Text", topic: "Serving [Your City] for Over X Years", hook: "Your neighbors trust us. Here's why.", pain_point: "Local customers want nearby, reliable options", core_message: "We're local, experienced, and trusted", cta: "Visit us or call today", posting_time: "2:00 PM", why_it_matters: "Boosts local SEO", status: "draft" },
-        { day_number: 7, content_theme: "Social Proof", content_goal: "Conversion", primary_platform: "Instagram", secondary_platforms: ["LinkedIn", "Facebook"], content_type: "Carousel", topic: "Client Success Story: Before & After", hook: "See the transformation we created for a real client", pain_point: "Prospects need proof before committing", core_message: "Real results from real clients", cta: "Ready for your transformation? Link in bio", posting_time: "5:00 PM", why_it_matters: "Social proof drives conversions", status: "draft" },
-      ];
-
-      const insertItems = sampleItems.map((item) => ({
-        ...item,
-        plan_id: (plan as any).id,
-        user_id: user.id,
-      }));
-
-      await supabase.from("content_items").insert(insertItems as any);
+      const { data, error } = await supabase.functions.invoke("generate-content", {
+        body: { business_id: selectedBusiness },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({
+        title: "✨ Content Plan Generated!",
+        description: "AI has created a complete 7-day plan with captions, hashtags, and more.",
+      });
       await fetchPlans(selectedBusiness);
     } catch (error: any) {
-      console.error("Error creating plan:", error);
+      console.error("Error generating plan:", error);
+      toast({
+        title: "Generation Failed",
+        description: error.message || "Could not generate content plan. Please try again.",
+        variant: "destructive",
+      });
     }
-    setLoading(false);
+    setGenerating(false);
   };
 
   if (loading) {
@@ -167,6 +158,8 @@ export default function Dashboard() {
     );
   }
 
+  const currentPlan = plans.find((p) => p.id === selectedPlan);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -181,6 +174,9 @@ export default function Dashboard() {
             )}
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigate("/settings")}>
+              <Settings className="h-4 w-4 mr-1" /> Accounts
+            </Button>
             <Button variant="outline" size="sm" onClick={() => navigate("/setup")}>
               <Plus className="h-4 w-4 mr-1" /> New Business
             </Button>
@@ -192,6 +188,18 @@ export default function Dashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        {/* Strategy summary */}
+        {currentPlan?.strategy_summary && (
+          <Card className="mb-6 shadow-card bg-primary/5 border-primary/20">
+            <CardContent className="py-4">
+              <p className="text-sm text-foreground">
+                <span className="font-semibold text-primary">📋 Strategy:</span>{" "}
+                {currentPlan.strategy_summary}
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Plans header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -201,12 +209,20 @@ export default function Dashboard() {
             </h2>
             {plans.length > 0 && (
               <span className="text-sm text-muted-foreground">
-                Week {plans.find((p) => p.id === selectedPlan)?.week_number || 1}
+                Week {currentPlan?.week_number || 1}
               </span>
             )}
           </div>
-          <Button onClick={createSamplePlan} size="sm">
-            <Plus className="h-4 w-4 mr-1" /> New Week
+          <Button onClick={generateAIPlan} size="sm" disabled={generating}>
+            {generating ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" /> Generating...
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4 mr-1" /> Generate New Week
+              </>
+            )}
           </Button>
         </div>
 
@@ -232,12 +248,26 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* Generating state */}
+        {generating && (
+          <Card className="mb-6 shadow-card">
+            <CardContent className="py-12 text-center space-y-4">
+              <div className="w-12 h-12 border-3 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+              <h3 className="font-heading font-semibold text-foreground">AI is crafting your content plan...</h3>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                Generating captions, hashtags, hooks, and platform-specific content for 7 days. This takes about 15-30 seconds.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Content grid */}
-        {items.length > 0 ? (
+        {!generating && items.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {items.map((item) => (
               <ContentCard
                 key={item.id}
+                id={item.id}
                 dayNumber={item.day_number}
                 theme={item.content_theme}
                 goal={item.content_goal}
@@ -252,20 +282,26 @@ export default function Dashboard() {
                 postingTime={item.posting_time}
                 whyItMatters={item.why_it_matters}
                 status={item.status}
+                caption={item.caption}
+                hashtags={item.hashtags}
+                imagePrompt={item.image_prompt}
+                visualStyle={item.visual_style}
+                repurposingSuggestion={item.repurposing_suggestion}
+                onStatusChange={() => selectedPlan && fetchItems(selectedPlan)}
               />
             ))}
           </div>
-        ) : (
+        ) : !generating ? (
           <Card className="shadow-card">
             <CardContent className="py-16 text-center space-y-3">
-              <CalendarDays className="h-12 w-12 text-muted-foreground mx-auto" />
+              <Sparkles className="h-12 w-12 text-primary mx-auto" />
               <h3 className="font-heading font-semibold text-foreground">No content plan yet</h3>
               <p className="text-sm text-muted-foreground">
-                Click "New Week" to generate your first 7-day content plan.
+                Click "Generate New Week" to let AI create a complete 7-day content plan with captions, hashtags, and more.
               </p>
             </CardContent>
           </Card>
-        )}
+        ) : null}
       </main>
     </div>
   );
