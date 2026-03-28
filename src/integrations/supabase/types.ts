@@ -91,9 +91,12 @@ export type Database = {
           image_prompt: string | null
           pain_point: string | null
           plan_id: string
+          post_error: string | null
+          posted_at: string | null
           posting_time: string | null
           primary_platform: string | null
           repurposing_suggestion: string | null
+          scheduled_at: string | null
           secondary_platforms: string[] | null
           status: string
           topic: string
@@ -119,9 +122,12 @@ export type Database = {
           image_prompt?: string | null
           pain_point?: string | null
           plan_id: string
+          post_error?: string | null
+          posted_at?: string | null
           posting_time?: string | null
           primary_platform?: string | null
           repurposing_suggestion?: string | null
+          scheduled_at?: string | null
           secondary_platforms?: string[] | null
           status?: string
           topic: string
@@ -147,9 +153,12 @@ export type Database = {
           image_prompt?: string | null
           pain_point?: string | null
           plan_id?: string
+          post_error?: string | null
+          posted_at?: string | null
           posting_time?: string | null
           primary_platform?: string | null
           repurposing_suggestion?: string | null
+          scheduled_at?: string | null
           secondary_platforms?: string[] | null
           status?: string
           topic?: string
@@ -206,6 +215,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "content_plans_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_accounts: {
+        Row: {
+          access_token: string | null
+          account_id: string | null
+          account_name: string | null
+          business_id: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          platform: string
+          refresh_token: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          account_id?: string | null
+          account_name?: string | null
+          business_id: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          platform: string
+          refresh_token?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string | null
+          account_id?: string | null
+          account_name?: string | null
+          business_id?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          platform?: string
+          refresh_token?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_accounts_business_id_fkey"
             columns: ["business_id"]
             isOneToOne: false
             referencedRelation: "businesses"
