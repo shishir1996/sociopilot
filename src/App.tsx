@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import BusinessSetup from "./pages/BusinessSetup";
 import NotFound from "./pages/NotFound";
+import SocialSettings from "./pages/SocialSettings";
 
 const queryClient = new QueryClient();
 
@@ -22,6 +23,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/setup" element={<BusinessSetup />} />
+            <Route path="/settings" element={<SocialSettings />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
