@@ -14,7 +14,205 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      businesses: {
+        Row: {
+          brand_tone: string | null
+          competitors: string | null
+          content_style: string | null
+          content_types: string[] | null
+          created_at: string
+          goals: string[] | null
+          id: string
+          industry: string | null
+          location: string | null
+          main_offers: string | null
+          name: string
+          platforms: string[] | null
+          posting_goals: string[] | null
+          products_services: string | null
+          target_audience: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          brand_tone?: string | null
+          competitors?: string | null
+          content_style?: string | null
+          content_types?: string[] | null
+          created_at?: string
+          goals?: string[] | null
+          id?: string
+          industry?: string | null
+          location?: string | null
+          main_offers?: string | null
+          name: string
+          platforms?: string[] | null
+          posting_goals?: string[] | null
+          products_services?: string | null
+          target_audience?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          brand_tone?: string | null
+          competitors?: string | null
+          content_style?: string | null
+          content_types?: string[] | null
+          created_at?: string
+          goals?: string[] | null
+          id?: string
+          industry?: string | null
+          location?: string | null
+          main_offers?: string | null
+          name?: string
+          platforms?: string[] | null
+          posting_goals?: string[] | null
+          products_services?: string | null
+          target_audience?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      content_items: {
+        Row: {
+          caption: string | null
+          carousel_slides: Json | null
+          content_goal: string | null
+          content_theme: string
+          content_type: string
+          core_message: string | null
+          created_at: string
+          cta: string | null
+          day_number: number
+          hashtags: string[] | null
+          hook: string | null
+          id: string
+          image_prompt: string | null
+          pain_point: string | null
+          plan_id: string
+          posting_time: string | null
+          primary_platform: string | null
+          repurposing_suggestion: string | null
+          secondary_platforms: string[] | null
+          status: string
+          topic: string
+          updated_at: string
+          user_id: string
+          video_script: Json | null
+          visual_style: string | null
+          why_it_matters: string | null
+        }
+        Insert: {
+          caption?: string | null
+          carousel_slides?: Json | null
+          content_goal?: string | null
+          content_theme: string
+          content_type: string
+          core_message?: string | null
+          created_at?: string
+          cta?: string | null
+          day_number: number
+          hashtags?: string[] | null
+          hook?: string | null
+          id?: string
+          image_prompt?: string | null
+          pain_point?: string | null
+          plan_id: string
+          posting_time?: string | null
+          primary_platform?: string | null
+          repurposing_suggestion?: string | null
+          secondary_platforms?: string[] | null
+          status?: string
+          topic: string
+          updated_at?: string
+          user_id: string
+          video_script?: Json | null
+          visual_style?: string | null
+          why_it_matters?: string | null
+        }
+        Update: {
+          caption?: string | null
+          carousel_slides?: Json | null
+          content_goal?: string | null
+          content_theme?: string
+          content_type?: string
+          core_message?: string | null
+          created_at?: string
+          cta?: string | null
+          day_number?: number
+          hashtags?: string[] | null
+          hook?: string | null
+          id?: string
+          image_prompt?: string | null
+          pain_point?: string | null
+          plan_id?: string
+          posting_time?: string | null
+          primary_platform?: string | null
+          repurposing_suggestion?: string | null
+          secondary_platforms?: string[] | null
+          status?: string
+          topic?: string
+          updated_at?: string
+          user_id?: string
+          video_script?: Json | null
+          visual_style?: string | null
+          why_it_matters?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_items_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "content_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_plans: {
+        Row: {
+          business_id: string
+          created_at: string
+          id: string
+          status: string
+          strategy_summary: string | null
+          updated_at: string
+          user_id: string
+          week_number: number
+          week_start: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          id?: string
+          status?: string
+          strategy_summary?: string | null
+          updated_at?: string
+          user_id: string
+          week_number?: number
+          week_start: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          id?: string
+          status?: string
+          strategy_summary?: string | null
+          updated_at?: string
+          user_id?: string
+          week_number?: number
+          week_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_plans_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
