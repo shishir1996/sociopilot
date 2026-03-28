@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import BusinessSetup from "./pages/BusinessSetup";
 import NotFound from "./pages/NotFound";
+import SocialSettings from "./pages/SocialSettings";
 
 const queryClient = new QueryClient();
 
