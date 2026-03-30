@@ -6,6 +6,74 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+async function ensureBucketExists(supabaseAdmin: any) {
+  const { data: buckets } = await supabaseAdmin.storage.listBuckets();
+  const exists = buckets?.some((b: any) => b.id === "content-images");
+  if (!exists) {
+    await supabaseAdmin.storage.createBucket("content-images", { public: true });
+  }
+}
+
+async function generateImage(prompt: string, apiKey: string): Promise<string | null> {
+  try {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-3.1-flash-image-preview",
+        messages: [{ role: "user", content: prompt }],
+        modalities: ["image", "text"],
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("Image gen error:", response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    return imageUrl || null;
+  } catch (err) {
+    console.error("Image generation failed:", err);
+    return null;
+  }
+}
+
+async function uploadBase64Image(
+  supabaseAdmin: any,
+  base64Data: string,
+  fileName: string,
+  supabaseUrl: string,
+): Promise<string | null> {
+  try {
+    // Extract base64 content after the data URL prefix
+    const base64Content = base64Data.replace(/^data:image\/\w+;base64,/, "");
+    const binaryData = Uint8Array.from(atob(base64Content), (c) => c.charCodeAt(0));
+
+    const { error } = await supabaseAdmin.storage
+      .from("content-images")
+      .upload(fileName, binaryData, {
+        contentType: "image/png",
+        upsert: true,
+      });
+
+    if (error) {
+      console.error("Upload error:", error);
+      return null;
+    }
+
+    // Return public URL
+    return `${supabaseUrl}/storage/v1/object/public/content-images/${fileName}`;
+  } catch (err) {
+    console.error("Upload failed:", err);
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -16,11 +84,14 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(
-      supabaseUrl,
-      supabaseKey,
-      { global: { headers: { Authorization: authHeader! } } }
-    );
+
+    // Admin client for storage operations (no auth override)
+    const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
+
+    // User-scoped client for RLS queries
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { Authorization: authHeader! } },
+    });
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
@@ -79,13 +150,13 @@ Return ONLY a valid JSON object with this exact structure:
       "why_it_matters": "Why this post matters for growth",
       "caption": "Full ready-to-post caption (150-300 words)",
       "hashtags": ["hashtag1", "hashtag2", "hashtag3"],
-      "image_prompt": "Detailed AI image generation prompt",
+      "image_prompt": "Detailed AI image generation prompt for a social media visual. Include style, colors, composition details.",
       "visual_style": "Visual direction for the creative",
       "repurposing_suggestion": "How to repurpose this for other platforms"
     }
   ]
 }
-Generate exactly 7 days. Make content diverse: mix educational, trust-building, promotional, engagement, authority, local visibility, and conversion posts. Every caption must be complete and ready to copy-paste. Hashtags should be relevant and a mix of broad and niche.`;
+Generate exactly 7 days. Make content diverse: mix educational, trust-building, promotional, engagement, authority, local visibility, and conversion posts. Every caption must be complete and ready to copy-paste. Hashtags should be relevant and a mix of broad and niche. Image prompts must be detailed enough to generate stunning social media visuals.`;
 
     const userPrompt = `Generate a Week ${weekNumber} content plan for:
 Business: ${business.name}
@@ -103,7 +174,7 @@ Competitors: ${business.competitors || "Not specified"}
 
 Important: Make this week fresh and different from previous weeks. Focus on content that drives ${(business.posting_goals || ["engagement"]).join(", ")}.`;
 
-    // Call Lovable AI with tool calling for structured output
+    // Call Lovable AI for content plan
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -199,7 +270,10 @@ Important: Make this week fresh and different from previous weeks. Focus on cont
 
     if (planError) throw planError;
 
-    // Insert content items
+    // Ensure storage bucket exists
+    await ensureBucketExists(supabaseAdmin);
+
+    // Insert content items first (without images)
     const items = plan.days.map((day: any) => ({
       plan_id: newPlan.id,
       user_id: user.id,
@@ -224,8 +298,45 @@ Important: Make this week fresh and different from previous weeks. Focus on cont
       status: "draft",
     }));
 
-    const { error: itemsError } = await supabase.from("content_items").insert(items);
+    const { data: insertedItems, error: itemsError } = await supabaseAdmin
+      .from("content_items")
+      .insert(items)
+      .select("id, image_prompt, day_number");
+
     if (itemsError) throw itemsError;
+
+    // Generate images for each content item in parallel (max 3 concurrent)
+    console.log("Starting image generation for", insertedItems.length, "items...");
+
+    const generateAndUpload = async (item: any) => {
+      if (!item.image_prompt) return;
+      try {
+        const base64Image = await generateImage(item.image_prompt, LOVABLE_API_KEY);
+        if (!base64Image) return;
+
+        const fileName = `${newPlan.id}/day-${item.day_number}-${Date.now()}.png`;
+        const publicUrl = await uploadBase64Image(supabaseAdmin, base64Image, fileName, supabaseUrl);
+
+        if (publicUrl) {
+          await supabaseAdmin
+            .from("content_items")
+            .update({ image_url: publicUrl })
+            .eq("id", item.id);
+          console.log(`Image generated for day ${item.day_number}`);
+        }
+      } catch (err) {
+        console.error(`Image gen failed for day ${item.day_number}:`, err);
+      }
+    };
+
+    // Process images in batches of 3 to avoid rate limits
+    for (let i = 0; i < insertedItems.length; i += 3) {
+      const batch = insertedItems.slice(i, i + 3);
+      await Promise.all(batch.map(generateAndUpload));
+      if (i + 3 < insertedItems.length) {
+        await new Promise((r) => setTimeout(r, 2000)); // delay between batches
+      }
+    }
 
     return new Response(JSON.stringify({ success: true, plan_id: newPlan.id }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
