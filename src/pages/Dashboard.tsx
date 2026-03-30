@@ -42,6 +42,7 @@ interface ContentItem {
   caption: string;
   hashtags: string[];
   image_prompt: string;
+  image_url: string;
   visual_style: string;
   repurposing_suggestion: string;
 }
