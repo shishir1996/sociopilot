@@ -286,6 +286,7 @@ export default function Dashboard() {
                 caption={item.caption}
                 hashtags={item.hashtags}
                 imagePrompt={item.image_prompt}
+                imageUrl={item.image_url}
                 visualStyle={item.visual_style}
                 repurposingSuggestion={item.repurposing_suggestion}
                 onStatusChange={() => selectedPlan && fetchItems(selectedPlan)}
