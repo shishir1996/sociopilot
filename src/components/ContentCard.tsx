@@ -28,6 +28,7 @@ interface ContentCardProps {
   caption?: string;
   hashtags?: string[];
   imagePrompt?: string;
+  imageUrl?: string;
   visualStyle?: string;
   repurposingSuggestion?: string;
   onStatusChange?: () => void;
@@ -52,6 +53,7 @@ export function ContentCard({
   caption,
   hashtags,
   imagePrompt,
+  imageUrl,
   visualStyle,
   repurposingSuggestion,
   onStatusChange,
@@ -183,6 +185,18 @@ export function ContentCard({
         {cta && (
           <div className="rounded-md bg-primary/10 px-3 py-2">
             <p className="text-xs font-medium text-primary">CTA: {cta}</p>
+          </div>
+        )}
+
+        {/* Generated image */}
+        {imageUrl && (
+          <div className="rounded-lg overflow-hidden border border-border">
+            <img
+              src={imageUrl}
+              alt={`Generated visual for: ${topic}`}
+              className="w-full h-40 object-cover"
+              loading="lazy"
+            />
           </div>
         )}
 
