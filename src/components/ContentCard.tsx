@@ -53,6 +53,7 @@ export function ContentCard({
   caption,
   hashtags,
   imagePrompt,
+  imageUrl,
   visualStyle,
   repurposingSuggestion,
   onStatusChange,
