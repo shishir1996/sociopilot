@@ -28,6 +28,7 @@ interface ContentCardProps {
   caption?: string;
   hashtags?: string[];
   imagePrompt?: string;
+  imageUrl?: string;
   visualStyle?: string;
   repurposingSuggestion?: string;
   onStatusChange?: () => void;
