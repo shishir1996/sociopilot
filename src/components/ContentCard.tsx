@@ -188,6 +188,18 @@ export function ContentCard({
           </div>
         )}
 
+        {/* Generated image */}
+        {imageUrl && (
+          <div className="rounded-lg overflow-hidden border border-border">
+            <img
+              src={imageUrl}
+              alt={`Generated visual for: ${topic}`}
+              className="w-full h-40 object-cover"
+              loading="lazy"
+            />
+          </div>
+        )}
+
         {/* Expandable section for AI-generated content */}
         {(caption || hashtags?.length) && (
           <button
