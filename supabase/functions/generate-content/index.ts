@@ -14,33 +14,53 @@ async function ensureBucketExists(supabaseAdmin: any) {
   }
 }
 
-async function generateImage(prompt: string, apiKey: string): Promise<string | null> {
-  try {
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3.1-flash-image-preview",
-        messages: [{ role: "user", content: prompt }],
-        modalities: ["image", "text"],
-      }),
-    });
+async function generateImage(prompt: string, apiKey: string, maxRetries = 3): Promise<{ data: string | null; rateLimited: boolean }> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      if (attempt > 0) {
+        const delay = Math.pow(2, attempt) * 3000; // 6s, 12s backoff
+        console.log(`Retry ${attempt}/${maxRetries}, waiting ${delay}ms...`);
+        await new Promise((r) => setTimeout(r, delay));
+      }
 
-    if (!response.ok) {
-      console.error("Image gen error:", response.status);
-      return null;
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-3.1-flash-image-preview",
+          messages: [{ role: "user", content: prompt }],
+          modalities: ["image", "text"],
+        }),
+      });
+
+      if (response.status === 429) {
+        console.warn(`Image gen rate limited (attempt ${attempt + 1})`);
+        if (attempt === maxRetries - 1) return { data: null, rateLimited: true };
+        continue;
+      }
+
+      if (response.status === 402) {
+        console.error("AI credits exhausted");
+        return { data: null, rateLimited: false };
+      }
+
+      if (!response.ok) {
+        console.error("Image gen error:", response.status);
+        return { data: null, rateLimited: false };
+      }
+
+      const data = await response.json();
+      const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+      return { data: imageUrl || null, rateLimited: false };
+    } catch (err) {
+      console.error("Image generation failed:", err);
+      if (attempt === maxRetries - 1) return { data: null, rateLimited: false };
     }
-
-    const data = await response.json();
-    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-    return imageUrl || null;
-  } catch (err) {
-    console.error("Image generation failed:", err);
-    return null;
   }
+  return { data: null, rateLimited: false };
 }
 
 async function uploadBase64Image(
@@ -102,14 +122,19 @@ serve(async (req) => {
     // Handle image regeneration for a single content item
     if (body.regenerate_image && body.content_item_id && body.image_prompt) {
       await ensureBucketExists(supabaseAdmin);
-      const base64Image = await generateImage(body.image_prompt, LOVABLE_API_KEY);
-      if (!base64Image) {
-        return new Response(JSON.stringify({ error: "Image generation failed" }), {
+      const result = await generateImage(body.image_prompt, LOVABLE_API_KEY);
+      if (result.rateLimited) {
+        return new Response(JSON.stringify({ error: "AI rate limit reached. Please try again in a minute." }), {
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (!result.data) {
+        return new Response(JSON.stringify({ error: "Image generation failed. Please try again." }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const fileName = `regen/${body.content_item_id}-${Date.now()}.png`;
-      const publicUrl = await uploadBase64Image(supabaseAdmin, base64Image, fileName, supabaseUrl);
+      const publicUrl = await uploadBase64Image(supabaseAdmin, result.data, fileName, supabaseUrl);
       if (publicUrl) {
         await supabaseAdmin.from("content_items").update({ image_url: publicUrl }).eq("id", body.content_item_id);
         return new Response(JSON.stringify({ success: true, image_url: publicUrl }), {
@@ -332,11 +357,11 @@ Important: Make this week fresh and different from previous weeks. Focus on cont
     const generateAndUpload = async (item: any) => {
       if (!item.image_prompt) return;
       try {
-        const base64Image = await generateImage(item.image_prompt, LOVABLE_API_KEY);
-        if (!base64Image) return;
+        const result = await generateImage(item.image_prompt, LOVABLE_API_KEY);
+        if (!result.data) return;
 
         const fileName = `${newPlan.id}/day-${item.day_number}-${Date.now()}.png`;
-        const publicUrl = await uploadBase64Image(supabaseAdmin, base64Image, fileName, supabaseUrl);
+        const publicUrl = await uploadBase64Image(supabaseAdmin, result.data, fileName, supabaseUrl);
 
         if (publicUrl) {
           await supabaseAdmin
@@ -350,13 +375,10 @@ Important: Make this week fresh and different from previous weeks. Focus on cont
       }
     };
 
-    // Process images in batches of 3 to avoid rate limits
-    for (let i = 0; i < insertedItems.length; i += 3) {
-      const batch = insertedItems.slice(i, i + 3);
-      await Promise.all(batch.map(generateAndUpload));
-      if (i + 3 < insertedItems.length) {
-        await new Promise((r) => setTimeout(r, 2000)); // delay between batches
-      }
+    // Process images one at a time with delays to avoid rate limits
+    for (const item of insertedItems) {
+      await generateAndUpload(item);
+      await new Promise((r) => setTimeout(r, 4000)); // 4s delay between each
     }
 
     return new Response(JSON.stringify({ success: true, plan_id: newPlan.id }), {
