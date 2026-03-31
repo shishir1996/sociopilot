@@ -357,11 +357,11 @@ Important: Make this week fresh and different from previous weeks. Focus on cont
     const generateAndUpload = async (item: any) => {
       if (!item.image_prompt) return;
       try {
-        const base64Image = await generateImage(item.image_prompt, LOVABLE_API_KEY);
-        if (!base64Image) return;
+        const result = await generateImage(item.image_prompt, LOVABLE_API_KEY);
+        if (!result.data) return;
 
         const fileName = `${newPlan.id}/day-${item.day_number}-${Date.now()}.png`;
-        const publicUrl = await uploadBase64Image(supabaseAdmin, base64Image, fileName, supabaseUrl);
+        const publicUrl = await uploadBase64Image(supabaseAdmin, result.data, fileName, supabaseUrl);
 
         if (publicUrl) {
           await supabaseAdmin
