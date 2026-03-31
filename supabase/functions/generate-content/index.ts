@@ -375,13 +375,10 @@ Important: Make this week fresh and different from previous weeks. Focus on cont
       }
     };
 
-    // Process images in batches of 3 to avoid rate limits
-    for (let i = 0; i < insertedItems.length; i += 3) {
-      const batch = insertedItems.slice(i, i + 3);
-      await Promise.all(batch.map(generateAndUpload));
-      if (i + 3 < insertedItems.length) {
-        await new Promise((r) => setTimeout(r, 2000)); // delay between batches
-      }
+    // Process images one at a time with delays to avoid rate limits
+    for (const item of insertedItems) {
+      await generateAndUpload(item);
+      await new Promise((r) => setTimeout(r, 4000)); // 4s delay between each
     }
 
     return new Response(JSON.stringify({ success: true, plan_id: newPlan.id }), {
