@@ -14,33 +14,53 @@ async function ensureBucketExists(supabaseAdmin: any) {
   }
 }
 
-async function generateImage(prompt: string, apiKey: string): Promise<string | null> {
-  try {
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3.1-flash-image-preview",
-        messages: [{ role: "user", content: prompt }],
-        modalities: ["image", "text"],
-      }),
-    });
+async function generateImage(prompt: string, apiKey: string, maxRetries = 3): Promise<{ data: string | null; rateLimited: boolean }> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      if (attempt > 0) {
+        const delay = Math.pow(2, attempt) * 3000; // 6s, 12s backoff
+        console.log(`Retry ${attempt}/${maxRetries}, waiting ${delay}ms...`);
+        await new Promise((r) => setTimeout(r, delay));
+      }
 
-    if (!response.ok) {
-      console.error("Image gen error:", response.status);
-      return null;
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-3.1-flash-image-preview",
+          messages: [{ role: "user", content: prompt }],
+          modalities: ["image", "text"],
+        }),
+      });
+
+      if (response.status === 429) {
+        console.warn(`Image gen rate limited (attempt ${attempt + 1})`);
+        if (attempt === maxRetries - 1) return { data: null, rateLimited: true };
+        continue;
+      }
+
+      if (response.status === 402) {
+        console.error("AI credits exhausted");
+        return { data: null, rateLimited: false };
+      }
+
+      if (!response.ok) {
+        console.error("Image gen error:", response.status);
+        return { data: null, rateLimited: false };
+      }
+
+      const data = await response.json();
+      const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+      return { data: imageUrl || null, rateLimited: false };
+    } catch (err) {
+      console.error("Image generation failed:", err);
+      if (attempt === maxRetries - 1) return { data: null, rateLimited: false };
     }
-
-    const data = await response.json();
-    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-    return imageUrl || null;
-  } catch (err) {
-    console.error("Image generation failed:", err);
-    return null;
   }
+  return { data: null, rateLimited: false };
 }
 
 async function uploadBase64Image(
