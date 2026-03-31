@@ -89,6 +89,7 @@ export type Database = {
           hook: string | null
           id: string
           image_prompt: string | null
+          image_url: string | null
           pain_point: string | null
           plan_id: string
           post_error: string | null
@@ -120,6 +121,7 @@ export type Database = {
           hook?: string | null
           id?: string
           image_prompt?: string | null
+          image_url?: string | null
           pain_point?: string | null
           plan_id: string
           post_error?: string | null
@@ -151,6 +153,7 @@ export type Database = {
           hook?: string | null
           id?: string
           image_prompt?: string | null
+          image_url?: string | null
           pain_point?: string | null
           plan_id?: string
           post_error?: string | null

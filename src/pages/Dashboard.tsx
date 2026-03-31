@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ContentCard } from "@/components/ContentCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, LogOut, Building2, CalendarDays, Sparkles, Settings, Loader2 } from "lucide-react";
+import { Plus, LogOut, Building2, CalendarDays, Sparkles, Settings, Loader2, UserCog } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface Business {
@@ -178,6 +178,9 @@ export default function Dashboard() {
             <Button variant="outline" size="sm" onClick={() => navigate("/settings")}>
               <Settings className="h-4 w-4 mr-1" /> Accounts
             </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate("/account")}>
+              <UserCog className="h-4 w-4 mr-1" /> Account
+            </Button>
             <Button variant="outline" size="sm" onClick={() => navigate("/setup")}>
               <Plus className="h-4 w-4 mr-1" /> New Business
             </Button>
@@ -290,6 +293,7 @@ export default function Dashboard() {
                 visualStyle={item.visual_style}
                 repurposingSuggestion={item.repurposing_suggestion}
                 onStatusChange={() => selectedPlan && fetchItems(selectedPlan)}
+                onDelete={() => selectedPlan && fetchItems(selectedPlan)}
               />
             ))}
           </div>

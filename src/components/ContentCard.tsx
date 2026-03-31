@@ -4,10 +4,17 @@ import { PlatformBadge } from "./PlatformBadge";
 import { ContentTypeBadge } from "./ContentTypeBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Clock, Lightbulb, MessageSquare, Target, Send, CalendarClock, ChevronDown, ChevronUp, Copy, Hash, Check } from "lucide-react";
+import {
+  Clock, Lightbulb, MessageSquare, Target, Send, CalendarClock,
+  ChevronDown, ChevronUp, Copy, Hash, Check, Trash2, RefreshCw, Image as ImageIcon,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface ContentCardProps {
   id: string;
@@ -32,39 +39,24 @@ interface ContentCardProps {
   visualStyle?: string;
   repurposingSuggestion?: string;
   onStatusChange?: () => void;
+  onDelete?: () => void;
 }
 
 export function ContentCard({
-  id,
-  dayNumber,
-  theme,
-  goal,
-  primaryPlatform,
-  secondaryPlatforms,
-  contentType,
-  topic,
-  hook,
-  painPoint,
-  coreMessage,
-  cta,
-  postingTime,
-  whyItMatters,
-  status,
-  caption,
-  hashtags,
-  imagePrompt,
-  imageUrl,
-  visualStyle,
-  repurposingSuggestion,
-  onStatusChange,
+  id, dayNumber, theme, goal, primaryPlatform, secondaryPlatforms,
+  contentType, topic, hook, painPoint, coreMessage, cta, postingTime,
+  whyItMatters, status, caption, hashtags, imagePrompt, imageUrl,
+  visualStyle, repurposingSuggestion, onStatusChange, onDelete,
 }: ContentCardProps) {
   const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const { toast } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [posting, setPosting] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
   const [scheduling, setScheduling] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
   const [copied, setCopied] = useState(false);
+  const [currentImageUrl, setCurrentImageUrl] = useState(imageUrl);
 
   const statusColors: Record<string, string> = {
     draft: "secondary",
@@ -97,7 +89,7 @@ export function ContentCard({
         toast({ title: "Posted!", description: "Content published to your platforms" });
         onStatusChange?.();
       } else {
-        toast({ title: "Partial Success", description: "Some platforms had errors. Check details.", variant: "destructive" });
+        toast({ title: "Partial Success", description: "Some platforms had errors.", variant: "destructive" });
         onStatusChange?.();
       }
     } catch (err: any) {
@@ -127,6 +119,37 @@ export function ContentCard({
     setPosting(false);
   };
 
+  const handleDelete = async () => {
+    try {
+      const { error } = await supabase.from("content_items").delete().eq("id", id) as any;
+      if (error) throw error;
+      toast({ title: "Deleted", description: "Content item removed" });
+      onDelete?.();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleRegenerate = async () => {
+    if (!imagePrompt) return;
+    setRegenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-content", {
+        body: { regenerate_image: true, content_item_id: id, image_prompt: imagePrompt },
+      });
+      if (error) throw error;
+      if (data?.image_url) {
+        setCurrentImageUrl(data.image_url);
+        toast({ title: "Image Regenerated!", description: "New image has been generated" });
+      } else {
+        toast({ title: "Failed", description: data?.error || "Could not regenerate image", variant: "destructive" });
+      }
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+    setRegenerating(false);
+  };
+
   return (
     <Card className="shadow-card hover:shadow-elevated transition-shadow animate-fade-in group">
       <CardHeader className="pb-3">
@@ -142,9 +165,28 @@ export function ContentCard({
               <p className="text-sm font-heading font-semibold text-foreground">{theme}</p>
             </div>
           </div>
-          <Badge variant={statusColors[status] as any || "secondary"} className="text-xs">
-            {status}
-          </Badge>
+          <div className="flex items-center gap-1">
+            <Badge variant={statusColors[status] as any || "secondary"} className="text-xs">
+              {status}
+            </Badge>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete this post?</AlertDialogTitle>
+                  <AlertDialogDescription>This will permanently remove this content item.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -160,6 +202,42 @@ export function ContentCard({
           <p className="text-sm font-semibold text-foreground">{topic}</p>
           {goal && <p className="text-xs text-muted-foreground mt-0.5">Goal: {goal}</p>}
         </div>
+
+        {/* Generated image display */}
+        {currentImageUrl && (
+          <div className="relative rounded-lg overflow-hidden border border-border">
+            <img
+              src={currentImageUrl}
+              alt={`Visual for: ${topic}`}
+              className="w-full h-44 object-cover"
+              loading="lazy"
+            />
+            {imagePrompt && (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="absolute bottom-2 right-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={handleRegenerate}
+                disabled={regenerating}
+              >
+                <RefreshCw className={`h-3 w-3 mr-1 ${regenerating ? "animate-spin" : ""}`} />
+                {regenerating ? "Generating..." : "Regenerate"}
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* No image yet but has prompt */}
+        {!currentImageUrl && imagePrompt && (
+          <div className="rounded-lg border border-dashed border-border bg-muted/50 p-4 text-center">
+            <ImageIcon className="h-6 w-6 mx-auto text-muted-foreground mb-1" />
+            <p className="text-xs text-muted-foreground mb-2">Image not generated yet</p>
+            <Button variant="outline" size="sm" className="text-xs" onClick={handleRegenerate} disabled={regenerating}>
+              <RefreshCw className={`h-3 w-3 mr-1 ${regenerating ? "animate-spin" : ""}`} />
+              {regenerating ? "Generating..." : "Generate Image"}
+            </Button>
+          </div>
+        )}
 
         {hook && (
           <div className="flex gap-2 items-start">
@@ -188,19 +266,7 @@ export function ContentCard({
           </div>
         )}
 
-        {/* Generated image */}
-        {imageUrl && (
-          <div className="rounded-lg overflow-hidden border border-border">
-            <img
-              src={imageUrl}
-              alt={`Generated visual for: ${topic}`}
-              className="w-full h-40 object-cover"
-              loading="lazy"
-            />
-          </div>
-        )}
-
-        {/* Expandable section for AI-generated content */}
+        {/* Expandable section */}
         {(caption || hashtags?.length) && (
           <button
             onClick={() => setExpanded(!expanded)}
@@ -225,7 +291,6 @@ export function ContentCard({
                 <p className="text-xs text-muted-foreground whitespace-pre-line leading-relaxed">{caption}</p>
               </div>
             )}
-
             {hashtags && hashtags.length > 0 && (
               <div className="space-y-1">
                 <div className="flex items-center gap-1">
@@ -235,21 +300,18 @@ export function ContentCard({
                 <p className="text-xs text-primary/80">{hashtags.map(h => h.startsWith("#") ? h : `#${h}`).join(" ")}</p>
               </div>
             )}
-
             {imagePrompt && (
               <div className="space-y-1">
                 <p className="text-xs font-semibold text-foreground">🎨 Image Prompt</p>
                 <p className="text-xs text-muted-foreground">{imagePrompt}</p>
               </div>
             )}
-
             {visualStyle && (
               <div className="space-y-1">
                 <p className="text-xs font-semibold text-foreground">🖼️ Visual Style</p>
                 <p className="text-xs text-muted-foreground">{visualStyle}</p>
               </div>
             )}
-
             {repurposingSuggestion && (
               <div className="space-y-1">
                 <p className="text-xs font-semibold text-foreground">♻️ Repurposing</p>
@@ -276,23 +338,11 @@ export function ContentCard({
         {/* Post / Schedule actions */}
         {status !== "posted" && (
           <div className="flex gap-2 pt-2">
-            <Button
-              size="sm"
-              variant="default"
-              className="flex-1 text-xs"
-              onClick={handlePostNow}
-              disabled={posting}
-            >
+            <Button size="sm" variant="default" className="flex-1 text-xs" onClick={handlePostNow} disabled={posting}>
               <Send className="h-3 w-3 mr-1" />
               {posting ? "Posting..." : "Post Now"}
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="text-xs"
-              onClick={() => setScheduling(!scheduling)}
-              disabled={posting}
-            >
+            <Button size="sm" variant="outline" className="text-xs" onClick={() => setScheduling(!scheduling)} disabled={posting}>
               <CalendarClock className="h-3 w-3" />
             </Button>
           </div>

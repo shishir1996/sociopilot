@@ -85,10 +85,7 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Admin client for storage operations (no auth override)
     const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
-
-    // User-scoped client for RLS queries
     const supabase = createClient(supabaseUrl, supabaseKey, {
       global: { headers: { Authorization: authHeader! } },
     });
@@ -100,7 +97,31 @@ serve(async (req) => {
       });
     }
 
-    const { business_id } = await req.json();
+    const body = await req.json();
+
+    // Handle image regeneration for a single content item
+    if (body.regenerate_image && body.content_item_id && body.image_prompt) {
+      await ensureBucketExists(supabaseAdmin);
+      const base64Image = await generateImage(body.image_prompt, LOVABLE_API_KEY);
+      if (!base64Image) {
+        return new Response(JSON.stringify({ error: "Image generation failed" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const fileName = `regen/${body.content_item_id}-${Date.now()}.png`;
+      const publicUrl = await uploadBase64Image(supabaseAdmin, base64Image, fileName, supabaseUrl);
+      if (publicUrl) {
+        await supabaseAdmin.from("content_items").update({ image_url: publicUrl }).eq("id", body.content_item_id);
+        return new Response(JSON.stringify({ success: true, image_url: publicUrl }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ error: "Upload failed" }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { business_id } = body;
     if (!business_id) {
       return new Response(JSON.stringify({ error: "business_id is required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
