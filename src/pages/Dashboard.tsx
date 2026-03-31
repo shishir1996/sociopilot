@@ -294,6 +294,7 @@ export default function Dashboard() {
                 repurposingSuggestion={item.repurposing_suggestion}
                 onStatusChange={() => selectedPlan && fetchItems(selectedPlan)}
                 onDelete={() => selectedPlan && fetchItems(selectedPlan)}
+              />
             ))}
           </div>
         ) : !generating ? (
