@@ -122,14 +122,19 @@ serve(async (req) => {
     // Handle image regeneration for a single content item
     if (body.regenerate_image && body.content_item_id && body.image_prompt) {
       await ensureBucketExists(supabaseAdmin);
-      const base64Image = await generateImage(body.image_prompt, LOVABLE_API_KEY);
-      if (!base64Image) {
-        return new Response(JSON.stringify({ error: "Image generation failed" }), {
+      const result = await generateImage(body.image_prompt, LOVABLE_API_KEY);
+      if (result.rateLimited) {
+        return new Response(JSON.stringify({ error: "AI rate limit reached. Please try again in a minute." }), {
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (!result.data) {
+        return new Response(JSON.stringify({ error: "Image generation failed. Please try again." }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const fileName = `regen/${body.content_item_id}-${Date.now()}.png`;
-      const publicUrl = await uploadBase64Image(supabaseAdmin, base64Image, fileName, supabaseUrl);
+      const publicUrl = await uploadBase64Image(supabaseAdmin, result.data, fileName, supabaseUrl);
       if (publicUrl) {
         await supabaseAdmin.from("content_items").update({ image_url: publicUrl }).eq("id", body.content_item_id);
         return new Response(JSON.stringify({ success: true, image_url: publicUrl }), {
