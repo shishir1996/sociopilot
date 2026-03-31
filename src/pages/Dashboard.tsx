@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ContentCard } from "@/components/ContentCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, LogOut, Building2, CalendarDays, Sparkles, Settings, Loader2 } from "lucide-react";
+import { Plus, LogOut, Building2, CalendarDays, Sparkles, Settings, Loader2, UserCog } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface Business {
