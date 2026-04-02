@@ -15,6 +15,12 @@ const GOALS = ["Brand Awareness", "Lead Generation", "Trust Building", "Engageme
 const CONTENT_TYPES = ["Image Posts", "Carousels", "Short Videos / Reels", "Text Posts", "GMB Posts", "LinkedIn Posts"];
 const TONES = ["Simple", "Premium", "Luxury", "Informative", "Viral", "Emotional", "Educational", "Promotional"];
 
+const TIMEZONES = [
+  "Asia/Kolkata", "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",
+  "Europe/London", "Europe/Paris", "Europe/Berlin", "Asia/Dubai", "Asia/Singapore",
+  "Asia/Tokyo", "Australia/Sydney", "Pacific/Auckland", "America/Sao_Paulo", "Africa/Lagos",
+];
+
 export default function BusinessSetup() {
   const { user } = useAuth();
   const navigate = useNavigate();
