@@ -27,6 +27,7 @@ const App = () => (
             <Route path="/setup" element={<BusinessSetup />} />
             <Route path="/settings" element={<SocialSettings />} />
             <Route path="/account" element={<AccountSettings />} />
+            <Route path="/admin" element={<AdminDashboard />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
