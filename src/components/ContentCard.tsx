@@ -194,18 +194,6 @@ export function ContentCard({
               className="w-full h-44 object-cover"
               loading="lazy"
             />
-            {imagePrompt && (
-              <Button
-                variant="secondary"
-                size="sm"
-                className="absolute bottom-2 right-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={handleRegenerate}
-                disabled={regenerating}
-              >
-                <RefreshCw className={`h-3 w-3 mr-1 ${regenerating ? "animate-spin" : ""}`} />
-                {regenerating ? "Generating..." : "Regenerate"}
-              </Button>
-            )}
           </div>
         )}
 
@@ -213,11 +201,7 @@ export function ContentCard({
         {!currentImageUrl && imagePrompt && (
           <div className="rounded-lg border border-dashed border-border bg-muted/50 p-4 text-center">
             <ImageIcon className="h-6 w-6 mx-auto text-muted-foreground mb-1" />
-            <p className="text-xs text-muted-foreground mb-2">Image not generated yet</p>
-            <Button variant="outline" size="sm" className="text-xs" onClick={handleRegenerate} disabled={regenerating}>
-              <RefreshCw className={`h-3 w-3 mr-1 ${regenerating ? "animate-spin" : ""}`} />
-              {regenerating ? "Generating..." : "Generate Image"}
-            </Button>
+            <p className="text-xs text-muted-foreground">Image generating...</p>
           </div>
         )}
 
