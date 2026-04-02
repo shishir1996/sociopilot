@@ -301,20 +301,33 @@ export function ContentCard({
           )}
         </div>
 
-        {/* Post / Schedule actions */}
+        {/* Reschedule / Delete actions */}
         {status !== "posted" && (
           <div className="flex gap-2 pt-2">
-            <Button size="sm" variant="default" className="flex-1 text-xs" onClick={handlePostNow} disabled={posting}>
-              <Send className="h-3 w-3 mr-1" />
-              {posting ? "Posting..." : "Post Now"}
-            </Button>
-            <Button size="sm" variant="outline" className="text-xs" onClick={() => setScheduling(!scheduling)} disabled={posting}>
-              <CalendarClock className="h-3 w-3" />
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" variant="destructive" className="text-xs">
+                  <Trash2 className="h-3 w-3 mr-1" /> Delete
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete this post?</AlertDialogTitle>
+                  <AlertDialogDescription>This will permanently remove this content item.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={() => setShowReschedule(!showReschedule)}>
+              <CalendarClock className="h-3 w-3 mr-1" /> Reschedule
             </Button>
           </div>
         )}
 
-        {scheduling && (
+        {showReschedule && (
           <div className="flex gap-2 animate-fade-in">
             <Input
               type="datetime-local"
@@ -323,7 +336,7 @@ export function ContentCard({
               className="text-xs flex-1"
             />
             <Button size="sm" onClick={handleSchedule} disabled={!scheduleDate || posting}>
-              Schedule
+              {posting ? "..." : "Set"}
             </Button>
           </div>
         )}
