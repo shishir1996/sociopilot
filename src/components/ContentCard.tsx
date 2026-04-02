@@ -130,25 +130,7 @@ export function ContentCard({
     }
   };
 
-  const handleRegenerate = async () => {
-    if (!imagePrompt) return;
-    setRegenerating(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("generate-content", {
-        body: { regenerate_image: true, content_item_id: id, image_prompt: imagePrompt },
-      });
-      if (error) throw error;
-      if (data?.image_url) {
-        setCurrentImageUrl(data.image_url);
-        toast({ title: "Image Regenerated!", description: "New image has been generated" });
-      } else {
-        toast({ title: "Failed", description: data?.error || "Could not regenerate image", variant: "destructive" });
-      }
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    }
-    setRegenerating(false);
-  };
+  // Removed regenerate - images auto-generate with the plan
 
   return (
     <Card className="shadow-card hover:shadow-elevated transition-shadow animate-fade-in group">
