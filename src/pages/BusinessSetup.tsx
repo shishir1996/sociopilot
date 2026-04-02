@@ -73,6 +73,7 @@ export default function BusinessSetup() {
         posting_goals: form.posting_goals,
         content_types: form.content_types,
         content_style: form.content_style,
+        timezone: form.timezone,
       } as any);
       if (error) throw error;
       toast({ title: "Business created!", description: "Now let's build your content plan." });
