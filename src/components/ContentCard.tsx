@@ -52,7 +52,7 @@ export function ContentCard({
   const { toast } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [posting, setPosting] = useState(false);
-  const [regenerating, setRegenerating] = useState(false);
+  const [showReschedule, setShowReschedule] = useState(false);
   const [scheduling, setScheduling] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
   const [copied, setCopied] = useState(false);
