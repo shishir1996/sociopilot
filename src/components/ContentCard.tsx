@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Clock, Lightbulb, MessageSquare, Target, Send, CalendarClock,
-  ChevronDown, ChevronUp, Copy, Hash, Check, Trash2, RefreshCw, Image as ImageIcon,
+  ChevronDown, ChevronUp, Copy, Hash, Check, Trash2, Image as ImageIcon,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
