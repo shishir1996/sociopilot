@@ -42,6 +42,7 @@ export default function BusinessSetup() {
     posting_goals: [] as string[],
     content_types: [] as string[],
     content_style: "",
+    timezone: "Asia/Kolkata",
   });
 
   const updateField = (field: string, value: any) => setForm((p) => ({ ...p, [field]: value }));
