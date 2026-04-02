@@ -181,9 +181,7 @@ export default function Dashboard() {
             <Button variant="outline" size="sm" onClick={() => navigate("/account")}>
               <UserCog className="h-4 w-4 mr-1" /> Account
             </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate("/setup")}>
-              <Plus className="h-4 w-4 mr-1" /> New Business
-            </Button>
+            {/* Only one business per user - no "New Business" button */}
             <Button variant="ghost" size="sm" onClick={signOut}>
               <LogOut className="h-4 w-4" />
             </Button>

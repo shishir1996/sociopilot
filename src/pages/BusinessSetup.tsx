@@ -15,6 +15,12 @@ const GOALS = ["Brand Awareness", "Lead Generation", "Trust Building", "Engageme
 const CONTENT_TYPES = ["Image Posts", "Carousels", "Short Videos / Reels", "Text Posts", "GMB Posts", "LinkedIn Posts"];
 const TONES = ["Simple", "Premium", "Luxury", "Informative", "Viral", "Emotional", "Educational", "Promotional"];
 
+const TIMEZONES = [
+  "Asia/Kolkata", "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",
+  "Europe/London", "Europe/Paris", "Europe/Berlin", "Asia/Dubai", "Asia/Singapore",
+  "Asia/Tokyo", "Australia/Sydney", "Pacific/Auckland", "America/Sao_Paulo", "Africa/Lagos",
+];
+
 export default function BusinessSetup() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -36,6 +42,7 @@ export default function BusinessSetup() {
     posting_goals: [] as string[],
     content_types: [] as string[],
     content_style: "",
+    timezone: "Asia/Kolkata",
   });
 
   const updateField = (field: string, value: any) => setForm((p) => ({ ...p, [field]: value }));
@@ -66,6 +73,7 @@ export default function BusinessSetup() {
         posting_goals: form.posting_goals,
         content_types: form.content_types,
         content_style: form.content_style,
+        timezone: form.timezone,
       } as any);
       if (error) throw error;
       toast({ title: "Business created!", description: "Now let's build your content plan." });
@@ -99,6 +107,18 @@ export default function BusinessSetup() {
           <div className="space-y-2">
             <Label>Location / Target Market</Label>
             <Input value={form.location} onChange={(e) => updateField("location", e.target.value)} placeholder="City, region, or global" />
+          </div>
+          <div className="space-y-2">
+            <Label>Timezone *</Label>
+            <select
+              value={form.timezone}
+              onChange={(e) => updateField("timezone", e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              {TIMEZONES.map((tz) => (
+                <option key={tz} value={tz}>{tz.replace(/_/g, " ")}</option>
+              ))}
+            </select>
           </div>
         </div>
       ),

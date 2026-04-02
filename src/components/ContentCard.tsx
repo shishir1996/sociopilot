@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Clock, Lightbulb, MessageSquare, Target, Send, CalendarClock,
-  ChevronDown, ChevronUp, Copy, Hash, Check, Trash2, RefreshCw, Image as ImageIcon,
+  ChevronDown, ChevronUp, Copy, Hash, Check, Trash2, Image as ImageIcon,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -52,7 +52,7 @@ export function ContentCard({
   const { toast } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [posting, setPosting] = useState(false);
-  const [regenerating, setRegenerating] = useState(false);
+  const [showReschedule, setShowReschedule] = useState(false);
   const [scheduling, setScheduling] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
   const [copied, setCopied] = useState(false);
@@ -130,25 +130,7 @@ export function ContentCard({
     }
   };
 
-  const handleRegenerate = async () => {
-    if (!imagePrompt) return;
-    setRegenerating(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("generate-content", {
-        body: { regenerate_image: true, content_item_id: id, image_prompt: imagePrompt },
-      });
-      if (error) throw error;
-      if (data?.image_url) {
-        setCurrentImageUrl(data.image_url);
-        toast({ title: "Image Regenerated!", description: "New image has been generated" });
-      } else {
-        toast({ title: "Failed", description: data?.error || "Could not regenerate image", variant: "destructive" });
-      }
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    }
-    setRegenerating(false);
-  };
+  // Removed regenerate - images auto-generate with the plan
 
   return (
     <Card className="shadow-card hover:shadow-elevated transition-shadow animate-fade-in group">
@@ -212,18 +194,6 @@ export function ContentCard({
               className="w-full h-44 object-cover"
               loading="lazy"
             />
-            {imagePrompt && (
-              <Button
-                variant="secondary"
-                size="sm"
-                className="absolute bottom-2 right-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={handleRegenerate}
-                disabled={regenerating}
-              >
-                <RefreshCw className={`h-3 w-3 mr-1 ${regenerating ? "animate-spin" : ""}`} />
-                {regenerating ? "Generating..." : "Regenerate"}
-              </Button>
-            )}
           </div>
         )}
 
@@ -231,11 +201,7 @@ export function ContentCard({
         {!currentImageUrl && imagePrompt && (
           <div className="rounded-lg border border-dashed border-border bg-muted/50 p-4 text-center">
             <ImageIcon className="h-6 w-6 mx-auto text-muted-foreground mb-1" />
-            <p className="text-xs text-muted-foreground mb-2">Image not generated yet</p>
-            <Button variant="outline" size="sm" className="text-xs" onClick={handleRegenerate} disabled={regenerating}>
-              <RefreshCw className={`h-3 w-3 mr-1 ${regenerating ? "animate-spin" : ""}`} />
-              {regenerating ? "Generating..." : "Generate Image"}
-            </Button>
+            <p className="text-xs text-muted-foreground">Image generating...</p>
           </div>
         )}
 
@@ -335,20 +301,33 @@ export function ContentCard({
           )}
         </div>
 
-        {/* Post / Schedule actions */}
+        {/* Reschedule / Delete actions */}
         {status !== "posted" && (
           <div className="flex gap-2 pt-2">
-            <Button size="sm" variant="default" className="flex-1 text-xs" onClick={handlePostNow} disabled={posting}>
-              <Send className="h-3 w-3 mr-1" />
-              {posting ? "Posting..." : "Post Now"}
-            </Button>
-            <Button size="sm" variant="outline" className="text-xs" onClick={() => setScheduling(!scheduling)} disabled={posting}>
-              <CalendarClock className="h-3 w-3" />
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" variant="destructive" className="text-xs">
+                  <Trash2 className="h-3 w-3 mr-1" /> Delete
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete this post?</AlertDialogTitle>
+                  <AlertDialogDescription>This will permanently remove this content item.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={() => setShowReschedule(!showReschedule)}>
+              <CalendarClock className="h-3 w-3 mr-1" /> Reschedule
             </Button>
           </div>
         )}
 
-        {scheduling && (
+        {showReschedule && (
           <div className="flex gap-2 animate-fade-in">
             <Input
               type="datetime-local"
@@ -357,7 +336,7 @@ export function ContentCard({
               className="text-xs flex-1"
             />
             <Button size="sm" onClick={handleSchedule} disabled={!scheduleDate || posting}>
-              Schedule
+              {posting ? "..." : "Set"}
             </Button>
           </div>
         )}
