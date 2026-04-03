@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 // Admin email whitelist - add your email(s) here
-const ADMIN_EMAILS = ["admin@contentflow.com"];
+const ADMIN_EMAILS = ["shishir.mandal@outlook.com"];
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
