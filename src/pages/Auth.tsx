@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarDays, Sparkles, TrendingUp } from "lucide-react";
+import { Zap, Sparkles, Globe, MessageSquare } from "lucide-react";
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -50,51 +50,62 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen flex">
-      {/* Left panel - Branding */}
+      {/* Left panel */}
       <div className="hidden lg:flex lg:w-1/2 gradient-hero flex-col justify-between p-12">
         <div>
-          <h1 className="text-3xl font-heading font-bold text-primary-foreground tracking-tight">
-            ContentFlow
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground" style={{ color: 'hsl(220 14% 60%)' }}>
-            AI-Powered Content Strategy
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-lg gradient-primary flex items-center justify-center">
+              <Zap className="h-5 w-5 text-primary-foreground" />
+            </div>
+            <h1 className="text-2xl font-bold text-primary-foreground tracking-tight">
+              SocioPilot
+            </h1>
+          </div>
+          <p className="mt-2 text-sm text-muted-foreground" style={{ color: 'hsl(215 20% 55%)' }}>
+            AI-Powered Social Media Automation
           </p>
         </div>
 
         <div className="space-y-8">
           <FeatureItem
-            icon={<CalendarDays className="h-6 w-6" />}
-            title="7-Day Content Plans"
-            description="Get a complete weekly content calendar tailored to your business."
-          />
-          <FeatureItem
             icon={<Sparkles className="h-6 w-6" />}
-            title="Multi-Platform Ready"
-            description="Content optimized for Instagram, LinkedIn, Facebook, GMB & more."
+            title="AI Content Creation"
+            description="Generate platform-optimized posts, captions, and hashtags automatically."
           />
           <FeatureItem
-            icon={<TrendingUp className="h-6 w-6" />}
-            title="Growth-Focused"
-            description="Every post designed to drive awareness, trust, and conversions."
+            icon={<Globe className="h-6 w-6" />}
+            title="Multi-Platform Posting"
+            description="Publish across Facebook, Instagram, LinkedIn, X & Google Business Profile."
+          />
+          <FeatureItem
+            icon={<MessageSquare className="h-6 w-6" />}
+            title="Auto Engagement"
+            description="AI handles comments, replies, and messages with on-brand responses."
           />
         </div>
 
-        <p className="text-xs" style={{ color: 'hsl(220 14% 45%)' }}>
-          © 2026 ContentFlow. All rights reserved.
+        <p className="text-xs" style={{ color: 'hsl(215 20% 40%)' }}>
+          © 2026 SocioPilot. All rights reserved.
         </p>
       </div>
 
-      {/* Right panel - Auth form */}
-      <div className="flex-1 flex items-center justify-center p-8">
+      {/* Right panel */}
+      <div className="flex-1 flex items-center justify-center p-8 bg-background">
         <Card className="w-full max-w-md shadow-elevated border-border">
           <CardHeader className="text-center space-y-2 pb-2">
-            <h2 className="text-2xl font-heading font-bold text-foreground">
+            <div className="lg:hidden flex items-center justify-center gap-2 mb-4">
+              <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
+                <Zap className="h-4 w-4 text-primary-foreground" />
+              </div>
+              <span className="text-xl font-bold text-foreground">SocioPilot</span>
+            </div>
+            <h2 className="text-2xl font-bold text-foreground">
               {isLogin ? "Welcome back" : "Create your account"}
             </h2>
             <p className="text-sm text-muted-foreground">
               {isLogin
-                ? "Sign in to access your content plans"
-                : "Start building your content strategy"}
+                ? "Sign in to your dashboard"
+                : "Start automating your social media"}
             </p>
           </CardHeader>
           <CardContent>
@@ -122,7 +133,7 @@ export default function Auth() {
                   minLength={6}
                 />
               </div>
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button type="submit" className="w-full gradient-primary border-0" disabled={loading}>
                 {loading ? "Please wait..." : isLogin ? "Sign In" : "Create Account"}
               </Button>
             </form>
@@ -147,12 +158,12 @@ export default function Auth() {
 function FeatureItem({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
   return (
     <div className="flex gap-4 items-start">
-      <div className="p-3 rounded-lg" style={{ backgroundColor: 'hsl(172 66% 38% / 0.15)', color: 'hsl(172 66% 48%)' }}>
+      <div className="p-3 rounded-xl" style={{ backgroundColor: 'rgba(37, 99, 235, 0.15)', color: '#60A5FA' }}>
         {icon}
       </div>
       <div>
-        <h3 className="font-heading font-semibold" style={{ color: 'hsl(0 0% 95%)' }}>{title}</h3>
-        <p className="text-sm mt-1" style={{ color: 'hsl(220 14% 55%)' }}>{description}</p>
+        <h3 className="font-semibold" style={{ color: 'hsl(0 0% 95%)' }}>{title}</h3>
+        <p className="text-sm mt-1" style={{ color: 'hsl(215 20% 55%)' }}>{description}</p>
       </div>
     </div>
   );
