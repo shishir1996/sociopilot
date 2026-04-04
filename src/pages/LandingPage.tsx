@@ -45,7 +45,7 @@ export default function LandingPage() {
           </div>
           <h1 className="text-4xl sm:text-5xl lg:text-7xl font-extrabold tracking-tight text-foreground max-w-4xl mx-auto leading-[1.1]">
             Run Your Social Media on{" "}
-            <span className="gradient-text">Autopilot</span>
+            <span className="gradient-text">Autopilot - SocioPilot</span>
           </h1>
           <p className="mt-6 text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
             Create, schedule, publish, and manage content across all platforms with AI.
