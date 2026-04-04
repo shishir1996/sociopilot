@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
-  Sparkles, Zap, Globe, MessageSquare, Palette, BarChart3,
+  Sparkles, Zap, Globe, MessageSquare, Palette, BarChart3, Antenna,
   ArrowRight, Check, Star, ChevronRight, Play,
   Facebook, Instagram, Linkedin, Twitter
 } from "lucide-react";
