@@ -16,9 +16,9 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
-              <Zap className="h-4 w-4 text-primary-foreground" />
+              <Antenna className="h-4 w-4 text-primary-foreground" />
             </div>
-            <span className="text-xl font-bold text-foreground">SocioPilot</span>
+            <span className="text-base font-bold text-primary shadow-none">SocioPilot By Offdx</span>
           </div>
           <div className="hidden md:flex items-center gap-8">
             <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Features</a>
