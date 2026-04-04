@@ -319,7 +319,7 @@ export default function LandingPage() {
               onClick={() => navigate("/auth")}
               className="bg-primary-foreground text-foreground hover:bg-primary-foreground/90 h-12 px-8 text-base font-semibold"
             >
-              Get Started Free <ChevronRight className="h-5 w-5 ml-1" />
+              Get Started <ChevronRight className="h-5 w-5 ml-1" />
             </Button>
           </div>
         </div>
