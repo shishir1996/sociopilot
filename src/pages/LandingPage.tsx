@@ -30,51 +30,16 @@ export default function LandingPage() {
               Sign In
             </Button>
             <Button size="sm" onClick={() => navigate("/auth")} className="gradient-primary border-0">
-              Get Started Free <ArrowRight className="h-4 w-4 ml-1" />
-            </Button>
-          </div>
-        </div>
-      </nav>
-
-      {/* Hero Section */}
-      <section className="pt-32 pb-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
-            <Sparkles className="h-4 w-4" />
-            AI-Powered Social Media Automation
-          </div>
-          <h1 className="text-4xl sm:text-5xl lg:text-7xl font-extrabold tracking-tight text-foreground max-w-4xl mx-auto leading-[1.1]">
-            Run Your Social Media on{" "}
-            <span className="gradient-text">Autopilot - SocioPilot</span>
-          </h1>
-          <p className="mt-6 text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Create, schedule, publish, and manage content across all platforms with AI.
-            Auto-replies, engagement handling, and analytics — all in one place.
-          </p>
-          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+              Get Started <ArrowRight className="h-4 w-4 ml-1" />
+// ... keep existing code
             <Button size="lg" onClick={() => navigate("/auth")} className="gradient-primary border-0 h-12 px-8 text-base shadow-glow">
-              Start Free Trial <ArrowRight className="h-5 w-5 ml-2" />
+              Start Your Trial <ArrowRight className="h-5 w-5 ml-2" />
             </Button>
-            <Button variant="outline" size="lg" className="h-12 px-8 text-base">
-              <Play className="h-4 w-4 mr-2" /> Watch Demo
-            </Button>
-          </div>
-          <div className="mt-8 flex items-center justify-center gap-6 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1.5"><Check className="h-4 w-4 text-success" /> No credit card required</span>
-            <span className="flex items-center gap-1.5"><Check className="h-4 w-4 text-success" /> 14-day free trial</span>
-            <span className="flex items-center gap-1.5"><Check className="h-4 w-4 text-success" /> Cancel anytime</span>
-          </div>
-
-          {/* Platform Icons */}
-          <div className="mt-12 flex items-center justify-center gap-4">
-            {[
-              { icon: Facebook, label: "Facebook" },
-              { icon: Instagram, label: "Instagram" },
-              { icon: Linkedin, label: "LinkedIn" },
-              { icon: Twitter, label: "X" },
-              { icon: Globe, label: "Google Business" },
+// ... keep existing code
+            <span className="flex items-center gap-1.5"><Check className="h-4 w-4 text-success" /> 7-day trial</span>
+// ... keep existing code
             ].map((p) => (
-              <div key={p.label} className="w-12 h-12 rounded-xl bg-card border border-border flex items-center justify-center shadow-card hover:shadow-elevated transition-shadow">
+              <div key={p.label} className="w-12 h-12 rounded-xl border border-border flex items-center justify-center shadow-card hover:shadow-elevated transition-shadow text-success-foreground bg-primary-foreground">
                 <p.icon className="h-5 w-5 text-muted-foreground" />
               </div>
             ))}
