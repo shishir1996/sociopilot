@@ -30,7 +30,7 @@ export default function LandingPage() {
               Sign In
             </Button>
             <Button size="sm" onClick={() => navigate("/auth")} className="gradient-primary border-0">
-              Get Started Free <ArrowRight className="h-4 w-4 ml-1" />
+              Get Started <ArrowRight className="h-4 w-4 ml-1" />
             </Button>
           </div>
         </div>
@@ -53,7 +53,7 @@ export default function LandingPage() {
           </p>
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button size="lg" onClick={() => navigate("/auth")} className="gradient-primary border-0 h-12 px-8 text-base shadow-glow">
-              Start Free Trial <ArrowRight className="h-5 w-5 ml-2" />
+              Start Your Trial <ArrowRight className="h-5 w-5 ml-2" />
             </Button>
             <Button variant="outline" size="lg" className="h-12 px-8 text-base">
               <Play className="h-4 w-4 mr-2" /> Watch Demo
@@ -61,7 +61,7 @@ export default function LandingPage() {
           </div>
           <div className="mt-8 flex items-center justify-center gap-6 text-sm text-muted-foreground">
             <span className="flex items-center gap-1.5"><Check className="h-4 w-4 text-success" /> No credit card required</span>
-            <span className="flex items-center gap-1.5"><Check className="h-4 w-4 text-success" /> 14-day free trial</span>
+            <span className="flex items-center gap-1.5"><Check className="h-4 w-4 text-success" /> 7-day trial</span>
             <span className="flex items-center gap-1.5"><Check className="h-4 w-4 text-success" /> Cancel anytime</span>
           </div>
 
@@ -74,7 +74,7 @@ export default function LandingPage() {
               { icon: Twitter, label: "X" },
               { icon: Globe, label: "Google Business" },
             ].map((p) => (
-              <div key={p.label} className="w-12 h-12 rounded-xl bg-card border border-border flex items-center justify-center shadow-card hover:shadow-elevated transition-shadow">
+              <div key={p.label} className="w-12 h-12 rounded-xl border border-border flex items-center justify-center shadow-card hover:shadow-elevated transition-shadow text-success-foreground bg-primary-foreground">
                 <p.icon className="h-5 w-5 text-muted-foreground" />
               </div>
             ))}
@@ -319,7 +319,7 @@ export default function LandingPage() {
               onClick={() => navigate("/auth")}
               className="bg-primary-foreground text-foreground hover:bg-primary-foreground/90 h-12 px-8 text-base font-semibold"
             >
-              Get Started Free <ChevronRight className="h-5 w-5 ml-1" />
+              Get Started <ChevronRight className="h-5 w-5 ml-1" />
             </Button>
           </div>
         </div>
