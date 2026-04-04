@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
-  Sparkles, Zap, Globe, MessageSquare, Palette, BarChart3,
+  Sparkles, Zap, Globe, MessageSquare, Palette, BarChart3, Antenna,
   ArrowRight, Check, Star, ChevronRight, Play,
   Facebook, Instagram, Linkedin, Twitter
 } from "lucide-react";
@@ -16,9 +16,9 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
-              <Zap className="h-4 w-4 text-primary-foreground" />
+              <Antenna className="h-4 w-4 text-primary-foreground" />
             </div>
-            <span className="text-xl font-bold text-foreground">SocioPilot</span>
+            <span className="text-base font-bold text-primary shadow-none">SocioPilot By Offdx</span>
           </div>
           <div className="hidden md:flex items-center gap-8">
             <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Features</a>
@@ -45,7 +45,7 @@ export default function LandingPage() {
           </div>
           <h1 className="text-4xl sm:text-5xl lg:text-7xl font-extrabold tracking-tight text-foreground max-w-4xl mx-auto leading-[1.1]">
             Run Your Social Media on{" "}
-            <span className="gradient-text">Autopilot</span>
+            <span className="gradient-text">Autopilot - SocioPilot</span>
           </h1>
           <p className="mt-6 text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
             Create, schedule, publish, and manage content across all platforms with AI.
