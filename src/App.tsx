@@ -11,6 +11,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
 import SocialSettings from "./pages/SocialSettings";
 import AccountSettings from "./pages/AccountSettings";
+import BrandAssets from "./pages/BrandAssets";
 
 const queryClient = new QueryClient();
 
