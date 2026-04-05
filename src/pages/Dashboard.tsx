@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Plus, LogOut, Building2, CalendarDays, Sparkles, Settings, Loader2, UserCog,
-  Zap, BarChart3, MessageSquare, LayoutDashboard, Calendar, Inbox, Globe
+  Zap, BarChart3, MessageSquare, LayoutDashboard, Calendar, Inbox, Globe, ImageIcon
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
