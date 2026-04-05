@@ -71,6 +71,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   useEffect(() => {
     fetchBusinesses();
