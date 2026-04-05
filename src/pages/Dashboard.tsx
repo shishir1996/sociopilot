@@ -243,6 +243,9 @@ export default function Dashboard() {
             )}
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigate("/brand-assets")} className="text-xs">
+              <ImageIcon className="h-3.5 w-3.5 mr-1" /> Brand
+            </Button>
             <Button variant="outline" size="sm" onClick={() => navigate("/settings")} className="text-xs">
               <Settings className="h-3.5 w-3.5 mr-1" /> Accounts
             </Button>
