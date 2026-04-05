@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Plus, LogOut, Building2, CalendarDays, Sparkles, Settings, Loader2, UserCog,
-  Zap, BarChart3, MessageSquare, LayoutDashboard, Calendar, Inbox, Globe
+  Zap, BarChart3, MessageSquare, LayoutDashboard, Calendar, Inbox, Globe, ImageIcon
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -71,6 +71,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   useEffect(() => {
     fetchBusinesses();
@@ -86,6 +87,17 @@ export default function Dashboard() {
     if (data && data.length > 0) {
       setSelectedBusiness(data[0].id);
       fetchPlans(data[0].id);
+      // Fetch user's logo
+      const { data: logoData } = await supabase
+        .from("brand_assets")
+        .select("file_url")
+        .eq("business_id", data[0].id)
+        .eq("asset_type", "logo")
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (logoData && logoData.length > 0) {
+        setLogoUrl(logoData[0].file_url);
+      }
     }
     setLoading(false);
   };
@@ -179,9 +191,13 @@ export default function Dashboard() {
       {/* Sidebar */}
       <aside className={`${sidebarOpen ? "w-60" : "w-16"} bg-foreground transition-all duration-200 flex flex-col hidden md:flex`}>
         <div className="p-4 flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0">
-            <Zap className="h-4 w-4 text-primary-foreground" />
-          </div>
+          {logoUrl ? (
+            <img src={logoUrl} alt="Logo" className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
+          ) : (
+            <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0">
+              <Zap className="h-4 w-4 text-primary-foreground" />
+            </div>
+          )}
           {sidebarOpen && <span className="text-sm font-bold text-primary-foreground">SocioPilot</span>}
         </div>
         <nav className="flex-1 px-2 mt-4 space-y-1">
@@ -215,9 +231,13 @@ export default function Dashboard() {
         <header className="border-b border-border bg-card h-14 flex items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-3">
             <div className="md:hidden flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg gradient-primary flex items-center justify-center">
-                <Zap className="h-3.5 w-3.5 text-primary-foreground" />
-              </div>
+              {logoUrl ? (
+                <img src={logoUrl} alt="Logo" className="w-7 h-7 rounded-lg object-cover" />
+              ) : (
+                <div className="w-7 h-7 rounded-lg gradient-primary flex items-center justify-center">
+                  <Zap className="h-3.5 w-3.5 text-primary-foreground" />
+                </div>
+              )}
               <span className="text-sm font-bold text-foreground">SocioPilot</span>
             </div>
             {selectedBusiness && (
@@ -227,6 +247,9 @@ export default function Dashboard() {
             )}
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigate("/brand-assets")} className="text-xs">
+              <ImageIcon className="h-3.5 w-3.5 mr-1" /> Brand
+            </Button>
             <Button variant="outline" size="sm" onClick={() => navigate("/settings")} className="text-xs">
               <Settings className="h-3.5 w-3.5 mr-1" /> Accounts
             </Button>

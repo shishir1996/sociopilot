@@ -11,6 +11,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
 import SocialSettings from "./pages/SocialSettings";
 import AccountSettings from "./pages/AccountSettings";
+import BrandAssets from "./pages/BrandAssets";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/setup" element={<BusinessSetup />} />
             <Route path="/settings" element={<SocialSettings />} />
             <Route path="/account" element={<AccountSettings />} />
+            <Route path="/brand-assets" element={<BrandAssets />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

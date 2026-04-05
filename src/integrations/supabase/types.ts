@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      brand_assets: {
+        Row: {
+          asset_type: string
+          business_id: string
+          created_at: string
+          file_url: string
+          id: string
+          label: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          asset_type?: string
+          business_id: string
+          created_at?: string
+          file_url: string
+          id?: string
+          label?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          asset_type?: string
+          business_id?: string
+          created_at?: string
+          file_url?: string
+          id?: string
+          label?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brand_assets_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       businesses: {
         Row: {
           brand_tone: string | null
