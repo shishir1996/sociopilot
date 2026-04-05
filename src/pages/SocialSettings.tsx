@@ -34,9 +34,10 @@ export default function SocialSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const userIdRef = user?.id;
   useEffect(() => {
-    if (user) fetchBusinesses();
-  }, [user]);
+    if (userIdRef) fetchBusinesses();
+  }, [userIdRef]);
 
   const fetchBusinesses = async () => {
     const { data } = await supabase
