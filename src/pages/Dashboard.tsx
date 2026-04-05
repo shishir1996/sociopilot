@@ -191,9 +191,13 @@ export default function Dashboard() {
       {/* Sidebar */}
       <aside className={`${sidebarOpen ? "w-60" : "w-16"} bg-foreground transition-all duration-200 flex flex-col hidden md:flex`}>
         <div className="p-4 flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0">
-            <Zap className="h-4 w-4 text-primary-foreground" />
-          </div>
+          {logoUrl ? (
+            <img src={logoUrl} alt="Logo" className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
+          ) : (
+            <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0">
+              <Zap className="h-4 w-4 text-primary-foreground" />
+            </div>
+          )}
           {sidebarOpen && <span className="text-sm font-bold text-primary-foreground">SocioPilot</span>}
         </div>
         <nav className="flex-1 px-2 mt-4 space-y-1">
