@@ -231,9 +231,13 @@ export default function Dashboard() {
         <header className="border-b border-border bg-card h-14 flex items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-3">
             <div className="md:hidden flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg gradient-primary flex items-center justify-center">
-                <Zap className="h-3.5 w-3.5 text-primary-foreground" />
-              </div>
+              {logoUrl ? (
+                <img src={logoUrl} alt="Logo" className="w-7 h-7 rounded-lg object-cover" />
+              ) : (
+                <div className="w-7 h-7 rounded-lg gradient-primary flex items-center justify-center">
+                  <Zap className="h-3.5 w-3.5 text-primary-foreground" />
+                </div>
+              )}
               <span className="text-sm font-bold text-foreground">SocioPilot</span>
             </div>
             {selectedBusiness && (
