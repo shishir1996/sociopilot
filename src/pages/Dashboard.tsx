@@ -87,6 +87,17 @@ export default function Dashboard() {
     if (data && data.length > 0) {
       setSelectedBusiness(data[0].id);
       fetchPlans(data[0].id);
+      // Fetch user's logo
+      const { data: logoData } = await supabase
+        .from("brand_assets")
+        .select("file_url")
+        .eq("business_id", data[0].id)
+        .eq("asset_type", "logo")
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (logoData && logoData.length > 0) {
+        setLogoUrl(logoData[0].file_url);
+      }
     }
     setLoading(false);
   };
