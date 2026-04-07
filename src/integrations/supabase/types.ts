@@ -57,6 +57,7 @@ export type Database = {
       }
       businesses: {
         Row: {
+          brand_colors: string[] | null
           brand_tone: string | null
           competitors: string | null
           content_style: string | null
@@ -71,12 +72,14 @@ export type Database = {
           platforms: string[] | null
           posting_goals: string[] | null
           products_services: string | null
+          slogan: string | null
           target_audience: string | null
           timezone: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          brand_colors?: string[] | null
           brand_tone?: string | null
           competitors?: string | null
           content_style?: string | null
@@ -91,12 +94,14 @@ export type Database = {
           platforms?: string[] | null
           posting_goals?: string[] | null
           products_services?: string | null
+          slogan?: string | null
           target_audience?: string | null
           timezone?: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          brand_colors?: string[] | null
           brand_tone?: string | null
           competitors?: string | null
           content_style?: string | null
@@ -111,6 +116,7 @@ export type Database = {
           platforms?: string[] | null
           posting_goals?: string[] | null
           products_services?: string | null
+          slogan?: string | null
           target_audience?: string | null
           timezone?: string
           updated_at?: string

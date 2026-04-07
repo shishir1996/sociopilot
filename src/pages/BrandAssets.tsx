@@ -8,8 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import {
-  ArrowLeft, Upload, Trash2, Image as ImageIcon, Building2, Package, Loader2,
-  Star,
+  ArrowLeft, Upload, Trash2, Building2, Package, Loader2,
+  Star, Palette, Type,
 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -30,6 +30,8 @@ const ASSET_TYPES = [
   { value: "service_image", label: "Service Image", icon: Building2, description: "Images representing your services" },
 ] as const;
 
+const DEFAULT_COLORS = ["#2563EB", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
+
 export default function BrandAssets() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -38,6 +40,9 @@ export default function BrandAssets() {
   const [assets, setAssets] = useState<BrandAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState<string | null>(null);
+  const [brandColors, setBrandColors] = useState<string[]>(DEFAULT_COLORS);
+  const [slogan, setSlogan] = useState("");
+  const [savingBrand, setSavingBrand] = useState(false);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   useEffect(() => {
@@ -48,12 +53,19 @@ export default function BrandAssets() {
     if (!user) return;
     const { data: biz } = await supabase
       .from("businesses")
-      .select("id")
+      .select("id, brand_colors, slogan")
       .eq("user_id", user.id)
       .limit(1) as any;
 
     if (biz && biz.length > 0) {
       setBusinessId(biz[0].id);
+      if (biz[0].brand_colors && biz[0].brand_colors.length > 0) {
+        const colors = [...biz[0].brand_colors];
+        while (colors.length < 5) colors.push(DEFAULT_COLORS[colors.length]);
+        setBrandColors(colors.slice(0, 5));
+      }
+      if (biz[0].slogan) setSlogan(biz[0].slogan);
+
       const { data: assetData } = await supabase
         .from("brand_assets")
         .select("id, asset_type, file_url, label, created_at")
@@ -62,6 +74,22 @@ export default function BrandAssets() {
       setAssets((assetData as BrandAsset[]) || []);
     }
     setLoading(false);
+  };
+
+  const saveBrandInfo = async () => {
+    if (!businessId) return;
+    setSavingBrand(true);
+    try {
+      const { error } = await supabase
+        .from("businesses")
+        .update({ brand_colors: brandColors, slogan } as any)
+        .eq("id", businessId);
+      if (error) throw error;
+      toast({ title: "Saved!", description: "Brand colors and slogan updated." });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+    setSavingBrand(false);
   };
 
   const handleUpload = async (assetType: string, file: File) => {
@@ -162,9 +190,94 @@ export default function BrandAssets() {
 
       <main className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
         <p className="text-sm text-muted-foreground">
-          Upload your logo, product images, and service photos. These will be used alongside AI-generated content for a more authentic, human touch.
+          Upload your logo, product images, and service photos. Set your brand colors and slogan for AI-generated content with a more authentic, human touch.
         </p>
 
+        {/* Brand Colors */}
+        <Card className="shadow-card">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Palette className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Brand Colors</CardTitle>
+                <p className="text-xs text-muted-foreground">Choose 5 colors that represent your brand</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-5 gap-3">
+              {brandColors.map((color, idx) => (
+                <div key={idx} className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Color {idx + 1}</Label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={color}
+                      onChange={(e) => {
+                        const updated = [...brandColors];
+                        updated[idx] = e.target.value;
+                        setBrandColors(updated);
+                      }}
+                      className="w-10 h-10 rounded-lg border border-border cursor-pointer p-0"
+                    />
+                    <Input
+                      value={color}
+                      onChange={(e) => {
+                        const updated = [...brandColors];
+                        updated[idx] = e.target.value;
+                        setBrandColors(updated);
+                      }}
+                      className="text-xs h-8 font-mono uppercase"
+                      maxLength={7}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              {brandColors.map((c, i) => (
+                <div key={i} className="h-8 flex-1 rounded-md border border-border" style={{ backgroundColor: c }} />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Slogan / Tagline */}
+        <Card className="shadow-card">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Type className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Slogan / Tagline</CardTitle>
+                <p className="text-xs text-muted-foreground">Your brand's catchy tagline used in content</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Input
+              placeholder="e.g. Empowering businesses to grow smarter"
+              value={slogan}
+              onChange={(e) => setSlogan(e.target.value)}
+              maxLength={150}
+            />
+            <p className="text-[10px] text-muted-foreground mt-1">{slogan.length}/150 characters</p>
+          </CardContent>
+        </Card>
+
+        {/* Save brand info button */}
+        <Button
+          onClick={saveBrandInfo}
+          disabled={savingBrand}
+          className="gradient-primary border-0 w-full sm:w-auto"
+        >
+          {savingBrand ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : "Save Brand Colors & Slogan"}
+        </Button>
+
+        {/* Asset upload sections */}
         {ASSET_TYPES.map((type) => {
           const typeAssets = assets.filter((a) => a.asset_type === type.value);
           const isUploading = uploading === type.value;
