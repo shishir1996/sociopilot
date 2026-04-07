@@ -18,7 +18,7 @@ async function generateImage(prompt: string, apiKey: string, maxRetries = 3): Pr
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       if (attempt > 0) {
-        const delay = Math.pow(2, attempt) * 3000; // 6s, 12s backoff
+        const delay = Math.pow(2, attempt) * 3000;
         console.log(`Retry ${attempt}/${maxRetries}, waiting ${delay}ms...`);
         await new Promise((r) => setTimeout(r, delay));
       }
@@ -70,7 +70,6 @@ async function uploadBase64Image(
   supabaseUrl: string,
 ): Promise<string | null> {
   try {
-    // Extract base64 content after the data URL prefix
     const base64Content = base64Data.replace(/^data:image\/\w+;base64,/, "");
     const binaryData = Uint8Array.from(atob(base64Content), (c) => c.charCodeAt(0));
 
@@ -86,12 +85,46 @@ async function uploadBase64Image(
       return null;
     }
 
-    // Return public URL
     return `${supabaseUrl}/storage/v1/object/public/content-images/${fileName}`;
   } catch (err) {
     console.error("Upload failed:", err);
     return null;
   }
+}
+
+// Background image generation for all items in a plan
+async function generateImagesInBackground(
+  insertedItems: any[],
+  planId: string,
+  supabaseUrl: string,
+  supabaseKey: string,
+  apiKey: string,
+) {
+  const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
+  await ensureBucketExists(supabaseAdmin);
+
+  for (const item of insertedItems) {
+    if (!item.image_prompt) continue;
+    try {
+      const result = await generateImage(item.image_prompt, apiKey);
+      if (!result.data) continue;
+
+      const fileName = `${planId}/day-${item.day_number}-${Date.now()}.png`;
+      const publicUrl = await uploadBase64Image(supabaseAdmin, result.data, fileName, supabaseUrl);
+
+      if (publicUrl) {
+        await supabaseAdmin
+          .from("content_items")
+          .update({ image_url: publicUrl })
+          .eq("id", item.id);
+        console.log(`Image generated for day ${item.day_number}`);
+      }
+    } catch (err) {
+      console.error(`Image gen failed for day ${item.day_number}:`, err);
+    }
+    await new Promise((r) => setTimeout(r, 4000));
+  }
+  console.log("Background image generation complete for plan", planId);
 }
 
 serve(async (req) => {
@@ -167,6 +200,24 @@ serve(async (req) => {
       });
     }
 
+    // Fetch brand assets for richer prompts
+    const { data: brandAssets } = await supabaseAdmin
+      .from("brand_assets")
+      .select("asset_type, file_url, label")
+      .eq("business_id", business_id);
+
+    const brandContext = brandAssets && brandAssets.length > 0
+      ? `\nBrand Assets: ${brandAssets.map((a: any) => `${a.asset_type}: ${a.label || a.file_url}`).join(", ")}`
+      : "";
+
+    const colorContext = business.brand_colors && business.brand_colors.length > 0
+      ? `\nBrand Colors: ${business.brand_colors.join(", ")}`
+      : "";
+
+    const sloganContext = business.slogan
+      ? `\nSlogan/Tagline: ${business.slogan}`
+      : "";
+
     // Get existing plan count
     const { count } = await supabase
       .from("content_plans")
@@ -202,7 +253,10 @@ Return ONLY a valid JSON object with this exact structure:
     }
   ]
 }
-Generate exactly 7 days. Make content diverse: mix educational, trust-building, promotional, engagement, authority, local visibility, and conversion posts. Every caption must be complete and ready to copy-paste. Hashtags should be relevant and a mix of broad and niche. Image prompts must be detailed enough to generate stunning social media visuals.`;
+Generate exactly 7 days. Make content diverse: mix educational, trust-building, promotional, engagement, authority, local visibility, and conversion posts. Every caption must be complete and ready to copy-paste. Hashtags should be relevant and a mix of broad and niche. Image prompts must be detailed enough to generate stunning social media visuals.
+When the business has brand colors, incorporate them into the image prompts for visual consistency.
+When the business has a slogan/tagline, weave it naturally into captions where appropriate.
+Include Google Business Profile as a platform when the business has a physical location.`;
 
     const userPrompt = `Generate a Week ${weekNumber} content plan for:
 Business: ${business.name}
@@ -216,7 +270,7 @@ Platforms: ${(business.platforms || []).join(", ") || "Instagram, Facebook, Link
 Content Types: ${(business.content_types || []).join(", ") || "Mixed"}
 Content Style: ${business.content_style || "Balanced"}
 Main Offers: ${business.main_offers || "Not specified"}
-Competitors: ${business.competitors || "Not specified"}
+Competitors: ${business.competitors || "Not specified"}${colorContext}${sloganContext}${brandContext}
 
 Important: Make this week fresh and different from previous weeks. Focus on content that drives ${(business.posting_goals || ["engagement"]).join(", ")}.`;
 
@@ -316,10 +370,7 @@ Important: Make this week fresh and different from previous weeks. Focus on cont
 
     if (planError) throw planError;
 
-    // Ensure storage bucket exists
-    await ensureBucketExists(supabaseAdmin);
-
-    // Insert content items first (without images)
+    // Insert content items (without images - they'll be generated in background)
     const items = plan.days.map((day: any) => ({
       plan_id: newPlan.id,
       user_id: user.id,
@@ -351,36 +402,19 @@ Important: Make this week fresh and different from previous weeks. Focus on cont
 
     if (itemsError) throw itemsError;
 
-    // Generate images for each content item in parallel (max 3 concurrent)
-    console.log("Starting image generation for", insertedItems.length, "items...");
+    // Generate images in the background (non-blocking)
+    console.log("Starting background image generation for", insertedItems.length, "items...");
+    EdgeRuntime.waitUntil(
+      generateImagesInBackground(
+        insertedItems,
+        newPlan.id,
+        supabaseUrl,
+        supabaseKey,
+        LOVABLE_API_KEY,
+      )
+    );
 
-    const generateAndUpload = async (item: any) => {
-      if (!item.image_prompt) return;
-      try {
-        const result = await generateImage(item.image_prompt, LOVABLE_API_KEY);
-        if (!result.data) return;
-
-        const fileName = `${newPlan.id}/day-${item.day_number}-${Date.now()}.png`;
-        const publicUrl = await uploadBase64Image(supabaseAdmin, result.data, fileName, supabaseUrl);
-
-        if (publicUrl) {
-          await supabaseAdmin
-            .from("content_items")
-            .update({ image_url: publicUrl })
-            .eq("id", item.id);
-          console.log(`Image generated for day ${item.day_number}`);
-        }
-      } catch (err) {
-        console.error(`Image gen failed for day ${item.day_number}:`, err);
-      }
-    };
-
-    // Process images one at a time with delays to avoid rate limits
-    for (const item of insertedItems) {
-      await generateAndUpload(item);
-      await new Promise((r) => setTimeout(r, 4000)); // 4s delay between each
-    }
-
+    // Return immediately with the plan
     return new Response(JSON.stringify({ success: true, plan_id: newPlan.id }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
