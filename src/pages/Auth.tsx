@@ -361,9 +361,6 @@ export default function Auth() {
   );
 }
 
-function Loader2Icon({ className }: { className?: string }) {
-  return <div className={className} />;
-}
 
 function FeatureItem({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
   return (
