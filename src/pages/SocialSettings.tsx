@@ -14,6 +14,7 @@ const PLATFORM_OPTIONS = [
   { value: "instagram", label: "Instagram", fields: ["access_token", "account_id"] },
   { value: "linkedin", label: "LinkedIn", fields: ["access_token", "account_id"] },
   { value: "x_twitter", label: "X (Twitter)", fields: ["access_token", "account_id"] },
+  { value: "google_business", label: "Google Business Profile", fields: ["access_token", "account_id"] },
 ];
 
 interface SocialAccount {
