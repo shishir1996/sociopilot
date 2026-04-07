@@ -14,6 +14,7 @@ const PLATFORM_OPTIONS = [
   { value: "instagram", label: "Instagram", fields: ["access_token", "account_id"] },
   { value: "linkedin", label: "LinkedIn", fields: ["access_token", "account_id"] },
   { value: "x_twitter", label: "X (Twitter)", fields: ["access_token", "account_id"] },
+  { value: "google_business", label: "Google Business Profile", fields: ["access_token", "account_id"] },
 ];
 
 interface SocialAccount {
@@ -245,6 +246,13 @@ export default function SocialSettings() {
               <p>2. Enable Read & Write permissions</p>
               <p>3. Generate Access Token & Secret</p>
               <p>4. Use your User ID as the Account ID</p>
+            </div>
+            <div>
+              <p className="font-semibold text-foreground">Google Business Profile</p>
+              <p>1. Go to console.cloud.google.com → Create Project</p>
+              <p>2. Enable "Google My Business API" and "Business Profile API"</p>
+              <p>3. Create OAuth 2.0 credentials and generate an access token</p>
+              <p>4. Use your Location ID (accounts/*/locations/*) as the Account ID</p>
             </div>
           </CardContent>
         </Card>
