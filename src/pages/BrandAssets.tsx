@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Upload, Trash2, Building2, Package, Loader2,
-  Star, Palette, Type,
+  Star, Palette, Type, Sparkles,
 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -42,6 +43,7 @@ export default function BrandAssets() {
   const [uploading, setUploading] = useState<string | null>(null);
   const [brandColors, setBrandColors] = useState<string[]>(DEFAULT_COLORS);
   const [slogan, setSlogan] = useState("");
+  const [creativeDirection, setCreativeDirection] = useState("");
   const [savingBrand, setSavingBrand] = useState(false);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -53,7 +55,7 @@ export default function BrandAssets() {
     if (!user) return;
     const { data: biz } = await supabase
       .from("businesses")
-      .select("id, brand_colors, slogan")
+      .select("id, brand_colors, slogan, creative_direction")
       .eq("user_id", user.id)
       .limit(1) as any;
 
@@ -65,6 +67,7 @@ export default function BrandAssets() {
         setBrandColors(colors.slice(0, 5));
       }
       if (biz[0].slogan) setSlogan(biz[0].slogan);
+      if (biz[0].creative_direction) setCreativeDirection(biz[0].creative_direction);
 
       const { data: assetData } = await supabase
         .from("brand_assets")
@@ -82,10 +85,10 @@ export default function BrandAssets() {
     try {
       const { error } = await supabase
         .from("businesses")
-        .update({ brand_colors: brandColors, slogan } as any)
+        .update({ brand_colors: brandColors, slogan, creative_direction: creativeDirection } as any)
         .eq("id", businessId);
       if (error) throw error;
-      toast({ title: "Saved!", description: "Brand colors and slogan updated." });
+      toast({ title: "Saved!", description: "Brand settings updated successfully." });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
