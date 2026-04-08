@@ -92,7 +92,6 @@ async function uploadBase64Image(
   }
 }
 
-// Background image generation for all items in a plan
 async function generateImagesInBackground(
   insertedItems: any[],
   planId: string,
@@ -186,8 +185,8 @@ serve(async (req) => {
       });
     }
 
-    // Fetch business details
-    const { data: business, error: bizError } = await supabase
+    // Fetch business details (including creative_direction)
+    const { data: business, error: bizError } = await supabaseAdmin
       .from("businesses")
       .select("*")
       .eq("id", business_id)
@@ -218,61 +217,100 @@ serve(async (req) => {
       ? `\nSlogan/Tagline: ${business.slogan}`
       : "";
 
-    // Get existing plan count
-    const { count } = await supabase
+    const creativeDirectionContext = business.creative_direction
+      ? `\n\n--- USER'S CREATIVE DIRECTION (MUST FOLLOW) ---\n${business.creative_direction}\n--- END CREATIVE DIRECTION ---`
+      : "";
+
+    // Get existing plan count for correct week numbering
+    const { count } = await supabaseAdmin
       .from("content_plans")
       .select("*", { count: "exact", head: true })
-      .eq("business_id", business_id);
+      .eq("business_id", business_id)
+      .eq("user_id", user.id);
 
     const weekNumber = (count || 0) + 1;
 
-    const systemPrompt = `You are an AI Content Growth Manager. Generate a 7-day social media content plan.
+    // Fetch previous week topics to avoid repetition
+    let previousTopicsSummary = "";
+    const { data: recentItems } = await supabaseAdmin
+      .from("content_items")
+      .select("topic, content_theme, hook")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(21);
+
+    if (recentItems && recentItems.length > 0) {
+      const topicList = recentItems.map((i: any) => `"${i.topic}"`).join(", ");
+      previousTopicsSummary = `\n\nPREVIOUSLY USED TOPICS (DO NOT REPEAT THESE — create completely new angles):\n${topicList}`;
+    }
+
+    // Build deeply personalized system prompt
+    const systemPrompt = `You are a senior AI Content Strategist specialized in ${business.industry || "business"} marketing.
+You create hyper-personalized, niche-specific social media content plans that feel like they were written by an expert marketer who deeply understands the client's business.
+
+BUSINESS PROFILE:
+- Name: ${business.name}
+- Industry/Niche: ${business.industry || "General"}
+- Products/Services: ${business.products_services || "Not specified"}
+- Location: ${business.location || "Not specified"}
+- Target Audience: ${business.target_audience || "General audience"}
+- Business Goals: ${(business.goals || []).join(", ") || "Brand awareness"}
+- Brand Tone: ${business.brand_tone || "Professional"}
+- Content Style: ${business.content_style || "Balanced"}
+- Main Offers: ${business.main_offers || "Not specified"}
+- Competitors: ${business.competitors || "Not specified"}
+- Posting Goals: ${(business.posting_goals || ["engagement"]).join(", ")}${colorContext}${sloganContext}${brandContext}${creativeDirectionContext}
+
+CONTENT RULES:
+1. Every post MUST be specifically about "${business.name}" and its ${business.industry || "business"} niche — NO generic motivational quotes or filler content.
+2. Captions must mention the business name, products, services, or location naturally.
+3. Hooks must be scroll-stopping, specific to the industry, and address real pain points of "${business.target_audience || "the target audience"}".
+4. CTAs must drive specific actions: calls, DMs, website visits, store visits, bookings — not vague "like and share".
+5. Hashtags must include brand-specific, location-specific (if applicable), and niche-specific tags.
+6. Image prompts must be detailed, brand-aligned, and describe professional social media visuals — NOT generic stock photos.
+7. Each day must target a DIFFERENT content goal: awareness, engagement, trust, sales, education, local visibility, conversion.
+8. ${business.location ? `Include Google Business Profile as a platform option since this is a local business in ${business.location}.` : ""}
+9. When brand colors are provided, ALWAYS incorporate them into image prompts.
+10. Content must feel like it was written by someone who works at "${business.name}", not a generic AI.
+
 Return ONLY a valid JSON object with this exact structure:
 {
-  "strategy_summary": "Brief strategy for this week",
+  "strategy_summary": "Specific strategy for Week ${weekNumber} of ${business.name}'s content plan, mentioning key themes and goals",
   "days": [
     {
       "day_number": 1,
-      "content_theme": "Theme",
-      "content_goal": "Goal",
+      "content_theme": "Theme specific to ${business.industry}",
+      "content_goal": "Specific goal (awareness/engagement/trust/sales/education/local/conversion)",
       "primary_platform": "Platform name",
       "secondary_platforms": ["Platform2"],
-      "content_type": "Carousel|Reel|Image|Text",
-      "topic": "Post topic",
-      "hook": "Scroll-stopping hook",
-      "pain_point": "Audience pain point addressed",
-      "core_message": "Key message",
-      "cta": "Call to action",
+      "content_type": "Carousel|Reel|Image|Text|Story|Video",
+      "topic": "Specific topic about ${business.name}'s niche",
+      "hook": "Industry-specific scroll-stopping hook",
+      "pain_point": "Real pain point of ${business.target_audience || "audience"}",
+      "core_message": "Key message tied to business value proposition",
+      "cta": "Specific action-driving CTA",
       "posting_time": "10:00 AM",
-      "why_it_matters": "Why this post matters for growth",
-      "caption": "Full ready-to-post caption (150-300 words)",
-      "hashtags": ["hashtag1", "hashtag2", "hashtag3"],
-      "image_prompt": "Detailed AI image generation prompt for a social media visual. Include style, colors, composition details.",
-      "visual_style": "Visual direction for the creative",
-      "repurposing_suggestion": "How to repurpose this for other platforms"
+      "why_it_matters": "Why this post drives ${(business.posting_goals || ["growth"]).join("/")}",
+      "caption": "Full ready-to-post caption (200-400 words), personalized to ${business.name}",
+      "hashtags": ["brandTag", "nicheTag", "locationTag", "industryTag"],
+      "image_prompt": "Detailed AI image prompt with brand colors, style, composition, and industry context",
+      "visual_style": "Visual direction matching brand identity",
+      "repurposing_suggestion": "Platform-specific repurposing tip"
     }
   ]
 }
-Generate exactly 7 days. Make content diverse: mix educational, trust-building, promotional, engagement, authority, local visibility, and conversion posts. Every caption must be complete and ready to copy-paste. Hashtags should be relevant and a mix of broad and niche. Image prompts must be detailed enough to generate stunning social media visuals.
-When the business has brand colors, incorporate them into the image prompts for visual consistency.
-When the business has a slogan/tagline, weave it naturally into captions where appropriate.
-Include Google Business Profile as a platform when the business has a physical location.`;
+Generate exactly 7 days with diverse, non-repetitive content.${previousTopicsSummary}`;
 
-    const userPrompt = `Generate a Week ${weekNumber} content plan for:
-Business: ${business.name}
-Industry: ${business.industry || "General"}
-Products/Services: ${business.products_services || "Not specified"}
-Location: ${business.location || "Global"}
-Target Audience: ${business.target_audience || "General audience"}
-Goals: ${(business.goals || []).join(", ") || "Brand awareness"}
-Brand Tone: ${business.brand_tone || "Professional"}
-Platforms: ${(business.platforms || []).join(", ") || "Instagram, Facebook, LinkedIn"}
-Content Types: ${(business.content_types || []).join(", ") || "Mixed"}
-Content Style: ${business.content_style || "Balanced"}
-Main Offers: ${business.main_offers || "Not specified"}
-Competitors: ${business.competitors || "Not specified"}${colorContext}${sloganContext}${brandContext}
+    const userPrompt = `Generate Week ${weekNumber} content plan for "${business.name}".
 
-Important: Make this week fresh and different from previous weeks. Focus on content that drives ${(business.posting_goals || ["engagement"]).join(", ")}.`;
+Platforms to use: ${(business.platforms || ["Instagram", "Facebook"]).join(", ")}
+Content Types preferred: ${(business.content_types || ["Image", "Carousel", "Reel"]).join(", ")}
+
+This is week ${weekNumber} — make sure the content is COMPLETELY FRESH and different from any previous weeks. 
+Focus this week on: ${weekNumber % 4 === 1 ? "brand awareness and reach" : weekNumber % 4 === 2 ? "engagement and community building" : weekNumber % 4 === 3 ? "trust building and social proof" : "sales conversion and lead generation"}.
+
+Every caption must be ready to copy-paste with emojis, line breaks, and a clear CTA.
+Every image prompt must describe a professional, brand-aligned visual that would look great on social media.`;
 
     // Call Lovable AI for content plan
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -282,7 +320,7 @@ Important: Make this week fresh and different from previous weeks. Focus on cont
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -350,17 +388,35 @@ Important: Make this week fresh and different from previous weeks. Focus on cont
 
     const aiData = await aiResponse.json();
     const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall) throw new Error("No structured response from AI");
+    if (!toolCall) {
+      console.error("AI response had no tool call:", JSON.stringify(aiData).slice(0, 500));
+      throw new Error("No structured response from AI. Please try again.");
+    }
 
-    const plan = JSON.parse(toolCall.function.arguments);
+    let plan;
+    try {
+      plan = JSON.parse(toolCall.function.arguments);
+    } catch (parseErr) {
+      console.error("Failed to parse AI response:", toolCall.function.arguments?.slice(0, 500));
+      throw new Error("AI returned invalid content. Please try again.");
+    }
 
-    // Create the content plan
-    const { data: newPlan, error: planError } = await supabase
+    if (!plan.days || !Array.isArray(plan.days) || plan.days.length === 0) {
+      throw new Error("AI returned an empty content plan. Please try again.");
+    }
+
+    // Calculate the actual week_start date for proper sequencing
+    const weekStartDate = new Date();
+    weekStartDate.setDate(weekStartDate.getDate() + (weekNumber - 1) * 7);
+    const weekStart = weekStartDate.toISOString().split("T")[0];
+
+    // Create the content plan using admin client to bypass any RLS issues
+    const { data: newPlan, error: planError } = await supabaseAdmin
       .from("content_plans")
       .insert({
         business_id,
         user_id: user.id,
-        week_start: new Date().toISOString().split("T")[0],
+        week_start: weekStart,
         week_number: weekNumber,
         strategy_summary: plan.strategy_summary,
         status: "draft",
@@ -368,9 +424,12 @@ Important: Make this week fresh and different from previous weeks. Focus on cont
       .select()
       .single();
 
-    if (planError) throw planError;
+    if (planError) {
+      console.error("Plan insert error:", planError);
+      throw new Error(`Failed to save content plan: ${planError.message}`);
+    }
 
-    // Insert content items (without images - they'll be generated in background)
+    // Insert content items
     const items = plan.days.map((day: any) => ({
       plan_id: newPlan.id,
       user_id: user.id,
@@ -400,7 +459,10 @@ Important: Make this week fresh and different from previous weeks. Focus on cont
       .insert(items)
       .select("id, image_prompt, day_number");
 
-    if (itemsError) throw itemsError;
+    if (itemsError) {
+      console.error("Items insert error:", itemsError);
+      throw new Error(`Failed to save content items: ${itemsError.message}`);
+    }
 
     // Generate images in the background (non-blocking)
     console.log("Starting background image generation for", insertedItems.length, "items...");
@@ -415,7 +477,7 @@ Important: Make this week fresh and different from previous weeks. Focus on cont
     );
 
     // Return immediately with the plan
-    return new Response(JSON.stringify({ success: true, plan_id: newPlan.id }), {
+    return new Response(JSON.stringify({ success: true, plan_id: newPlan.id, week_number: weekNumber }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
