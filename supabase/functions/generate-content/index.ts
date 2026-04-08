@@ -127,7 +127,38 @@ async function generateImagesInBackground(
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  const requestStartedAt = Date.now();
+
+  const respond = (payload: Record<string, unknown>) => new Response(JSON.stringify(payload), {
+    status: 200,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
+  const succeed = (payload: Record<string, unknown> = {}) => respond({
+    ok: true,
+    ...payload,
+    diagnostics: {
+      processing_time_ms: Date.now() - requestStartedAt,
+    },
+  });
+
+  const fail = (
+    error: string,
+    requestedStatus: number,
+    errorStage: string,
+    diagnostics: Record<string, unknown> = {},
+  ) => respond({
+    ok: false,
+    error,
+    diagnostics: {
+      requested_status: requestedStatus,
+      error_stage: errorStage,
+      processing_time_ms: Date.now() - requestStartedAt,
+      ...diagnostics,
+    },
+  });
 
   try {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -143,11 +174,7 @@ serve(async (req) => {
     });
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (authError || !user) return fail("Unauthorized", 401, "auth");
 
     const body = await req.json();
 
@@ -156,33 +183,23 @@ serve(async (req) => {
       await ensureBucketExists(supabaseAdmin);
       const result = await generateImage(body.image_prompt, LOVABLE_API_KEY);
       if (result.rateLimited) {
-        return new Response(JSON.stringify({ error: "AI rate limit reached. Please try again in a minute." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return fail("AI rate limit reached. Please try again in a minute.", 429, "regenerate_image_rate_limit");
       }
       if (!result.data) {
-        return new Response(JSON.stringify({ error: "Image generation failed. Please try again." }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return fail("Image generation failed. Please try again.", 500, "regenerate_image_failed");
       }
       const fileName = `regen/${body.content_item_id}-${Date.now()}.png`;
       const publicUrl = await uploadBase64Image(supabaseAdmin, result.data, fileName, supabaseUrl);
       if (publicUrl) {
         await supabaseAdmin.from("content_items").update({ image_url: publicUrl }).eq("id", body.content_item_id);
-        return new Response(JSON.stringify({ success: true, image_url: publicUrl }), {
-          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return succeed({ success: true, image_url: publicUrl });
       }
-      return new Response(JSON.stringify({ error: "Upload failed" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return fail("Upload failed", 500, "regenerate_image_upload_failed");
     }
 
     const { business_id } = body;
     if (!business_id) {
-      return new Response(JSON.stringify({ error: "business_id is required" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return fail("business_id is required", 400, "validation", { field: "business_id" });
     }
 
     // Fetch business details (including creative_direction)
@@ -193,11 +210,7 @@ serve(async (req) => {
       .eq("user_id", user.id)
       .single();
 
-    if (bizError || !business) {
-      return new Response(JSON.stringify({ error: "Business not found" }), {
-        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (bizError || !business) return fail("Business not found", 404, "business_lookup", { business_id });
 
     // Fetch brand assets for richer prompts
     const { data: brandAssets } = await supabaseAdmin
@@ -374,23 +387,32 @@ Every image prompt must describe a professional, brand-aligned visual that would
       const errText = await aiResponse.text();
       console.error("AI gateway error:", aiResponse.status, errText);
       if (aiResponse.status === 429) {
-        return new Response(JSON.stringify({ error: "AI rate limit reached. Please try again in a moment." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return fail(
+          "AI rate limit reached. Please try again in a moment.",
+          429,
+          "content_plan_ai_rate_limit",
+          { ai_status: aiResponse.status },
+        );
       }
       if (aiResponse.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add funds in Settings > Workspace > Usage." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return fail(
+          "AI credits exhausted. Please add funds in Settings > Workspace > Usage.",
+          402,
+          "content_plan_ai_credits",
+          { ai_status: aiResponse.status },
+        );
       }
-      throw new Error(`AI error: ${aiResponse.status}`);
+      return fail(`AI error: ${aiResponse.status}`, aiResponse.status, "content_plan_ai_gateway", {
+        ai_status: aiResponse.status,
+        ai_error: errText.slice(0, 500),
+      });
     }
 
     const aiData = await aiResponse.json();
     const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall) {
       console.error("AI response had no tool call:", JSON.stringify(aiData).slice(0, 500));
-      throw new Error("No structured response from AI. Please try again.");
+      return fail("No structured response from AI. Please try again.", 502, "missing_tool_call");
     }
 
     let plan;
@@ -398,11 +420,11 @@ Every image prompt must describe a professional, brand-aligned visual that would
       plan = JSON.parse(toolCall.function.arguments);
     } catch (parseErr) {
       console.error("Failed to parse AI response:", toolCall.function.arguments?.slice(0, 500));
-      throw new Error("AI returned invalid content. Please try again.");
+      return fail("AI returned invalid content. Please try again.", 502, "invalid_ai_response");
     }
 
     if (!plan.days || !Array.isArray(plan.days) || plan.days.length === 0) {
-      throw new Error("AI returned an empty content plan. Please try again.");
+      return fail("AI returned an empty content plan. Please try again.", 502, "empty_content_plan");
     }
 
     // Calculate the actual week_start date for proper sequencing
@@ -426,7 +448,7 @@ Every image prompt must describe a professional, brand-aligned visual that would
 
     if (planError) {
       console.error("Plan insert error:", planError);
-      throw new Error(`Failed to save content plan: ${planError.message}`);
+      return fail(`Failed to save content plan: ${planError.message}`, 500, "plan_insert");
     }
 
     // Insert content items
@@ -461,7 +483,7 @@ Every image prompt must describe a professional, brand-aligned visual that would
 
     if (itemsError) {
       console.error("Items insert error:", itemsError);
-      throw new Error(`Failed to save content items: ${itemsError.message}`);
+      return fail(`Failed to save content items: ${itemsError.message}`, 500, "items_insert");
     }
 
     // Generate images in the background (non-blocking)
@@ -477,14 +499,10 @@ Every image prompt must describe a professional, brand-aligned visual that would
     );
 
     // Return immediately with the plan
-    return new Response(JSON.stringify({ success: true, plan_id: newPlan.id, week_number: weekNumber }), {
-      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return succeed({ success: true, plan_id: newPlan.id, week_number: weekNumber });
   } catch (error) {
     console.error("generate-content error:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
-    return new Response(JSON.stringify({ error: message }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return fail(message, 500, "unhandled_exception");
   }
 });
