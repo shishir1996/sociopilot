@@ -271,13 +271,40 @@ export default function BrandAssets() {
           </CardContent>
         </Card>
 
+        {/* Creative Direction / Custom AI Prompt */}
+        <Card className="shadow-card border-primary/20">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Sparkles className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-base">AI Content Preferences</CardTitle>
+                <p className="text-xs text-muted-foreground">Custom Prompt / Creative Direction</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Textarea
+              placeholder={`Tell the AI how you want your posts, captions, and images to be generated.\n\nExamples:\n• "Generate premium luxury-style posts for real estate investors."\n• "Use modern clean product visuals with white background."\n• "Create festive Indian-style creatives with bold Hindi-English hooks."\n• "Focus more on lead generation and strong CTA."\n• "Keep the content professional and B2B focused."`}
+              value={creativeDirection}
+              onChange={(e) => setCreativeDirection(e.target.value)}
+              className="min-h-[140px]"
+              maxLength={2000}
+            />
+            <p className="text-[10px] text-muted-foreground">
+              {creativeDirection.length}/2000 characters — This instruction is applied to every future content generation including posts, captions, image prompts, hooks, and ad copy.
+            </p>
+          </CardContent>
+        </Card>
+
         {/* Save brand info button */}
         <Button
           onClick={saveBrandInfo}
           disabled={savingBrand}
           className="gradient-primary border-0 w-full sm:w-auto"
         >
-          {savingBrand ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : "Save Brand Colors & Slogan"}
+          {savingBrand ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : "Save Brand Settings"}
         </Button>
 
         {/* Asset upload sections */}
