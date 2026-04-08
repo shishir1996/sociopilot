@@ -1,0 +1,1 @@
+ALTER TABLE public.businesses ADD COLUMN creative_direction text DEFAULT NULL;
