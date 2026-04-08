@@ -63,6 +63,7 @@ export type Database = {
           content_style: string | null
           content_types: string[] | null
           created_at: string
+          creative_direction: string | null
           goals: string[] | null
           id: string
           industry: string | null
@@ -85,6 +86,7 @@ export type Database = {
           content_style?: string | null
           content_types?: string[] | null
           created_at?: string
+          creative_direction?: string | null
           goals?: string[] | null
           id?: string
           industry?: string | null
@@ -107,6 +109,7 @@ export type Database = {
           content_style?: string | null
           content_types?: string[] | null
           created_at?: string
+          creative_direction?: string | null
           goals?: string[] | null
           id?: string
           industry?: string | null

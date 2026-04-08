@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Upload, Trash2, Building2, Package, Loader2,
-  Star, Palette, Type,
+  Star, Palette, Type, Sparkles,
 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -42,6 +43,7 @@ export default function BrandAssets() {
   const [uploading, setUploading] = useState<string | null>(null);
   const [brandColors, setBrandColors] = useState<string[]>(DEFAULT_COLORS);
   const [slogan, setSlogan] = useState("");
+  const [creativeDirection, setCreativeDirection] = useState("");
   const [savingBrand, setSavingBrand] = useState(false);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -53,7 +55,7 @@ export default function BrandAssets() {
     if (!user) return;
     const { data: biz } = await supabase
       .from("businesses")
-      .select("id, brand_colors, slogan")
+      .select("id, brand_colors, slogan, creative_direction")
       .eq("user_id", user.id)
       .limit(1) as any;
 
@@ -65,6 +67,7 @@ export default function BrandAssets() {
         setBrandColors(colors.slice(0, 5));
       }
       if (biz[0].slogan) setSlogan(biz[0].slogan);
+      if (biz[0].creative_direction) setCreativeDirection(biz[0].creative_direction);
 
       const { data: assetData } = await supabase
         .from("brand_assets")
@@ -82,10 +85,10 @@ export default function BrandAssets() {
     try {
       const { error } = await supabase
         .from("businesses")
-        .update({ brand_colors: brandColors, slogan } as any)
+        .update({ brand_colors: brandColors, slogan, creative_direction: creativeDirection } as any)
         .eq("id", businessId);
       if (error) throw error;
-      toast({ title: "Saved!", description: "Brand colors and slogan updated." });
+      toast({ title: "Saved!", description: "Brand settings updated successfully." });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
@@ -268,13 +271,40 @@ export default function BrandAssets() {
           </CardContent>
         </Card>
 
+        {/* Creative Direction / Custom AI Prompt */}
+        <Card className="shadow-card border-primary/20">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Sparkles className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-base">AI Content Preferences</CardTitle>
+                <p className="text-xs text-muted-foreground">Custom Prompt / Creative Direction</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Textarea
+              placeholder={`Tell the AI how you want your posts, captions, and images to be generated.\n\nExamples:\n• "Generate premium luxury-style posts for real estate investors."\n• "Use modern clean product visuals with white background."\n• "Create festive Indian-style creatives with bold Hindi-English hooks."\n• "Focus more on lead generation and strong CTA."\n• "Keep the content professional and B2B focused."`}
+              value={creativeDirection}
+              onChange={(e) => setCreativeDirection(e.target.value)}
+              className="min-h-[140px]"
+              maxLength={2000}
+            />
+            <p className="text-[10px] text-muted-foreground">
+              {creativeDirection.length}/2000 characters — This instruction is applied to every future content generation including posts, captions, image prompts, hooks, and ad copy.
+            </p>
+          </CardContent>
+        </Card>
+
         {/* Save brand info button */}
         <Button
           onClick={saveBrandInfo}
           disabled={savingBrand}
           className="gradient-primary border-0 w-full sm:w-auto"
         >
-          {savingBrand ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : "Save Brand Colors & Slogan"}
+          {savingBrand ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : "Save Brand Settings"}
         </Button>
 
         {/* Asset upload sections */}
