@@ -2,15 +2,15 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { ContentCard } from "@/components/ContentCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  Plus, LogOut, Building2, CalendarDays, Sparkles, Settings, Loader2, UserCog,
-  Zap, BarChart3, MessageSquare, LayoutDashboard, Calendar, Inbox, Globe, ImageIcon
+  LogOut, Building2, Sparkles, Settings, Loader2, UserCog,
+  Zap, BarChart3, LayoutDashboard, Calendar, Inbox, Globe, ImageIcon
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { SocialConnectWidget } from "@/components/SocialConnectWidget";
+import { DashboardAnalytics } from "@/components/dashboard/DashboardAnalytics";
 
 interface Business {
   id: string;
@@ -19,42 +19,10 @@ interface Business {
   platforms: string[];
 }
 
-interface ContentPlan {
-  id: string;
-  week_start: string;
-  week_number: number;
-  strategy_summary: string;
-  status: string;
-}
-
-interface ContentItem {
-  id: string;
-  day_number: number;
-  content_theme: string;
-  content_goal: string;
-  primary_platform: string;
-  secondary_platforms: string[];
-  content_type: string;
-  topic: string;
-  hook: string;
-  pain_point: string;
-  core_message: string;
-  cta: string;
-  posting_time: string;
-  why_it_matters: string;
-  status: string;
-  caption: string;
-  hashtags: string[];
-  image_prompt: string;
-  image_url: string;
-  visual_style: string;
-  repurposing_suggestion: string;
-}
-
 const sidebarNav = [
   { icon: LayoutDashboard, label: "Dashboard", active: true },
   { icon: Zap, label: "AI Studio", route: "/ai-studio" },
-  { icon: Sparkles, label: "Content" },
+  { icon: Sparkles, label: "Content", route: "/content" },
   { icon: Calendar, label: "Calendar" },
   { icon: BarChart3, label: "Analytics" },
   { icon: Inbox, label: "Inbox" },
