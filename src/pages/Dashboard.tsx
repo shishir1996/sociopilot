@@ -52,6 +52,7 @@ interface ContentItem {
 
 const sidebarNav = [
   { icon: LayoutDashboard, label: "Dashboard", active: true },
+  { icon: Zap, label: "AI Studio", route: "/ai-studio" },
   { icon: Sparkles, label: "Content" },
   { icon: Calendar, label: "Calendar" },
   { icon: BarChart3, label: "Analytics" },
@@ -204,6 +205,7 @@ export default function Dashboard() {
           {sidebarNav.map((item) => (
             <button
               key={item.label}
+              onClick={() => (item as any).route && navigate((item as any).route)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
                 item.active
                   ? "bg-primary/20 text-primary"

@@ -14,6 +14,396 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_brand_presets: {
+        Row: {
+          audience_profile: string | null
+          brand_voice: string | null
+          color_theme: string | null
+          created_at: string
+          cta_style: string | null
+          default_hashtags: string[] | null
+          id: string
+          image_style: string | null
+          is_default: boolean | null
+          name: string
+          offer_style: string | null
+          post_structure: string | null
+          prompt_notes: string | null
+          tone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          audience_profile?: string | null
+          brand_voice?: string | null
+          color_theme?: string | null
+          created_at?: string
+          cta_style?: string | null
+          default_hashtags?: string[] | null
+          id?: string
+          image_style?: string | null
+          is_default?: boolean | null
+          name: string
+          offer_style?: string | null
+          post_structure?: string | null
+          prompt_notes?: string | null
+          tone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          audience_profile?: string | null
+          brand_voice?: string | null
+          color_theme?: string | null
+          created_at?: string
+          cta_style?: string | null
+          default_hashtags?: string[] | null
+          id?: string
+          image_style?: string | null
+          is_default?: boolean | null
+          name?: string
+          offer_style?: string | null
+          post_structure?: string | null
+          prompt_notes?: string | null
+          tone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ai_feature_flags: {
+        Row: {
+          enabled: boolean | null
+          feature_key: string
+          id: string
+          plan_restriction: Json | null
+          updated_at: string
+        }
+        Insert: {
+          enabled?: boolean | null
+          feature_key: string
+          id?: string
+          plan_restriction?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          enabled?: boolean | null
+          feature_key?: string
+          id?: string
+          plan_restriction?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ai_image_generations: {
+        Row: {
+          business_id: string | null
+          created_at: string
+          id: string
+          image_prompt_used: string | null
+          image_style: string | null
+          input_params: Json | null
+          model: string | null
+          output_urls: string[] | null
+          platform: string | null
+          provider: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          business_id?: string | null
+          created_at?: string
+          id?: string
+          image_prompt_used?: string | null
+          image_style?: string | null
+          input_params?: Json | null
+          model?: string | null
+          output_urls?: string[] | null
+          platform?: string | null
+          provider?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          business_id?: string | null
+          created_at?: string
+          id?: string
+          image_prompt_used?: string | null
+          image_style?: string | null
+          input_params?: Json | null
+          model?: string | null
+          output_urls?: string[] | null
+          platform?: string | null
+          provider?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_image_generations_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_plan_limits: {
+        Row: {
+          brand_preset_limit: number | null
+          can_edit_prompts: boolean | null
+          can_select_model: boolean | null
+          created_at: string
+          id: string
+          image_generations_limit: number | null
+          plan_name: string
+          premium_image_styles: boolean | null
+          premium_model_access: boolean | null
+          regeneration_limit: number | null
+          text_generations_limit: number | null
+          updated_at: string
+        }
+        Insert: {
+          brand_preset_limit?: number | null
+          can_edit_prompts?: boolean | null
+          can_select_model?: boolean | null
+          created_at?: string
+          id?: string
+          image_generations_limit?: number | null
+          plan_name: string
+          premium_image_styles?: boolean | null
+          premium_model_access?: boolean | null
+          regeneration_limit?: number | null
+          text_generations_limit?: number | null
+          updated_at?: string
+        }
+        Update: {
+          brand_preset_limit?: number | null
+          can_edit_prompts?: boolean | null
+          can_select_model?: boolean | null
+          created_at?: string
+          id?: string
+          image_generations_limit?: number | null
+          plan_name?: string
+          premium_image_styles?: boolean | null
+          premium_model_access?: boolean | null
+          regeneration_limit?: number | null
+          text_generations_limit?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ai_prompt_templates: {
+        Row: {
+          created_at: string
+          hidden_instructions: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          platform_formatting: Json | null
+          system_prompt: string
+          template_type: string
+          updated_at: string
+          variable_placeholders: Json | null
+        }
+        Insert: {
+          created_at?: string
+          hidden_instructions?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          platform_formatting?: Json | null
+          system_prompt?: string
+          template_type: string
+          updated_at?: string
+          variable_placeholders?: Json | null
+        }
+        Update: {
+          created_at?: string
+          hidden_instructions?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          platform_formatting?: Json | null
+          system_prompt?: string
+          template_type?: string
+          updated_at?: string
+          variable_placeholders?: Json | null
+        }
+        Relationships: []
+      }
+      ai_provider_settings: {
+        Row: {
+          api_key_secret_name: string | null
+          config_json: Json | null
+          created_at: string
+          frequency_penalty: number | null
+          id: string
+          is_active: boolean | null
+          is_fallback: boolean | null
+          max_tokens: number | null
+          model_name: string
+          presence_penalty: number | null
+          provider_name: string
+          provider_type: string
+          temperature: number | null
+          top_p: number | null
+          updated_at: string
+        }
+        Insert: {
+          api_key_secret_name?: string | null
+          config_json?: Json | null
+          created_at?: string
+          frequency_penalty?: number | null
+          id?: string
+          is_active?: boolean | null
+          is_fallback?: boolean | null
+          max_tokens?: number | null
+          model_name: string
+          presence_penalty?: number | null
+          provider_name: string
+          provider_type: string
+          temperature?: number | null
+          top_p?: number | null
+          updated_at?: string
+        }
+        Update: {
+          api_key_secret_name?: string | null
+          config_json?: Json | null
+          created_at?: string
+          frequency_penalty?: number | null
+          id?: string
+          is_active?: boolean | null
+          is_fallback?: boolean | null
+          max_tokens?: number | null
+          model_name?: string
+          presence_penalty?: number | null
+          provider_name?: string
+          provider_type?: string
+          temperature?: number | null
+          top_p?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ai_text_generations: {
+        Row: {
+          brand_preset_id: string | null
+          business_id: string | null
+          content_type: string | null
+          created_at: string
+          id: string
+          input_params: Json | null
+          model: string | null
+          output_variations: Json | null
+          platform: string | null
+          prompt_template_id: string | null
+          provider: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          brand_preset_id?: string | null
+          business_id?: string | null
+          content_type?: string | null
+          created_at?: string
+          id?: string
+          input_params?: Json | null
+          model?: string | null
+          output_variations?: Json | null
+          platform?: string | null
+          prompt_template_id?: string | null
+          provider?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          brand_preset_id?: string | null
+          business_id?: string | null
+          content_type?: string | null
+          created_at?: string
+          id?: string
+          input_params?: Json | null
+          model?: string | null
+          output_variations?: Json | null
+          platform?: string | null
+          prompt_template_id?: string | null
+          provider?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_text_generations_brand_preset_id_fkey"
+            columns: ["brand_preset_id"]
+            isOneToOne: false
+            referencedRelation: "ai_brand_presets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_text_generations_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_text_generations_prompt_template_id_fkey"
+            columns: ["prompt_template_id"]
+            isOneToOne: false
+            referencedRelation: "ai_prompt_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_usage_logs: {
+        Row: {
+          created_at: string
+          credits_used: number | null
+          error_message: string | null
+          estimated_cost: number | null
+          generation_type: string
+          id: string
+          model: string | null
+          output_result: string | null
+          prompt_input: string | null
+          provider: string | null
+          response_time_ms: number | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits_used?: number | null
+          error_message?: string | null
+          estimated_cost?: number | null
+          generation_type: string
+          id?: string
+          model?: string | null
+          output_result?: string | null
+          prompt_input?: string | null
+          provider?: string | null
+          response_time_ms?: number | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits_used?: number | null
+          error_message?: string | null
+          estimated_cost?: number | null
+          generation_type?: string
+          id?: string
+          model?: string | null
+          output_result?: string | null
+          prompt_input?: string | null
+          provider?: string | null
+          response_time_ms?: number | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       brand_assets: {
         Row: {
           asset_type: string
