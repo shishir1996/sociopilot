@@ -35,11 +35,7 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [selectedBusiness, setSelectedBusiness] = useState<string | null>(null);
-  const [plans, setPlans] = useState<ContentPlan[]>([]);
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
-  const [items, setItems] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
@@ -56,8 +52,6 @@ export default function Dashboard() {
     setBusinesses(data || []);
     if (data && data.length > 0) {
       setSelectedBusiness(data[0].id);
-      fetchPlans(data[0].id);
-      // Fetch user's logo
       const { data: logoData } = await supabase
         .from("brand_assets")
         .select("file_url")
@@ -70,56 +64,6 @@ export default function Dashboard() {
       }
     }
     setLoading(false);
-  };
-
-  const fetchPlans = async (businessId: string) => {
-    const { data } = await supabase
-      .from("content_plans")
-      .select("id, week_start, week_number, strategy_summary, status")
-      .eq("business_id", businessId)
-      .order("created_at", { ascending: false }) as any;
-    setPlans(data || []);
-    if (data && data.length > 0) {
-      setSelectedPlan(data[0].id);
-      fetchItems(data[0].id);
-    } else {
-      setSelectedPlan(null);
-      setItems([]);
-    }
-  };
-
-  const fetchItems = async (planId: string) => {
-    const { data } = await supabase
-      .from("content_items")
-      .select("*")
-      .eq("plan_id", planId)
-      .order("day_number", { ascending: true }) as any;
-    setItems(data || []);
-  };
-
-  const generateAIPlan = async () => {
-    if (!selectedBusiness || !user) return;
-    setGenerating(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("generate-content", {
-        body: { business_id: selectedBusiness },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      toast({
-        title: "✨ Content Plan Generated!",
-        description: "AI has created a complete 7-day plan with captions, hashtags, and more.",
-      });
-      await fetchPlans(selectedBusiness);
-    } catch (error: any) {
-      console.error("Error generating plan:", error);
-      toast({
-        title: "Generation Failed",
-        description: error.message || "Could not generate content plan. Please try again.",
-        variant: "destructive",
-      });
-    }
-    setGenerating(false);
   };
 
   if (loading) {
