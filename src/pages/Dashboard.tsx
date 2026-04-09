@@ -2,15 +2,14 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { ContentCard } from "@/components/ContentCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  Plus, LogOut, Building2, CalendarDays, Sparkles, Settings, Loader2, UserCog,
-  Zap, BarChart3, MessageSquare, LayoutDashboard, Calendar, Inbox, Globe, ImageIcon
+  LogOut, Building2, Sparkles, Settings, UserCog,
+  Zap, BarChart3, LayoutDashboard, Calendar, Inbox, Globe, ImageIcon
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
 import { SocialConnectWidget } from "@/components/SocialConnectWidget";
+import { DashboardAnalytics } from "@/components/dashboard/DashboardAnalytics";
 
 interface Business {
   id: string;
@@ -19,42 +18,10 @@ interface Business {
   platforms: string[];
 }
 
-interface ContentPlan {
-  id: string;
-  week_start: string;
-  week_number: number;
-  strategy_summary: string;
-  status: string;
-}
-
-interface ContentItem {
-  id: string;
-  day_number: number;
-  content_theme: string;
-  content_goal: string;
-  primary_platform: string;
-  secondary_platforms: string[];
-  content_type: string;
-  topic: string;
-  hook: string;
-  pain_point: string;
-  core_message: string;
-  cta: string;
-  posting_time: string;
-  why_it_matters: string;
-  status: string;
-  caption: string;
-  hashtags: string[];
-  image_prompt: string;
-  image_url: string;
-  visual_style: string;
-  repurposing_suggestion: string;
-}
-
 const sidebarNav = [
   { icon: LayoutDashboard, label: "Dashboard", active: true },
   { icon: Zap, label: "AI Studio", route: "/ai-studio" },
-  { icon: Sparkles, label: "Content" },
+  { icon: Sparkles, label: "Content", route: "/content" },
   { icon: Calendar, label: "Calendar" },
   { icon: BarChart3, label: "Analytics" },
   { icon: Inbox, label: "Inbox" },
@@ -64,14 +31,9 @@ const sidebarNav = [
 export default function Dashboard() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [selectedBusiness, setSelectedBusiness] = useState<string | null>(null);
-  const [plans, setPlans] = useState<ContentPlan[]>([]);
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
-  const [items, setItems] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
@@ -88,8 +50,6 @@ export default function Dashboard() {
     setBusinesses(data || []);
     if (data && data.length > 0) {
       setSelectedBusiness(data[0].id);
-      fetchPlans(data[0].id);
-      // Fetch user's logo
       const { data: logoData } = await supabase
         .from("brand_assets")
         .select("file_url")
@@ -102,56 +62,6 @@ export default function Dashboard() {
       }
     }
     setLoading(false);
-  };
-
-  const fetchPlans = async (businessId: string) => {
-    const { data } = await supabase
-      .from("content_plans")
-      .select("id, week_start, week_number, strategy_summary, status")
-      .eq("business_id", businessId)
-      .order("created_at", { ascending: false }) as any;
-    setPlans(data || []);
-    if (data && data.length > 0) {
-      setSelectedPlan(data[0].id);
-      fetchItems(data[0].id);
-    } else {
-      setSelectedPlan(null);
-      setItems([]);
-    }
-  };
-
-  const fetchItems = async (planId: string) => {
-    const { data } = await supabase
-      .from("content_items")
-      .select("*")
-      .eq("plan_id", planId)
-      .order("day_number", { ascending: true }) as any;
-    setItems(data || []);
-  };
-
-  const generateAIPlan = async () => {
-    if (!selectedBusiness || !user) return;
-    setGenerating(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("generate-content", {
-        body: { business_id: selectedBusiness },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      toast({
-        title: "✨ Content Plan Generated!",
-        description: "AI has created a complete 7-day plan with captions, hashtags, and more.",
-      });
-      await fetchPlans(selectedBusiness);
-    } catch (error: any) {
-      console.error("Error generating plan:", error);
-      toast({
-        title: "Generation Failed",
-        description: error.message || "Could not generate content plan. Please try again.",
-        variant: "destructive",
-      });
-    }
-    setGenerating(false);
   };
 
   if (loading) {
@@ -185,8 +95,6 @@ export default function Dashboard() {
       </div>
     );
   }
-
-  const currentPlan = plans.find((p) => p.id === selectedPlan);
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -274,122 +182,21 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* Strategy summary */}
-            {currentPlan?.strategy_summary && (
-              <Card className="mb-6 shadow-card bg-primary/5 border-primary/20">
-                <CardContent className="py-4">
-                  <p className="text-sm text-foreground">
-                    <span className="font-semibold text-primary">📋 Strategy:</span>{" "}
-                    {currentPlan.strategy_summary}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Plans header */}
+            {/* Analytics Header */}
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <CalendarDays className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-bold text-foreground">
-                  Weekly Content Plans
-                </h2>
-                {plans.length > 0 && (
-                  <span className="text-sm text-muted-foreground">
-                    Week {currentPlan?.week_number || 1}
-                  </span>
-                )}
+                <BarChart3 className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-bold text-foreground">Overview</h2>
               </div>
-              <Button onClick={generateAIPlan} size="sm" disabled={generating} className="gradient-primary border-0">
-                {generating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-1 animate-spin" /> Generating...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4 mr-1" /> Generate New Week
-                  </>
-                )}
+              <Button onClick={() => navigate("/content")} size="sm" className="gradient-primary border-0">
+                <Sparkles className="h-4 w-4 mr-1" /> View Content
               </Button>
             </div>
 
-            {/* Plan tabs */}
-            {plans.length > 1 && (
-              <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-                {plans.map((plan) => (
-                  <button
-                    key={plan.id}
-                    onClick={() => {
-                      setSelectedPlan(plan.id);
-                      fetchItems(plan.id);
-                    }}
-                    className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                      selectedPlan === plan.id
-                        ? "gradient-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground hover:bg-secondary"
-                    }`}
-                  >
-                    Week {plan.week_number}
-                  </button>
-                ))}
-              </div>
+            {/* Analytics */}
+            {selectedBusiness && (
+              <DashboardAnalytics businessId={selectedBusiness} />
             )}
-
-            {/* Generating state */}
-            {generating && (
-              <Card className="mb-6 shadow-card border-border">
-                <CardContent className="py-12 text-center space-y-4">
-                  <div className="w-12 h-12 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-                  <h3 className="font-bold text-foreground">AI is crafting your content plan...</h3>
-                  <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                    Generating captions, hashtags, hooks, and platform-specific content for 7 days.
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Content grid */}
-            {!generating && items.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {items.map((item) => (
-                  <ContentCard
-                    key={item.id}
-                    id={item.id}
-                    dayNumber={item.day_number}
-                    theme={item.content_theme}
-                    goal={item.content_goal}
-                    primaryPlatform={item.primary_platform}
-                    secondaryPlatforms={item.secondary_platforms || []}
-                    contentType={item.content_type}
-                    topic={item.topic}
-                    hook={item.hook}
-                    painPoint={item.pain_point}
-                    coreMessage={item.core_message}
-                    cta={item.cta}
-                    postingTime={item.posting_time}
-                    whyItMatters={item.why_it_matters}
-                    status={item.status}
-                    caption={item.caption}
-                    hashtags={item.hashtags}
-                    imagePrompt={item.image_prompt}
-                    imageUrl={item.image_url}
-                    visualStyle={item.visual_style}
-                    repurposingSuggestion={item.repurposing_suggestion}
-                    onStatusChange={() => selectedPlan && fetchItems(selectedPlan)}
-                    onDelete={() => selectedPlan && fetchItems(selectedPlan)}
-                  />
-                ))}
-              </div>
-            ) : !generating ? (
-              <Card className="shadow-card border-border">
-                <CardContent className="py-16 text-center space-y-3">
-                  <Sparkles className="h-12 w-12 text-primary mx-auto" />
-                  <h3 className="font-bold text-foreground">No content plan yet</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Click "Generate New Week" to let AI create a complete 7-day content plan.
-                  </p>
-                </CardContent>
-              </Card>
-            ) : null}
           </div>
         </main>
       </div>
