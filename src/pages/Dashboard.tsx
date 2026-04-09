@@ -10,6 +10,7 @@ import {
   Zap, BarChart3, MessageSquare, LayoutDashboard, Calendar, Inbox, Globe, ImageIcon
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { SocialConnectWidget } from "@/components/SocialConnectWidget";
 
 interface Business {
   id: string;
@@ -266,6 +267,13 @@ export default function Dashboard() {
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">
           <div className="max-w-7xl mx-auto">
+            {/* Social Connect Widget */}
+            {selectedBusiness && (
+              <div className="mb-6">
+                <SocialConnectWidget businessId={selectedBusiness} />
+              </div>
+            )}
+
             {/* Strategy summary */}
             {currentPlan?.strategy_summary && (
               <Card className="mb-6 shadow-card bg-primary/5 border-primary/20">
