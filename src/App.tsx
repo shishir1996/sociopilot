@@ -13,6 +13,7 @@ import SocialSettings from "./pages/SocialSettings";
 import AccountSettings from "./pages/AccountSettings";
 import BrandAssets from "./pages/BrandAssets";
 import AIStudio from "./pages/AIStudio";
+import ContentPage from "./pages/ContentPage";
 import AdminAIControlCenter from "./pages/AdminAIControlCenter";
 
 const queryClient = new QueryClient();

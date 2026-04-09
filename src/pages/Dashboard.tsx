@@ -98,8 +98,6 @@ export default function Dashboard() {
     );
   }
 
-  const currentPlan = plans.find((p) => p.id === selectedPlan);
-
   return (
     <div className="min-h-screen bg-background flex">
       {/* Sidebar */}
@@ -186,122 +184,21 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* Strategy summary */}
-            {currentPlan?.strategy_summary && (
-              <Card className="mb-6 shadow-card bg-primary/5 border-primary/20">
-                <CardContent className="py-4">
-                  <p className="text-sm text-foreground">
-                    <span className="font-semibold text-primary">📋 Strategy:</span>{" "}
-                    {currentPlan.strategy_summary}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Plans header */}
+            {/* Analytics Header */}
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <CalendarDays className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-bold text-foreground">
-                  Weekly Content Plans
-                </h2>
-                {plans.length > 0 && (
-                  <span className="text-sm text-muted-foreground">
-                    Week {currentPlan?.week_number || 1}
-                  </span>
-                )}
+                <BarChart3 className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-bold text-foreground">Overview</h2>
               </div>
-              <Button onClick={generateAIPlan} size="sm" disabled={generating} className="gradient-primary border-0">
-                {generating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-1 animate-spin" /> Generating...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4 mr-1" /> Generate New Week
-                  </>
-                )}
+              <Button onClick={() => navigate("/content")} size="sm" className="gradient-primary border-0">
+                <Sparkles className="h-4 w-4 mr-1" /> View Content
               </Button>
             </div>
 
-            {/* Plan tabs */}
-            {plans.length > 1 && (
-              <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-                {plans.map((plan) => (
-                  <button
-                    key={plan.id}
-                    onClick={() => {
-                      setSelectedPlan(plan.id);
-                      fetchItems(plan.id);
-                    }}
-                    className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                      selectedPlan === plan.id
-                        ? "gradient-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground hover:bg-secondary"
-                    }`}
-                  >
-                    Week {plan.week_number}
-                  </button>
-                ))}
-              </div>
+            {/* Analytics */}
+            {selectedBusiness && (
+              <DashboardAnalytics businessId={selectedBusiness} />
             )}
-
-            {/* Generating state */}
-            {generating && (
-              <Card className="mb-6 shadow-card border-border">
-                <CardContent className="py-12 text-center space-y-4">
-                  <div className="w-12 h-12 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-                  <h3 className="font-bold text-foreground">AI is crafting your content plan...</h3>
-                  <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                    Generating captions, hashtags, hooks, and platform-specific content for 7 days.
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Content grid */}
-            {!generating && items.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {items.map((item) => (
-                  <ContentCard
-                    key={item.id}
-                    id={item.id}
-                    dayNumber={item.day_number}
-                    theme={item.content_theme}
-                    goal={item.content_goal}
-                    primaryPlatform={item.primary_platform}
-                    secondaryPlatforms={item.secondary_platforms || []}
-                    contentType={item.content_type}
-                    topic={item.topic}
-                    hook={item.hook}
-                    painPoint={item.pain_point}
-                    coreMessage={item.core_message}
-                    cta={item.cta}
-                    postingTime={item.posting_time}
-                    whyItMatters={item.why_it_matters}
-                    status={item.status}
-                    caption={item.caption}
-                    hashtags={item.hashtags}
-                    imagePrompt={item.image_prompt}
-                    imageUrl={item.image_url}
-                    visualStyle={item.visual_style}
-                    repurposingSuggestion={item.repurposing_suggestion}
-                    onStatusChange={() => selectedPlan && fetchItems(selectedPlan)}
-                    onDelete={() => selectedPlan && fetchItems(selectedPlan)}
-                  />
-                ))}
-              </div>
-            ) : !generating ? (
-              <Card className="shadow-card border-border">
-                <CardContent className="py-16 text-center space-y-3">
-                  <Sparkles className="h-12 w-12 text-primary mx-auto" />
-                  <h3 className="font-bold text-foreground">No content plan yet</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Click "Generate New Week" to let AI create a complete 7-day content plan.
-                  </p>
-                </CardContent>
-              </Card>
-            ) : null}
           </div>
         </main>
       </div>
