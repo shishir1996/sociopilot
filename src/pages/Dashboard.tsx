@@ -5,10 +5,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  LogOut, Building2, Sparkles, Settings, Loader2, UserCog,
+  LogOut, Building2, Sparkles, Settings, UserCog,
   Zap, BarChart3, LayoutDashboard, Calendar, Inbox, Globe, ImageIcon
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
 import { SocialConnectWidget } from "@/components/SocialConnectWidget";
 import { DashboardAnalytics } from "@/components/dashboard/DashboardAnalytics";
 
