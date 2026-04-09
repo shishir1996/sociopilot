@@ -33,6 +33,7 @@ const App = () => (
             <Route path="/account" element={<AccountSettings />} />
             <Route path="/brand-assets" element={<BrandAssets />} />
             <Route path="/ai-studio" element={<AIStudio />} />
+            <Route path="/content" element={<ContentPage />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/ai" element={<AdminAIControlCenter />} />
             <Route path="*" element={<NotFound />} />
