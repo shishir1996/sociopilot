@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 
 const platforms = ["Instagram", "Facebook", "LinkedIn", "Twitter", "YouTube", "Threads"];
-const contentTypes = ["Caption", "Ad Copy", "Hook", "CTA", "Carousel Post", "Reel Script", "Story Text", "Product Post", "Promotional Post", "Educational Post", "Personal Brand Post"];
+const contentTypes = ["Caption", "Ad Copy", "Hook", "CTA", "Carousel Post", "Story Text", "Product Post", "Promotional Post", "Educational Post", "Personal Brand Post"];
 const tones = ["Professional", "Casual", "Witty", "Inspirational", "Bold", "Luxury", "Friendly", "Authoritative"];
 const lengths = ["Short", "Medium", "Long"];
 const emojiOptions = ["Yes", "No", "Minimal"];
