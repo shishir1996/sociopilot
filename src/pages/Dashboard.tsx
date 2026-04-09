@@ -31,7 +31,6 @@ const sidebarNav = [
 export default function Dashboard() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [selectedBusiness, setSelectedBusiness] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
