@@ -55,6 +55,7 @@ export default function ContentPage() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [businessId, setBusinessId] = useState<string | null>(null);
+  const [hasConnectedPlatforms, setHasConnectedPlatforms] = useState(false);
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -83,6 +84,14 @@ export default function ContentPage() {
     const bizId = biz[0].id;
     setBusinessId(bizId);
 
+    // Check connected platforms
+    const { data: accounts } = await supabase
+      .from("social_accounts")
+      .select("id")
+      .eq("business_id", bizId)
+      .limit(1) as any;
+    setHasConnectedPlatforms((accounts || []).length > 0);
+
     const { data: plansData } = await supabase
       .from("content_plans")
       .select("id, week_start, week_number, strategy_summary, status")
@@ -105,6 +114,16 @@ export default function ContentPage() {
 
   const generateAIPlan = async () => {
     if (!businessId || !user) return;
+
+    if (!hasConnectedPlatforms) {
+      toast({
+        title: "Connect Platforms First",
+        description: "Please connect at least one social media platform on your dashboard before generating content.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setGenerating(true);
     try {
       const { data, error } = await supabase.functions.invoke("generate-content", {
@@ -112,7 +131,11 @@ export default function ContentPage() {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      toast({ title: "✨ Content Plan Generated!", description: "AI has created a new 7-day plan." });
+
+      // Enable auto-generate after first manual generation
+      await supabase.from("businesses").update({ auto_generate_enabled: true }).eq("id", businessId);
+
+      toast({ title: "✨ Content Plan Generated!", description: "AI has created a new 7-day plan. Future weeks will auto-generate every Sunday." });
       await fetchData();
     } catch (error: any) {
       toast({ title: "Generation Failed", description: error.message, variant: "destructive" });

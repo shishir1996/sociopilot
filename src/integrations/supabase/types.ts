@@ -447,6 +447,7 @@ export type Database = {
       }
       businesses: {
         Row: {
+          auto_generate_enabled: boolean
           brand_colors: string[] | null
           brand_tone: string | null
           competitors: string | null
@@ -470,6 +471,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          auto_generate_enabled?: boolean
           brand_colors?: string[] | null
           brand_tone?: string | null
           competitors?: string | null
@@ -493,6 +495,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          auto_generate_enabled?: boolean
           brand_colors?: string[] | null
           brand_tone?: string | null
           competitors?: string | null
@@ -661,6 +664,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "content_plans_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      posting_schedules: {
+        Row: {
+          business_id: string
+          created_at: string
+          day_of_week: number
+          enabled: boolean
+          id: string
+          platforms: string[]
+          posting_time: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          day_of_week: number
+          enabled?: boolean
+          id?: string
+          platforms?: string[]
+          posting_time?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          day_of_week?: number
+          enabled?: boolean
+          id?: string
+          platforms?: string[]
+          posting_time?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "posting_schedules_business_id_fkey"
             columns: ["business_id"]
             isOneToOne: false
             referencedRelation: "businesses"
