@@ -20,9 +20,8 @@ interface Business {
 
 const sidebarNav = [
   { icon: LayoutDashboard, label: "Dashboard", active: true },
-  { icon: Zap, label: "AI Studio", route: "/ai-studio" },
   { icon: Sparkles, label: "Content", route: "/content" },
-  { icon: Calendar, label: "Calendar" },
+  { icon: Calendar, label: "Schedule", route: "/schedule" },
   { icon: BarChart3, label: "Analytics" },
   { icon: Inbox, label: "Inbox" },
   { icon: Globe, label: "GMB" },
