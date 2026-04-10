@@ -102,8 +102,12 @@ async function generateImagesInBackground(
   const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
   await ensureBucketExists(supabaseAdmin);
 
-  for (const item of insertedItems) {
-    if (!item.image_prompt) continue;
+  // Only process items that need images (text_with_image or image_carousel)
+  const imageItems = insertedItems.filter((item) => item.image_prompt && item.post_format !== "text_only");
+
+  console.log(`Generating images for ${imageItems.length} of ${insertedItems.length} items (skipping text-only posts)`);
+
+  for (const item of imageItems) {
     try {
       const result = await generateImage(item.image_prompt, apiKey);
       if (!result.data) continue;
@@ -116,7 +120,7 @@ async function generateImagesInBackground(
           .from("content_items")
           .update({ image_url: publicUrl })
           .eq("id", item.id);
-        console.log(`Image generated for day ${item.day_number}`);
+        console.log(`Image generated for day ${item.day_number} (${item.post_format})`);
       }
     } catch (err) {
       console.error(`Image gen failed for day ${item.day_number}:`, err);
@@ -202,7 +206,7 @@ serve(async (req) => {
       return fail("business_id is required", 400, "validation", { field: "business_id" });
     }
 
-    // Fetch business details (including creative_direction)
+    // Fetch business details
     const { data: business, error: bizError } = await supabaseAdmin
       .from("businesses")
       .select("*")
@@ -257,9 +261,9 @@ serve(async (req) => {
       previousTopicsSummary = `\n\nPREVIOUSLY USED TOPICS (DO NOT REPEAT THESE — create completely new angles):\n${topicList}`;
     }
 
-    // Build deeply personalized system prompt
+    // Build optimized system prompt with FORMAT-FIRST decision making
     const systemPrompt = `You are a senior AI Content Strategist specialized in ${business.industry || "business"} marketing.
-You create hyper-personalized, niche-specific social media content plans that feel like they were written by an expert marketer who deeply understands the client's business.
+You create hyper-personalized, niche-specific social media content plans.
 
 BUSINESS PROFILE:
 - Name: ${business.name}
@@ -274,40 +278,55 @@ BUSINESS PROFILE:
 - Competitors: ${business.competitors || "Not specified"}
 - Posting Goals: ${(business.posting_goals || ["engagement"]).join(", ")}${colorContext}${sloganContext}${brandContext}${creativeDirectionContext}
 
-CONTENT RULES:
-1. Every post MUST be specifically about "${business.name}" and its ${business.industry || "business"} niche — NO generic motivational quotes or filler content.
-2. Captions must mention the business name, products, services, or location naturally.
-3. Hooks must be scroll-stopping, specific to the industry, and address real pain points of "${business.target_audience || "the target audience"}".
-4. CTAs must drive specific actions: calls, DMs, website visits, store visits, bookings — not vague "like and share".
-5. Hashtags must include brand-specific, location-specific (if applicable), and niche-specific tags.
-6. Image prompts must be detailed, brand-aligned, and describe professional social media visuals — NOT generic stock photos.
-7. Each day must target a DIFFERENT content goal: awareness, engagement, trust, sales, education, local visibility, conversion.
+=== FORMAT DECISION RULES (CRITICAL — FOLLOW EXACTLY) ===
+
+For EACH post, you MUST first decide the post_format from EXACTLY these 3 options:
+1. "text_only" — Pure text post, no image needed. Best for thought leadership, questions, polls, hot takes, quick tips.
+2. "text_with_image" — Text caption + single AI-generated image. Best for product showcases, tips with visuals, brand moments, testimonials.
+3. "image_carousel" — Text caption + multiple images (carousel). Best for step-by-step guides, before/after, product collections, listicles.
+
+FORMAT SELECTION LOGIC:
+- A good weekly mix is: 2-3 text_with_image, 1-2 image_carousel, 2-3 text_only
+- text_only posts: Do NOT include image_prompt or visual_style (set both to empty string "")
+- text_with_image posts: MUST include a detailed image_prompt
+- image_carousel posts: MUST include a detailed image_prompt describing the first/cover slide visual
+- NEVER use "Reel", "Video", "Story" as content_type — only use: "Text Post", "Image Post", "Carousel"
+
+=== CONTENT RULES ===
+1. Every post MUST be specifically about "${business.name}" and its niche — NO generic filler.
+2. Captions must mention the business name, products, or services naturally.
+3. Hooks must be scroll-stopping and address real pain points of "${business.target_audience || "the target audience"}".
+4. CTAs must drive specific actions: calls, DMs, website visits, bookings — not vague "like and share".
+5. Hashtags must include brand-specific, location-specific, and niche-specific tags.
+6. Image prompts (when post_format is NOT text_only) must be detailed, brand-aligned, professional social media visuals.
+7. Each day must target a DIFFERENT content goal.
 8. ${business.location ? `Include Google Business Profile as a platform option since this is a local business in ${business.location}.` : ""}
-9. When brand colors are provided, ALWAYS incorporate them into image prompts.
-10. Content must feel like it was written by someone who works at "${business.name}", not a generic AI.
+9. When brand colors are provided, incorporate them into image prompts.
+10. Content must feel like it was written by someone who works at "${business.name}".
 
 Return ONLY a valid JSON object with this exact structure:
 {
-  "strategy_summary": "Specific strategy for Week ${weekNumber} of ${business.name}'s content plan, mentioning key themes and goals",
+  "strategy_summary": "Specific strategy for Week ${weekNumber}",
   "days": [
     {
       "day_number": 1,
+      "post_format": "text_only | text_with_image | image_carousel",
       "content_theme": "Theme specific to ${business.industry}",
-      "content_goal": "Specific goal (awareness/engagement/trust/sales/education/local/conversion)",
+      "content_goal": "awareness|engagement|trust|sales|education|local|conversion",
       "primary_platform": "Platform name",
       "secondary_platforms": ["Platform2"],
-      "content_type": "Carousel|Reel|Image|Text|Story|Video",
+      "content_type": "Text Post | Image Post | Carousel",
       "topic": "Specific topic about ${business.name}'s niche",
       "hook": "Industry-specific scroll-stopping hook",
-      "pain_point": "Real pain point of ${business.target_audience || "audience"}",
-      "core_message": "Key message tied to business value proposition",
+      "pain_point": "Real pain point of audience",
+      "core_message": "Key message tied to business value",
       "cta": "Specific action-driving CTA",
       "posting_time": "10:00 AM",
-      "why_it_matters": "Why this post drives ${(business.posting_goals || ["growth"]).join("/")}",
-      "caption": "Full ready-to-post caption (200-400 words), personalized to ${business.name}",
-      "hashtags": ["brandTag", "nicheTag", "locationTag", "industryTag"],
-      "image_prompt": "Detailed AI image prompt with brand colors, style, composition, and industry context",
-      "visual_style": "Visual direction matching brand identity",
+      "why_it_matters": "Why this post drives growth",
+      "caption": "Full ready-to-post caption (200-400 words) with emojis and line breaks",
+      "hashtags": ["brandTag", "nicheTag", "locationTag"],
+      "image_prompt": "Detailed AI image prompt (EMPTY STRING if text_only)",
+      "visual_style": "Visual direction (EMPTY STRING if text_only)",
       "repurposing_suggestion": "Platform-specific repurposing tip"
     }
   ]
@@ -317,13 +336,18 @@ Generate exactly 7 days with diverse, non-repetitive content.${previousTopicsSum
     const userPrompt = `Generate Week ${weekNumber} content plan for "${business.name}".
 
 Platforms to use: ${(business.platforms || ["Instagram", "Facebook"]).join(", ")}
-Content Types preferred: ${(business.content_types || ["Image", "Carousel", "Reel"]).join(", ")}
+Content Types allowed: Text Post, Image Post, Carousel (NO videos, reels, or stories)
 
-This is week ${weekNumber} — make sure the content is COMPLETELY FRESH and different from any previous weeks. 
-Focus this week on: ${weekNumber % 4 === 1 ? "brand awareness and reach" : weekNumber % 4 === 2 ? "engagement and community building" : weekNumber % 4 === 3 ? "trust building and social proof" : "sales conversion and lead generation"}.
+IMPORTANT FORMAT MIX: 
+- Include at least 2 "text_only" posts (these save resources and are great for engagement)
+- Include at least 2 "text_with_image" posts (visual impact)
+- Include at least 1 "image_carousel" post (high engagement format)
+
+This is week ${weekNumber}. Focus on: ${weekNumber % 4 === 1 ? "brand awareness and reach" : weekNumber % 4 === 2 ? "engagement and community building" : weekNumber % 4 === 3 ? "trust building and social proof" : "sales conversion and lead generation"}.
 
 Every caption must be ready to copy-paste with emojis, line breaks, and a clear CTA.
-Every image prompt must describe a professional, brand-aligned visual that would look great on social media.`;
+For text_only posts: focus on powerful writing, no image_prompt needed.
+For text_with_image and image_carousel: include detailed, brand-aligned image prompts.`;
 
     // Call Lovable AI for content plan
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -342,7 +366,7 @@ Every image prompt must describe a professional, brand-aligned visual that would
           type: "function",
           function: {
             name: "create_content_plan",
-            description: "Create a 7-day content plan",
+            description: "Create a 7-day content plan with format-first decisions",
             parameters: {
               type: "object",
               properties: {
@@ -353,11 +377,12 @@ Every image prompt must describe a professional, brand-aligned visual that would
                     type: "object",
                     properties: {
                       day_number: { type: "number" },
+                      post_format: { type: "string", enum: ["text_only", "text_with_image", "image_carousel"] },
                       content_theme: { type: "string" },
                       content_goal: { type: "string" },
                       primary_platform: { type: "string" },
                       secondary_platforms: { type: "array", items: { type: "string" } },
-                      content_type: { type: "string" },
+                      content_type: { type: "string", enum: ["Text Post", "Image Post", "Carousel"] },
                       topic: { type: "string" },
                       hook: { type: "string" },
                       pain_point: { type: "string" },
@@ -371,7 +396,7 @@ Every image prompt must describe a professional, brand-aligned visual that would
                       visual_style: { type: "string" },
                       repurposing_suggestion: { type: "string" },
                     },
-                    required: ["day_number", "content_theme", "content_goal", "primary_platform", "content_type", "topic", "hook", "caption", "cta"],
+                    required: ["day_number", "post_format", "content_theme", "content_goal", "primary_platform", "content_type", "topic", "hook", "caption", "cta"],
                   },
                 },
               },
@@ -387,20 +412,10 @@ Every image prompt must describe a professional, brand-aligned visual that would
       const errText = await aiResponse.text();
       console.error("AI gateway error:", aiResponse.status, errText);
       if (aiResponse.status === 429) {
-        return fail(
-          "AI rate limit reached. Please try again in a moment.",
-          429,
-          "content_plan_ai_rate_limit",
-          { ai_status: aiResponse.status },
-        );
+        return fail("AI rate limit reached. Please try again in a moment.", 429, "content_plan_ai_rate_limit", { ai_status: aiResponse.status });
       }
       if (aiResponse.status === 402) {
-        return fail(
-          "AI credits exhausted. Please add funds in Settings > Workspace > Usage.",
-          402,
-          "content_plan_ai_credits",
-          { ai_status: aiResponse.status },
-        );
+        return fail("AI credits exhausted. Please add funds in Settings > Workspace > Usage.", 402, "content_plan_ai_credits", { ai_status: aiResponse.status });
       }
       return fail(`AI error: ${aiResponse.status}`, aiResponse.status, "content_plan_ai_gateway", {
         ai_status: aiResponse.status,
@@ -427,12 +442,41 @@ Every image prompt must describe a professional, brand-aligned visual that would
       return fail("AI returned an empty content plan. Please try again.", 502, "empty_content_plan");
     }
 
-    // Calculate the actual week_start date for proper sequencing
+    // Normalize and validate post formats
+    const validFormats = ["text_only", "text_with_image", "image_carousel"];
+    for (const day of plan.days) {
+      if (!validFormats.includes(day.post_format)) {
+        // Infer format from content_type as fallback
+        if (day.content_type === "Text Post" || !day.image_prompt) {
+          day.post_format = "text_only";
+        } else if (day.content_type === "Carousel") {
+          day.post_format = "image_carousel";
+        } else {
+          day.post_format = "text_with_image";
+        }
+      }
+      // Clean up: text_only posts should not have image prompts
+      if (day.post_format === "text_only") {
+        day.image_prompt = "";
+        day.visual_style = "";
+      }
+      // Map content_type to match format
+      if (day.post_format === "text_only") day.content_type = "Text Post";
+      else if (day.post_format === "image_carousel") day.content_type = "Carousel";
+      else day.content_type = "Image Post";
+    }
+
+    // Log format distribution
+    const formatCounts = plan.days.reduce((acc: Record<string, number>, d: any) => {
+      acc[d.post_format] = (acc[d.post_format] || 0) + 1;
+      return acc;
+    }, {});
+    console.log("Content format distribution:", JSON.stringify(formatCounts));
+
     const weekStartDate = new Date();
     weekStartDate.setDate(weekStartDate.getDate() + (weekNumber - 1) * 7);
     const weekStart = weekStartDate.toISOString().split("T")[0];
 
-    // Create the content plan using admin client to bypass any RLS issues
     const { data: newPlan, error: planError } = await supabaseAdmin
       .from("content_plans")
       .insert({
@@ -451,7 +495,7 @@ Every image prompt must describe a professional, brand-aligned visual that would
       return fail(`Failed to save content plan: ${planError.message}`, 500, "plan_insert");
     }
 
-    // Insert content items
+    // Insert content items with post_format mapped to content_type
     const items = plan.days.map((day: any) => ({
       plan_id: newPlan.id,
       user_id: user.id,
@@ -470,8 +514,8 @@ Every image prompt must describe a professional, brand-aligned visual that would
       why_it_matters: day.why_it_matters || "",
       caption: day.caption || "",
       hashtags: day.hashtags || [],
-      image_prompt: day.image_prompt || "",
-      visual_style: day.visual_style || "",
+      image_prompt: day.post_format !== "text_only" ? (day.image_prompt || "") : "",
+      visual_style: day.post_format !== "text_only" ? (day.visual_style || "") : "",
       repurposing_suggestion: day.repurposing_suggestion || "",
       status: "draft",
     }));
@@ -479,27 +523,43 @@ Every image prompt must describe a professional, brand-aligned visual that would
     const { data: insertedItems, error: itemsError } = await supabaseAdmin
       .from("content_items")
       .insert(items)
-      .select("id, image_prompt, day_number");
+      .select("id, image_prompt, day_number, content_type");
 
     if (itemsError) {
       console.error("Items insert error:", itemsError);
       return fail(`Failed to save content items: ${itemsError.message}`, 500, "items_insert");
     }
 
-    // Generate images in the background (non-blocking)
-    console.log("Starting background image generation for", insertedItems.length, "items...");
-    EdgeRuntime.waitUntil(
-      generateImagesInBackground(
-        insertedItems,
-        newPlan.id,
-        supabaseUrl,
-        supabaseKey,
-        LOVABLE_API_KEY,
-      )
-    );
+    // Only generate images for posts that need them (text_with_image, image_carousel)
+    const itemsNeedingImages = insertedItems.filter((item: any) => item.image_prompt && item.image_prompt.length > 0);
+    const textOnlyCount = insertedItems.length - itemsNeedingImages.length;
 
-    // Return immediately with the plan
-    return succeed({ success: true, plan_id: newPlan.id, week_number: weekNumber });
+    console.log(`Plan created: ${insertedItems.length} items total, ${itemsNeedingImages.length} need images, ${textOnlyCount} text-only (skipping image gen)`);
+
+    if (itemsNeedingImages.length > 0) {
+      // Map post_format onto items for background function
+      const itemsWithFormat = itemsNeedingImages.map((item: any) => {
+        const dayData = plan.days.find((d: any) => d.day_number === item.day_number);
+        return { ...item, post_format: dayData?.post_format || "text_with_image" };
+      });
+
+      EdgeRuntime.waitUntil(
+        generateImagesInBackground(
+          itemsWithFormat,
+          newPlan.id,
+          supabaseUrl,
+          supabaseKey,
+          LOVABLE_API_KEY,
+        )
+      );
+    }
+
+    return succeed({
+      success: true,
+      plan_id: newPlan.id,
+      week_number: weekNumber,
+      format_distribution: formatCounts,
+    });
   } catch (error) {
     console.error("generate-content error:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
