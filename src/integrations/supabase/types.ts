@@ -671,6 +671,39 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          action_url: string | null
+          created_at: string
+          id: string
+          message: string
+          read: boolean
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          action_url?: string | null
+          created_at?: string
+          id?: string
+          message: string
+          read?: boolean
+          title: string
+          type?: string
+          user_id: string
+        }
+        Update: {
+          action_url?: string | null
+          created_at?: string
+          id?: string
+          message?: string
+          read?: boolean
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       posting_schedules: {
         Row: {
           business_id: string
@@ -711,6 +744,38 @@ export type Database = {
             columns: ["business_id"]
             isOneToOne: false
             referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      regeneration_logs: {
+        Row: {
+          content_item_id: string
+          created_at: string
+          id: string
+          plan_type: string
+          user_id: string
+        }
+        Insert: {
+          content_item_id: string
+          created_at?: string
+          id?: string
+          plan_type?: string
+          user_id: string
+        }
+        Update: {
+          content_item_id?: string
+          created_at?: string
+          id?: string
+          plan_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "regeneration_logs_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: false
+            referencedRelation: "content_items"
             referencedColumns: ["id"]
           },
         ]
@@ -770,11 +835,14 @@ export type Database = {
           created_at: string
           ends_at: string | null
           id: string
+          is_trial: boolean
           plan_name: string | null
           starts_at: string | null
           status: string
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
+          trial_ends_at: string | null
+          trial_started_at: string | null
           updated_at: string
           user_id: string
         }
@@ -782,11 +850,14 @@ export type Database = {
           created_at?: string
           ends_at?: string | null
           id?: string
+          is_trial?: boolean
           plan_name?: string | null
           starts_at?: string | null
           status?: string
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
+          trial_ends_at?: string | null
+          trial_started_at?: string | null
           updated_at?: string
           user_id: string
         }
@@ -794,12 +865,39 @@ export type Database = {
           created_at?: string
           ends_at?: string | null
           id?: string
+          is_trial?: boolean
           plan_name?: string | null
           starts_at?: string | null
           status?: string
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
+          trial_ends_at?: string | null
+          trial_started_at?: string | null
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      upgrade_events: {
+        Row: {
+          action_taken: string | null
+          created_at: string
+          id: string
+          trigger_type: string
+          user_id: string
+        }
+        Insert: {
+          action_taken?: string | null
+          created_at?: string
+          id?: string
+          trigger_type: string
+          user_id: string
+        }
+        Update: {
+          action_taken?: string | null
+          created_at?: string
+          id?: string
+          trigger_type?: string
           user_id?: string
         }
         Relationships: []
@@ -824,6 +922,57 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      weekly_generation_requests: {
+        Row: {
+          business_id: string
+          content_plan_id: string | null
+          created_at: string
+          id: string
+          plan_type: string
+          selected_days: Json
+          selected_platforms: Json
+          status: string
+          user_id: string
+        }
+        Insert: {
+          business_id: string
+          content_plan_id?: string | null
+          created_at?: string
+          id?: string
+          plan_type?: string
+          selected_days?: Json
+          selected_platforms?: Json
+          status?: string
+          user_id: string
+        }
+        Update: {
+          business_id?: string
+          content_plan_id?: string | null
+          created_at?: string
+          id?: string
+          plan_type?: string
+          selected_days?: Json
+          selected_platforms?: Json
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_generation_requests_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weekly_generation_requests_content_plan_id_fkey"
+            columns: ["content_plan_id"]
+            isOneToOne: false
+            referencedRelation: "content_plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

@@ -3,67 +3,215 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Sparkles, Image, Type, Palette, PenTool, ImagePlus } from "lucide-react";
-import AICaptionGenerator from "@/components/ai-studio/AICaptionGenerator";
-import AIAdCopyGenerator from "@/components/ai-studio/AIAdCopyGenerator";
-import AIImageGenerator from "@/components/ai-studio/AIImageGenerator";
-import AIBrandPresets from "@/components/ai-studio/AIBrandPresets";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  ArrowLeft, Sparkles, Loader2, Calendar, Lock, Crown,
+  CheckCircle2, AlertTriangle, ChevronRight, ChevronLeft, Zap
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { ContentCard } from "@/components/ContentCard";
+import { UpgradePrompt } from "@/components/upgrade/UpgradePrompt";
 
-type ActiveView = "home" | "caption" | "adcopy" | "image" | "presets";
-
-const tools = [
-  {
-    id: "caption" as const,
-    icon: Type,
-    title: "AI Caption Generator",
-    description: "Create engaging captions for any social media platform",
-    color: "from-primary to-accent",
-  },
-  {
-    id: "adcopy" as const,
-    icon: PenTool,
-    title: "AI Ad Copy Generator",
-    description: "Generate high-converting ad copy and promotional content",
-    color: "from-accent to-primary",
-  },
-  {
-    id: "image" as const,
-    icon: ImagePlus,
-    title: "AI Image Generator",
-    description: "Create stunning social media visuals and creatives",
-    color: "from-primary to-success",
-  },
-  {
-    id: "presets" as const,
-    icon: Palette,
-    title: "Brand Presets",
-    description: "Save your brand voice, tone, and style for faster generation",
-    color: "from-warning to-accent",
-  },
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const PLATFORMS = [
+  { id: "instagram", label: "Instagram", color: "bg-pink-500" },
+  { id: "facebook", label: "Facebook", color: "bg-blue-600" },
+  { id: "linkedin", label: "LinkedIn", color: "bg-blue-700" },
+  { id: "twitter", label: "X (Twitter)", color: "bg-foreground" },
 ];
 
+type Step = "calendar" | "context" | "generating" | "results";
+
+interface DaySelection {
+  [day: number]: string[]; // day index -> platform ids
+}
+
 export default function AIStudio() {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [activeView, setActiveView] = useState<ActiveView>("home");
+  const { toast } = useToast();
+
+  const [step, setStep] = useState<Step>("calendar");
   const [business, setBusiness] = useState<any>(null);
+  const [subscription, setSubscription] = useState<any>(null);
+  const [planLimits, setPlanLimits] = useState<any>(null);
+  const [weeklyGenCount, setWeeklyGenCount] = useState(0);
+  const [regenCount, setRegenCount] = useState(0);
+  const [daySelection, setDaySelection] = useState<DaySelection>({});
+  const [generating, setGenerating] = useState(false);
+  const [generatedItems, setGeneratedItems] = useState<any[]>([]);
+  const [showUpgrade, setShowUpgrade] = useState<string | null>(null);
+
+  // Context form
+  const [businessName, setBusinessName] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [targetAudience, setTargetAudience] = useState("");
+  const [contentGoal, setContentGoal] = useState("");
+  const [tone, setTone] = useState("professional");
+
+  const planType = subscription?.plan_name || "free_trial";
+  const isTrial = subscription?.is_trial || planType === "free_trial";
+  const isBasic = planType === "basic";
+  const isPro = planType === "pro";
 
   useEffect(() => {
-    if (user) fetchBusiness();
+    if (user) fetchAll();
   }, [user]);
 
-  const fetchBusiness = async () => {
-    const { data } = await supabase
-      .from("businesses")
-      .select("*")
-      .eq("user_id", user!.id)
-      .limit(1)
-      .single();
-    setBusiness(data);
+  const fetchAll = async () => {
+    if (!user) return;
+
+    const [bizRes, subRes, limitsRes] = await Promise.all([
+      supabase.from("businesses").select("*").eq("user_id", user.id).limit(1).single(),
+      supabase.from("subscriptions").select("*").eq("user_id", user.id).limit(1).single(),
+      supabase.from("ai_plan_limits").select("*"),
+    ]);
+
+    if (bizRes.data) {
+      setBusiness(bizRes.data);
+      setBusinessName(bizRes.data.name || "");
+      setIndustry(bizRes.data.industry || "");
+      setTargetAudience(bizRes.data.target_audience || "");
+    }
+
+    const sub = subRes.data || { plan_name: "free_trial", is_trial: true };
+    setSubscription(sub);
+
+    if (limitsRes.data) {
+      const currentPlan = sub.plan_name || "free_trial";
+      const limits = limitsRes.data.find((l: any) => l.plan_name === currentPlan);
+      setPlanLimits(limits);
+    }
+
+    // Count weekly generations this week
+    const weekStart = new Date();
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+    weekStart.setHours(0, 0, 0, 0);
+
+    const { count: genCount } = await supabase
+      .from("weekly_generation_requests")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .gte("created_at", weekStart.toISOString());
+    setWeeklyGenCount(genCount || 0);
+
+    // Count regenerations
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+    const { count: regenC } = await supabase
+      .from("regeneration_logs")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .gte("created_at", monthStart.toISOString());
+    setRegenCount(regenC || 0);
   };
 
-  if (loading) {
+  const togglePlatform = (dayIndex: number, platformId: string) => {
+    setDaySelection(prev => {
+      const current = prev[dayIndex] || [];
+      const isSelected = current.includes(platformId);
+
+      if (isBasic || isTrial) {
+        // Basic/trial: only 1 platform per day (radio behavior)
+        if (isSelected) {
+          return { ...prev, [dayIndex]: [] };
+        }
+        return { ...prev, [dayIndex]: [platformId] };
+      }
+
+      // Pro: multi-select
+      if (isSelected) {
+        return { ...prev, [dayIndex]: current.filter(p => p !== platformId) };
+      }
+      if (current.length >= 4) return prev;
+      return { ...prev, [dayIndex]: [...current, platformId] };
+    });
+  };
+
+  const totalSelectedPosts = Object.values(daySelection).reduce((sum, platforms) => sum + platforms.length, 0);
+
+  const canGenerate = () => {
+    if (totalSelectedPosts === 0) return false;
+    if (isTrial && weeklyGenCount >= 1) return false;
+    return true;
+  };
+
+  const handleGenerate = async () => {
+    if (!canGenerate()) {
+      if (isTrial && weeklyGenCount >= 1) {
+        setShowUpgrade("trial_limit");
+      }
+      return;
+    }
+
+    setStep("generating");
+    setGenerating(true);
+
+    try {
+      // Record generation request
+      await supabase.from("weekly_generation_requests").insert({
+        user_id: user!.id,
+        business_id: business.id,
+        plan_type: planType,
+        selected_days: daySelection,
+        selected_platforms: Object.values(daySelection).flat(),
+        status: "generating",
+      });
+
+      const { data, error } = await supabase.functions.invoke("generate-content", {
+        body: {
+          business_id: business.id,
+          selected_days: daySelection,
+          business_context: {
+            name: businessName,
+            industry,
+            target_audience: targetAudience,
+            content_goal: contentGoal,
+            tone,
+          },
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      // Fetch the generated items
+      if (data?.plan_id) {
+        const { data: items } = await supabase
+          .from("content_items")
+          .select("*")
+          .eq("plan_id", data.plan_id)
+          .order("day_number", { ascending: true });
+        setGeneratedItems(items || []);
+      }
+
+      // Enable auto-generate
+      await supabase.from("businesses").update({ auto_generate_enabled: true }).eq("id", business.id);
+
+      setStep("results");
+
+      // Show upgrade prompt for trial users
+      if (isTrial) {
+        setShowUpgrade("trial_generated");
+      }
+
+      toast({ title: "✨ Weekly Content Generated!", description: `${totalSelectedPosts} posts created for your week.` });
+    } catch (err: any) {
+      toast({ title: "Generation Failed", description: err.message, variant: "destructive" });
+      setStep("calendar");
+    }
+
+    setGenerating(false);
+  };
+
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -76,83 +224,299 @@ export default function AIStudio() {
     return null;
   }
 
-  const renderContent = () => {
-    switch (activeView) {
-      case "caption":
-        return <AICaptionGenerator business={business} />;
-      case "adcopy":
-        return <AIAdCopyGenerator business={business} />;
-      case "image":
-        return <AIImageGenerator business={business} />;
-      case "presets":
-        return <AIBrandPresets />;
-      default:
-        return (
-          <div className="space-y-6">
-            <div className="text-center max-w-xl mx-auto">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center mx-auto mb-4">
-                <Sparkles className="h-7 w-7 text-primary-foreground" />
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b border-border bg-card h-14 flex items-center justify-between px-4 sm:px-6">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={() => step === "calendar" ? navigate("/") : setStep("calendar")} className="text-muted-foreground">
+            <ArrowLeft className="h-4 w-4 mr-1" /> {step === "calendar" ? "Dashboard" : "Back"}
+          </Button>
+          <div className="h-5 w-px bg-border" />
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+              <Sparkles className="h-3.5 w-3.5 text-primary-foreground" />
+            </div>
+            <h1 className="text-sm font-bold text-foreground">AI Studio</h1>
+          </div>
+        </div>
+        <Badge variant="outline" className="text-xs capitalize">
+          <Crown className="h-3 w-3 mr-1" />
+          {planType.replace("_", " ")} Plan
+        </Badge>
+      </header>
+
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+        {/* Step indicator */}
+        <div className="flex items-center justify-center gap-2 mb-8">
+          {[
+            { key: "calendar", label: "Select Days" },
+            { key: "context", label: "Business Context" },
+            { key: "results", label: "Results" },
+          ].map((s, i) => (
+            <div key={s.key} className="flex items-center gap-2">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                step === s.key || (step === "generating" && s.key === "results")
+                  ? "gradient-primary text-primary-foreground"
+                  : step === "results" && i < 2
+                  ? "bg-primary/20 text-primary"
+                  : "bg-muted text-muted-foreground"
+              }`}>
+                {step === "results" && i < 2 ? <CheckCircle2 className="h-4 w-4" /> : i + 1}
               </div>
-              <h2 className="text-2xl font-bold text-foreground mb-2">AI Studio</h2>
-              <p className="text-muted-foreground">
-                Your AI-powered social media content engine. Generate captions, ad copy, and images in seconds.
+              <span className="text-xs text-muted-foreground hidden sm:inline">{s.label}</span>
+              {i < 2 && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+            </div>
+          ))}
+        </div>
+
+        {/* Step 1: Calendar Selection */}
+        {step === "calendar" && (
+          <div className="space-y-6">
+            <div className="text-center max-w-lg mx-auto">
+              <h2 className="text-xl font-bold text-foreground mb-2">Select Your Weekly Schedule</h2>
+              <p className="text-sm text-muted-foreground">
+                Choose which days and platforms you want to post on.
+                {(isBasic || isTrial) && " (1 platform per day on your plan)"}
+                {isPro && " (Up to 4 platforms per day)"}
               </p>
             </div>
 
-            <div className="grid sm:grid-cols-2 gap-4 max-w-3xl mx-auto">
-              {tools.map((tool) => (
-                <Card
-                  key={tool.id}
-                  className="cursor-pointer hover:shadow-md hover:border-primary/30 transition-all group"
-                  onClick={() => setActiveView(tool.id)}
-                >
-                  <CardContent className="pt-6 pb-6">
-                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${tool.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
-                      <tool.icon className="h-5 w-5 text-primary-foreground" />
+            <div className="grid gap-3">
+              {DAYS.map((day, dayIndex) => (
+                <Card key={day} className="shadow-card">
+                  <CardContent className="py-3 px-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3 min-w-[100px]">
+                        <span className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
+                          {day.substring(0, 2)}
+                        </span>
+                        <span className="text-sm font-medium text-foreground">{day}</span>
+                      </div>
+
+                      <div className="flex gap-2 flex-wrap justify-end">
+                        {PLATFORMS.map(platform => {
+                          const selected = (daySelection[dayIndex] || []).includes(platform.id);
+                          const isDisabled = !isPro && !selected && (daySelection[dayIndex] || []).length >= 1;
+
+                          return (
+                            <button
+                              key={platform.id}
+                              onClick={() => {
+                                if (isDisabled && (isBasic || isTrial)) {
+                                  // Replace the existing selection
+                                  togglePlatform(dayIndex, (daySelection[dayIndex] || [])[0]);
+                                  togglePlatform(dayIndex, platform.id);
+                                  return;
+                                }
+                                togglePlatform(dayIndex, platform.id);
+                              }}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                selected
+                                  ? "gradient-primary text-primary-foreground shadow-sm"
+                                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+                              }`}
+                            >
+                              {platform.label}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <h3 className="font-semibold text-foreground mb-1">{tool.title}</h3>
-                    <p className="text-sm text-muted-foreground">{tool.description}</p>
                   </CardContent>
                 </Card>
               ))}
             </div>
-          </div>
-        );
-    }
-  };
 
-  return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => (activeView === "home" ? navigate("/") : setActiveView("home"))}
-            >
-              <ArrowLeft className="h-4 w-4 mr-1" />
-              {activeView === "home" ? "Dashboard" : "AI Studio"}
-            </Button>
-            <div className="h-6 w-px bg-border" />
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                <Sparkles className="h-4 w-4 text-primary-foreground" />
+            {/* Selection summary */}
+            <div className="flex items-center justify-between p-4 rounded-xl bg-card border border-border">
+              <div className="text-sm text-muted-foreground">
+                <span className="font-semibold text-foreground">{totalSelectedPosts}</span> posts selected this week
+                {planLimits && (
+                  <span className="ml-2 text-xs">
+                    (max {isBasic || isTrial ? "7" : "28"}/week)
+                  </span>
+                )}
               </div>
-              <h1 className="text-lg font-bold text-foreground">
-                {activeView === "home" && "AI Studio"}
-                {activeView === "caption" && "Caption Generator"}
-                {activeView === "adcopy" && "Ad Copy Generator"}
-                {activeView === "image" && "Image Generator"}
-                {activeView === "presets" && "Brand Presets"}
-              </h1>
+              <Button
+                onClick={() => setStep("context")}
+                disabled={totalSelectedPosts === 0}
+                className="gradient-primary border-0"
+              >
+                Next: Business Context <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+
+            {/* Trial/Basic limit info */}
+            {isTrial && weeklyGenCount >= 1 && (
+              <UpgradePrompt
+                type="trial_limit"
+                message="You've used your free weekly generation. Upgrade to continue generating content."
+                onUpgrade={() => navigate("/account")}
+                onDismiss={() => {}}
+              />
+            )}
+          </div>
+        )}
+
+        {/* Step 2: Business Context */}
+        {step === "context" && (
+          <div className="space-y-6 max-w-2xl mx-auto">
+            <div className="text-center">
+              <h2 className="text-xl font-bold text-foreground mb-2">Business Context</h2>
+              <p className="text-sm text-muted-foreground">
+                This info helps AI create better content. Auto-filled from your profile.
+              </p>
+            </div>
+
+            <div className="grid gap-4">
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs">Business Name</Label>
+                  <Input value={businessName} onChange={e => setBusinessName(e.target.value)} placeholder="Your business name" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Industry</Label>
+                  <Input value={industry} onChange={e => setIndustry(e.target.value)} placeholder="e.g. Restaurant, Fitness" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">Target Audience</Label>
+                <Input value={targetAudience} onChange={e => setTargetAudience(e.target.value)} placeholder="Who are you trying to reach?" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">Content Goal</Label>
+                <Select value={contentGoal} onValueChange={setContentGoal}>
+                  <SelectTrigger><SelectValue placeholder="What's your main goal?" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="brand_awareness">Brand Awareness</SelectItem>
+                    <SelectItem value="engagement">Engagement & Community</SelectItem>
+                    <SelectItem value="lead_generation">Lead Generation</SelectItem>
+                    <SelectItem value="sales">Drive Sales</SelectItem>
+                    <SelectItem value="education">Educate Audience</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">
+                  Tone
+                  {(isBasic || isTrial) && (
+                    <Badge variant="outline" className="ml-2 text-xs"><Lock className="h-3 w-3 mr-1" /> Advanced tones in Pro</Badge>
+                  )}
+                </Label>
+                <Select value={tone} onValueChange={setTone}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="professional">Professional</SelectItem>
+                    <SelectItem value="friendly">Friendly & Casual</SelectItem>
+                    <SelectItem value="inspirational">Inspirational</SelectItem>
+                    {isPro && (
+                      <>
+                        <SelectItem value="humorous">Humorous</SelectItem>
+                        <SelectItem value="authoritative">Authoritative</SelectItem>
+                        <SelectItem value="storytelling">Storytelling</SelectItem>
+                        <SelectItem value="bold">Bold & Edgy</SelectItem>
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => setStep("calendar")}>
+                <ChevronLeft className="h-4 w-4 mr-1" /> Back
+              </Button>
+              <Button
+                onClick={handleGenerate}
+                disabled={!canGenerate() || generating}
+                className="flex-1 gradient-primary border-0"
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                Generate Weekly Content ({totalSelectedPosts} posts)
+              </Button>
             </div>
           </div>
-        </div>
-      </header>
+        )}
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        {renderContent()}
+        {/* Step 3: Generating */}
+        {step === "generating" && (
+          <div className="text-center py-16 space-y-6">
+            <div className="w-20 h-20 rounded-full gradient-primary flex items-center justify-center mx-auto animate-pulse">
+              <Sparkles className="h-10 w-10 text-primary-foreground" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-foreground mb-2">AI is crafting your content...</h2>
+              <p className="text-sm text-muted-foreground">
+                Generating {totalSelectedPosts} platform-optimized posts with captions, hashtags, images, and CTAs.
+              </p>
+            </div>
+            <div className="flex justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Results */}
+        {step === "results" && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-foreground">Your Weekly Content</h2>
+                <p className="text-sm text-muted-foreground">{generatedItems.length} posts generated</p>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => navigate("/content")}>
+                  View All Content
+                </Button>
+                <Button size="sm" onClick={() => { setStep("calendar"); setDaySelection({}); setGeneratedItems([]); }} className="gradient-primary border-0">
+                  <Sparkles className="h-4 w-4 mr-1" /> Generate New Week
+                </Button>
+              </div>
+            </div>
+
+            {/* Upgrade prompt for trial */}
+            {showUpgrade === "trial_generated" && (
+              <UpgradePrompt
+                type="trial_generated"
+                message="Your free week is ready 🚀 Next week content is locked 🔒 Upgrade to continue generating."
+                onUpgrade={() => navigate("/account")}
+                onDismiss={() => setShowUpgrade(null)}
+              />
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {generatedItems.map((item) => (
+                <ContentCard
+                  key={item.id}
+                  id={item.id}
+                  dayNumber={item.day_number}
+                  theme={item.content_theme}
+                  goal={item.content_goal}
+                  primaryPlatform={item.primary_platform}
+                  secondaryPlatforms={item.secondary_platforms || []}
+                  contentType={item.content_type}
+                  topic={item.topic}
+                  hook={item.hook}
+                  painPoint={item.pain_point}
+                  coreMessage={item.core_message}
+                  cta={item.cta}
+                  postingTime={item.posting_time}
+                  whyItMatters={item.why_it_matters}
+                  status={item.status}
+                  caption={item.caption}
+                  hashtags={item.hashtags}
+                  imagePrompt={item.image_prompt}
+                  imageUrl={item.image_url}
+                  visualStyle={item.visual_style}
+                  repurposingSuggestion={item.repurposing_suggestion}
+                  onStatusChange={() => {}}
+                  onDelete={() => setGeneratedItems(prev => prev.filter(i => i.id !== item.id))}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

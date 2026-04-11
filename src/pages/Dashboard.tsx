@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { SocialConnectWidget } from "@/components/SocialConnectWidget";
 import { DashboardAnalytics } from "@/components/dashboard/DashboardAnalytics";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { TrialBanner } from "@/components/dashboard/TrialBanner";
 
 interface Business {
   id: string;
@@ -20,9 +22,9 @@ interface Business {
 
 const sidebarNav = [
   { icon: LayoutDashboard, label: "Dashboard", active: true },
-  { icon: Sparkles, label: "Content", route: "/content" },
+  { icon: Sparkles, label: "AI Studio", route: "/ai-studio" },
+  { icon: BarChart3, label: "Content", route: "/content" },
   { icon: Calendar, label: "Schedule", route: "/schedule" },
-  { icon: BarChart3, label: "Analytics" },
   { icon: Inbox, label: "Inbox" },
   { icon: Globe, label: "GMB" },
 ];
@@ -157,6 +159,7 @@ export default function Dashboard() {
             )}
           </div>
           <div className="flex items-center gap-2">
+            <NotificationBell />
             <Button variant="outline" size="sm" onClick={() => navigate("/brand-assets")} className="text-xs">
               <ImageIcon className="h-3.5 w-3.5 mr-1" /> Brand
             </Button>
@@ -174,6 +177,11 @@ export default function Dashboard() {
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">
           <div className="max-w-7xl mx-auto">
+            {/* Trial Banner */}
+            <div className="mb-4">
+              <TrialBanner />
+            </div>
+
             {/* Social Connect Widget */}
             {selectedBusiness && (
               <div className="mb-6">
@@ -187,9 +195,14 @@ export default function Dashboard() {
                 <BarChart3 className="h-5 w-5 text-primary" />
                 <h2 className="text-lg font-bold text-foreground">Overview</h2>
               </div>
-              <Button onClick={() => navigate("/content")} size="sm" className="gradient-primary border-0">
-                <Sparkles className="h-4 w-4 mr-1" /> View Content
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={() => navigate("/ai-studio")} size="sm" className="gradient-primary border-0">
+                  <Sparkles className="h-4 w-4 mr-1" /> Generate Content
+                </Button>
+                <Button onClick={() => navigate("/content")} size="sm" variant="outline">
+                  View Content
+                </Button>
+              </div>
             </div>
 
             {/* Analytics */}
