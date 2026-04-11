@@ -195,9 +195,14 @@ export default function Dashboard() {
                 <BarChart3 className="h-5 w-5 text-primary" />
                 <h2 className="text-lg font-bold text-foreground">Overview</h2>
               </div>
-              <Button onClick={() => navigate("/content")} size="sm" className="gradient-primary border-0">
-                <Sparkles className="h-4 w-4 mr-1" /> View Content
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={() => navigate("/ai-studio")} size="sm" className="gradient-primary border-0">
+                  <Sparkles className="h-4 w-4 mr-1" /> Generate Content
+                </Button>
+                <Button onClick={() => navigate("/content")} size="sm" variant="outline">
+                  View Content
+                </Button>
+              </div>
             </div>
 
             {/* Analytics */}
