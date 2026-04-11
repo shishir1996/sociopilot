@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { SocialConnectWidget } from "@/components/SocialConnectWidget";
 import { DashboardAnalytics } from "@/components/dashboard/DashboardAnalytics";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { TrialBanner } from "@/components/dashboard/TrialBanner";
 
 interface Business {
   id: string;
@@ -20,9 +22,9 @@ interface Business {
 
 const sidebarNav = [
   { icon: LayoutDashboard, label: "Dashboard", active: true },
-  { icon: Sparkles, label: "Content", route: "/content" },
+  { icon: Sparkles, label: "AI Studio", route: "/ai-studio" },
+  { icon: BarChart3, label: "Content", route: "/content" },
   { icon: Calendar, label: "Schedule", route: "/schedule" },
-  { icon: BarChart3, label: "Analytics" },
   { icon: Inbox, label: "Inbox" },
   { icon: Globe, label: "GMB" },
 ];
