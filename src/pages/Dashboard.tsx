@@ -159,6 +159,7 @@ export default function Dashboard() {
             )}
           </div>
           <div className="flex items-center gap-2">
+            <NotificationBell />
             <Button variant="outline" size="sm" onClick={() => navigate("/brand-assets")} className="text-xs">
               <ImageIcon className="h-3.5 w-3.5 mr-1" /> Brand
             </Button>
@@ -176,6 +177,11 @@ export default function Dashboard() {
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">
           <div className="max-w-7xl mx-auto">
+            {/* Trial Banner */}
+            <div className="mb-4">
+              <TrialBanner />
+            </div>
+
             {/* Social Connect Widget */}
             {selectedBusiness && (
               <div className="mb-6">
