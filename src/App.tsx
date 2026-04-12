@@ -16,6 +16,7 @@ import ContentPage from "./pages/ContentPage";
 import ScheduleSettings from "./pages/ScheduleSettings";
 import AdminAIControlCenter from "./pages/AdminAIControlCenter";
 import AIStudio from "./pages/AIStudio";
+import Pricing from "./pages/Pricing";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +37,7 @@ const App = () => (
             <Route path="/content" element={<ContentPage />} />
             <Route path="/schedule" element={<ScheduleSettings />} />
             <Route path="/ai-studio" element={<AIStudio />} />
+            <Route path="/pricing" element={<Pricing />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/ai" element={<AdminAIControlCenter />} />
             <Route path="*" element={<NotFound />} />
