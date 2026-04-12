@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   LogOut, Building2, Sparkles, Settings, UserCog,
-  Zap, BarChart3, LayoutDashboard, Calendar, Inbox, Globe, ImageIcon
+  Zap, BarChart3, LayoutDashboard, Calendar, Inbox, Globe, ImageIcon, Crown
 } from "lucide-react";
 import { SocialConnectWidget } from "@/components/SocialConnectWidget";
 import { DashboardAnalytics } from "@/components/dashboard/DashboardAnalytics";
@@ -168,6 +168,9 @@ export default function Dashboard() {
             </Button>
             <Button variant="outline" size="sm" onClick={() => navigate("/account")} className="text-xs">
               <UserCog className="h-3.5 w-3.5 mr-1" /> Account
+            </Button>
+            <Button size="sm" onClick={() => navigate("/pricing")} className="text-xs gradient-primary border-0">
+              <Crown className="h-3.5 w-3.5 mr-1" /> Plans
             </Button>
             <Button variant="ghost" size="sm" onClick={signOut}>
               <LogOut className="h-4 w-4" />

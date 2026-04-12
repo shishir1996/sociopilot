@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Settings, Cpu, Image, FileText, Shield, ToggleLeft, Activity,
-  Plus, Trash2, Save,
+  Plus, Trash2, Save, DollarSign,
 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -19,6 +19,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { GeoPricingPanel } from "@/components/admin/GeoPricingPanel";
 
 // ===================== TEXT MODELS =====================
 function TextModelsPanel() {
@@ -423,6 +424,7 @@ export default function AdminAIControlCenter() {
             <TabsTrigger value="image-models" className="flex items-center gap-1"><Image className="h-3.5 w-3.5" /> Image Models</TabsTrigger>
             <TabsTrigger value="prompts" className="flex items-center gap-1"><FileText className="h-3.5 w-3.5" /> Prompts</TabsTrigger>
             <TabsTrigger value="plans" className="flex items-center gap-1"><Shield className="h-3.5 w-3.5" /> Plan Limits</TabsTrigger>
+            <TabsTrigger value="pricing" className="flex items-center gap-1"><DollarSign className="h-3.5 w-3.5" /> Pricing</TabsTrigger>
             <TabsTrigger value="flags" className="flex items-center gap-1"><ToggleLeft className="h-3.5 w-3.5" /> Feature Flags</TabsTrigger>
             <TabsTrigger value="logs" className="flex items-center gap-1"><Activity className="h-3.5 w-3.5" /> Usage Logs</TabsTrigger>
           </TabsList>
@@ -430,6 +432,7 @@ export default function AdminAIControlCenter() {
           <TabsContent value="image-models"><ImageModelsPanel /></TabsContent>
           <TabsContent value="prompts"><PromptTemplatesPanel /></TabsContent>
           <TabsContent value="plans"><PlanLimitsPanel /></TabsContent>
+          <TabsContent value="pricing"><GeoPricingPanel /></TabsContent>
           <TabsContent value="flags"><FeatureFlagsPanel /></TabsContent>
           <TabsContent value="logs"><UsageLogsPanel /></TabsContent>
         </Tabs>

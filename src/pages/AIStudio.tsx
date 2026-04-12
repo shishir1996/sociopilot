@@ -3,20 +3,20 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  ArrowLeft, Sparkles, Loader2, Calendar, Lock, Crown,
-  CheckCircle2, AlertTriangle, ChevronRight, ChevronLeft, Zap
+  ArrowLeft, Sparkles, Loader2, Lock, Crown,
+  CheckCircle2, ChevronRight, ChevronLeft, Zap
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ContentCard } from "@/components/ContentCard";
 import { UpgradePrompt } from "@/components/upgrade/UpgradePrompt";
+import { UpgradeModal } from "@/components/upgrade/UpgradeModal";
+import { useGeoPricing } from "@/hooks/useGeoPricing";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const PLATFORMS = [
@@ -29,13 +29,14 @@ const PLATFORMS = [
 type Step = "calendar" | "context" | "generating" | "results";
 
 interface DaySelection {
-  [day: number]: string[]; // day index -> platform ids
+  [day: number]: string[];
 }
 
 export default function AIStudio() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { region } = useGeoPricing();
 
   const [step, setStep] = useState<Step>("calendar");
   const [business, setBusiness] = useState<any>(null);
@@ -47,6 +48,8 @@ export default function AIStudio() {
   const [generating, setGenerating] = useState(false);
   const [generatedItems, setGeneratedItems] = useState<any[]>([]);
   const [showUpgrade, setShowUpgrade] = useState<string | null>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeModalTrigger, setUpgradeModalTrigger] = useState("");
 
   // Context form
   const [businessName, setBusinessName] = useState("");
@@ -66,42 +69,33 @@ export default function AIStudio() {
 
   const fetchAll = async () => {
     if (!user) return;
-
     const [bizRes, subRes, limitsRes] = await Promise.all([
       supabase.from("businesses").select("*").eq("user_id", user.id).limit(1).single(),
       supabase.from("subscriptions").select("*").eq("user_id", user.id).limit(1).single(),
       supabase.from("ai_plan_limits").select("*"),
     ]);
-
     if (bizRes.data) {
       setBusiness(bizRes.data);
       setBusinessName(bizRes.data.name || "");
       setIndustry(bizRes.data.industry || "");
       setTargetAudience(bizRes.data.target_audience || "");
     }
-
     const sub = subRes.data || { plan_name: "free_trial", is_trial: true };
     setSubscription(sub);
-
     if (limitsRes.data) {
       const currentPlan = sub.plan_name || "free_trial";
       const limits = limitsRes.data.find((l: any) => l.plan_name === currentPlan);
       setPlanLimits(limits);
     }
-
-    // Count weekly generations this week
     const weekStart = new Date();
     weekStart.setDate(weekStart.getDate() - weekStart.getDay());
     weekStart.setHours(0, 0, 0, 0);
-
     const { count: genCount } = await supabase
       .from("weekly_generation_requests")
       .select("*", { count: "exact", head: true })
       .eq("user_id", user.id)
       .gte("created_at", weekStart.toISOString());
     setWeeklyGenCount(genCount || 0);
-
-    // Count regenerations
     const monthStart = new Date();
     monthStart.setDate(1);
     monthStart.setHours(0, 0, 0, 0);
@@ -117,22 +111,24 @@ export default function AIStudio() {
     setDaySelection(prev => {
       const current = prev[dayIndex] || [];
       const isSelected = current.includes(platformId);
-
       if (isBasic || isTrial) {
-        // Basic/trial: only 1 platform per day (radio behavior)
-        if (isSelected) {
-          return { ...prev, [dayIndex]: [] };
-        }
+        if (isSelected) return { ...prev, [dayIndex]: [] };
         return { ...prev, [dayIndex]: [platformId] };
       }
-
-      // Pro: multi-select
-      if (isSelected) {
-        return { ...prev, [dayIndex]: current.filter(p => p !== platformId) };
-      }
+      if (isSelected) return { ...prev, [dayIndex]: current.filter(p => p !== platformId) };
       if (current.length >= 4) return prev;
       return { ...prev, [dayIndex]: [...current, platformId] };
     });
+  };
+
+  const handleMultiPlatformClick = (dayIndex: number, platformId: string) => {
+    const current = daySelection[dayIndex] || [];
+    if ((isBasic || isTrial) && current.length >= 1 && !current.includes(platformId)) {
+      setUpgradeModalTrigger("multi_platform");
+      setShowUpgradeModal(true);
+      return;
+    }
+    togglePlatform(dayIndex, platformId);
   };
 
   const totalSelectedPosts = Object.values(daySelection).reduce((sum, platforms) => sum + platforms.length, 0);
@@ -143,19 +139,19 @@ export default function AIStudio() {
     return true;
   };
 
+  const handleUpgrade = (plan: "basic" | "pro") => {
+    setShowUpgradeModal(false);
+    navigate(`/account?upgrade=${plan}&region=${region}`);
+  };
+
   const handleGenerate = async () => {
     if (!canGenerate()) {
-      if (isTrial && weeklyGenCount >= 1) {
-        setShowUpgrade("trial_limit");
-      }
+      if (isTrial && weeklyGenCount >= 1) setShowUpgrade("trial_limit");
       return;
     }
-
     setStep("generating");
     setGenerating(true);
-
     try {
-      // Record generation request
       await supabase.from("weekly_generation_requests").insert({
         user_id: user!.id,
         business_id: business.id,
@@ -164,25 +160,15 @@ export default function AIStudio() {
         selected_platforms: Object.values(daySelection).flat(),
         status: "generating",
       });
-
       const { data, error } = await supabase.functions.invoke("generate-content", {
         body: {
           business_id: business.id,
           selected_days: daySelection,
-          business_context: {
-            name: businessName,
-            industry,
-            target_audience: targetAudience,
-            content_goal: contentGoal,
-            tone,
-          },
+          business_context: { name: businessName, industry, target_audience: targetAudience, content_goal: contentGoal, tone },
         },
       });
-
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-
-      // Fetch the generated items
       if (data?.plan_id) {
         const { data: items } = await supabase
           .from("content_items")
@@ -191,23 +177,14 @@ export default function AIStudio() {
           .order("day_number", { ascending: true });
         setGeneratedItems(items || []);
       }
-
-      // Enable auto-generate
       await supabase.from("businesses").update({ auto_generate_enabled: true }).eq("id", business.id);
-
       setStep("results");
-
-      // Show upgrade prompt for trial users
-      if (isTrial) {
-        setShowUpgrade("trial_generated");
-      }
-
+      if (isTrial) setShowUpgrade("trial_generated");
       toast({ title: "✨ Weekly Content Generated!", description: `${totalSelectedPosts} posts created for your week.` });
     } catch (err: any) {
       toast({ title: "Generation Failed", description: err.message, variant: "destructive" });
       setStep("calendar");
     }
-
     setGenerating(false);
   };
 
@@ -219,13 +196,17 @@ export default function AIStudio() {
     );
   }
 
-  if (!user) {
-    navigate("/auth");
-    return null;
-  }
+  if (!user) { navigate("/auth"); return null; }
 
   return (
     <div className="min-h-screen bg-background">
+      <UpgradeModal
+        open={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        onUpgrade={handleUpgrade}
+        trigger={upgradeModalTrigger}
+      />
+
       {/* Header */}
       <header className="border-b border-border bg-card h-14 flex items-center justify-between px-4 sm:px-6">
         <div className="flex items-center gap-3">
@@ -283,49 +264,63 @@ export default function AIStudio() {
             </div>
 
             <div className="grid gap-3">
-              {DAYS.map((day, dayIndex) => (
-                <Card key={day} className="shadow-card">
-                  <CardContent className="py-3 px-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 min-w-[100px]">
-                        <span className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
-                          {day.substring(0, 2)}
-                        </span>
-                        <span className="text-sm font-medium text-foreground">{day}</span>
+              {DAYS.map((day, dayIndex) => {
+                const selected = daySelection[dayIndex] || [];
+                return (
+                  <Card key={day} className="shadow-card">
+                    <CardContent className="py-3 px-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 min-w-[100px]">
+                          <span className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
+                            {day.substring(0, 2)}
+                          </span>
+                          <span className="text-sm font-medium text-foreground">{day}</span>
+                        </div>
+
+                        <div className="flex gap-2 flex-wrap justify-end">
+                          {PLATFORMS.map(platform => {
+                            const isSelected = selected.includes(platform.id);
+                            const isLocked = !isPro && !isSelected && selected.length >= 1;
+
+                            return (
+                              <button
+                                key={platform.id}
+                                onClick={() => handleMultiPlatformClick(dayIndex, platform.id)}
+                                className={`relative px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                  isSelected
+                                    ? "gradient-primary text-primary-foreground shadow-sm"
+                                    : isLocked
+                                    ? "bg-muted/50 text-muted-foreground/50 cursor-pointer"
+                                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                                }`}
+                              >
+                                {isLocked && (
+                                  <Lock className="h-3 w-3 absolute -top-1 -right-1 text-muted-foreground" />
+                                )}
+                                {platform.label}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
 
-                      <div className="flex gap-2 flex-wrap justify-end">
-                        {PLATFORMS.map(platform => {
-                          const selected = (daySelection[dayIndex] || []).includes(platform.id);
-                          const isDisabled = !isPro && !selected && (daySelection[dayIndex] || []).length >= 1;
-
-                          return (
-                            <button
-                              key={platform.id}
-                              onClick={() => {
-                                if (isDisabled && (isBasic || isTrial)) {
-                                  // Replace the existing selection
-                                  togglePlatform(dayIndex, (daySelection[dayIndex] || [])[0]);
-                                  togglePlatform(dayIndex, platform.id);
-                                  return;
-                                }
-                                togglePlatform(dayIndex, platform.id);
-                              }}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                                selected
-                                  ? "gradient-primary text-primary-foreground shadow-sm"
-                                  : "bg-muted text-muted-foreground hover:bg-muted/80"
-                              }`}
-                            >
-                              {platform.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                      {/* Helper text for locked state */}
+                      {(isBasic || isTrial) && selected.length >= 1 && (
+                        <p className="text-xs text-muted-foreground mt-2 text-right">
+                          <Lock className="h-3 w-3 inline mr-1" />
+                          Multi-platform is Pro only.{" "}
+                          <button
+                            onClick={() => { setUpgradeModalTrigger("multi_platform"); setShowUpgradeModal(true); }}
+                            className="text-primary font-medium hover:underline"
+                          >
+                            Activate Pro
+                          </button>
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
 
             {/* Selection summary */}
@@ -333,26 +328,19 @@ export default function AIStudio() {
               <div className="text-sm text-muted-foreground">
                 <span className="font-semibold text-foreground">{totalSelectedPosts}</span> posts selected this week
                 {planLimits && (
-                  <span className="ml-2 text-xs">
-                    (max {isBasic || isTrial ? "7" : "28"}/week)
-                  </span>
+                  <span className="ml-2 text-xs">(max {isBasic || isTrial ? "7" : "28"}/week)</span>
                 )}
               </div>
-              <Button
-                onClick={() => setStep("context")}
-                disabled={totalSelectedPosts === 0}
-                className="gradient-primary border-0"
-              >
+              <Button onClick={() => setStep("context")} disabled={totalSelectedPosts === 0} className="gradient-primary border-0">
                 Next: Business Context <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             </div>
 
-            {/* Trial/Basic limit info */}
             {isTrial && weeklyGenCount >= 1 && (
               <UpgradePrompt
                 type="trial_limit"
                 message="You've used your free weekly generation. Upgrade to continue generating content."
-                onUpgrade={() => navigate("/account")}
+                onUpgrade={() => navigate("/pricing")}
                 onDismiss={() => {}}
               />
             )}
@@ -364,11 +352,8 @@ export default function AIStudio() {
           <div className="space-y-6 max-w-2xl mx-auto">
             <div className="text-center">
               <h2 className="text-xl font-bold text-foreground mb-2">Business Context</h2>
-              <p className="text-sm text-muted-foreground">
-                This info helps AI create better content. Auto-filled from your profile.
-              </p>
+              <p className="text-sm text-muted-foreground">Auto-filled from your profile. Edit as needed.</p>
             </div>
-
             <div className="grid gap-4">
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -422,18 +407,12 @@ export default function AIStudio() {
                 </Select>
               </div>
             </div>
-
             <div className="flex gap-3">
               <Button variant="outline" onClick={() => setStep("calendar")}>
                 <ChevronLeft className="h-4 w-4 mr-1" /> Back
               </Button>
-              <Button
-                onClick={handleGenerate}
-                disabled={!canGenerate() || generating}
-                className="flex-1 gradient-primary border-0"
-              >
-                <Sparkles className="h-4 w-4 mr-2" />
-                Generate Weekly Content ({totalSelectedPosts} posts)
+              <Button onClick={handleGenerate} disabled={!canGenerate() || generating} className="flex-1 gradient-primary border-0">
+                <Sparkles className="h-4 w-4 mr-2" /> Generate Weekly Content ({totalSelectedPosts} posts)
               </Button>
             </div>
           </div>
@@ -451,9 +430,7 @@ export default function AIStudio() {
                 Generating {totalSelectedPosts} platform-optimized posts with captions, hashtags, images, and CTAs.
               </p>
             </div>
-            <div className="flex justify-center">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            </div>
+            <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />
           </div>
         )}
 
@@ -466,21 +443,18 @@ export default function AIStudio() {
                 <p className="text-sm text-muted-foreground">{generatedItems.length} posts generated</p>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => navigate("/content")}>
-                  View All Content
-                </Button>
+                <Button variant="outline" size="sm" onClick={() => navigate("/content")}>View All Content</Button>
                 <Button size="sm" onClick={() => { setStep("calendar"); setDaySelection({}); setGeneratedItems([]); }} className="gradient-primary border-0">
                   <Sparkles className="h-4 w-4 mr-1" /> Generate New Week
                 </Button>
               </div>
             </div>
 
-            {/* Upgrade prompt for trial */}
             {showUpgrade === "trial_generated" && (
               <UpgradePrompt
                 type="trial_generated"
                 message="Your free week is ready 🚀 Next week content is locked 🔒 Upgrade to continue generating."
-                onUpgrade={() => navigate("/account")}
+                onUpgrade={() => navigate("/pricing")}
                 onDismiss={() => setShowUpgrade(null)}
               />
             )}
