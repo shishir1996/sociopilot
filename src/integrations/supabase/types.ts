@@ -671,6 +671,42 @@ export type Database = {
           },
         ]
       }
+      geo_pricing: {
+        Row: {
+          created_at: string
+          currency: string
+          currency_symbol: string
+          id: string
+          monthly_price: number
+          plan_name: string
+          region: string
+          updated_at: string
+          yearly_price: number | null
+        }
+        Insert: {
+          created_at?: string
+          currency?: string
+          currency_symbol?: string
+          id?: string
+          monthly_price?: number
+          plan_name: string
+          region: string
+          updated_at?: string
+          yearly_price?: number | null
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          currency_symbol?: string
+          id?: string
+          monthly_price?: number
+          plan_name?: string
+          region?: string
+          updated_at?: string
+          yearly_price?: number | null
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           action_url: string | null
