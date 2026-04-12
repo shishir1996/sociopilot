@@ -44,7 +44,7 @@ export function TrialBanner() {
       <UpgradePrompt
         type="trial_expired"
         message="Upgrade to continue using Socio Pilot and keep generating content."
-        onUpgrade={() => navigate("/account")}
+        onUpgrade={() => navigate("/pricing")}
         onDismiss={() => {}}
       />
     );
@@ -56,7 +56,7 @@ export function TrialBanner() {
         type="trial_expiring"
         daysLeft={daysLeft}
         message=""
-        onUpgrade={() => navigate("/account")}
+        onUpgrade={() => navigate("/pricing")}
         onDismiss={() => setDismissed(true)}
       />
     );
