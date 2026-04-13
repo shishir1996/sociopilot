@@ -110,6 +110,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <ImpersonationBanner />
+      <div className="flex flex-1">
       {/* Sidebar */}
       <aside className={`${sidebarOpen ? "w-60" : "w-16"} bg-foreground transition-all duration-200 flex flex-col hidden md:flex`}>
         <div className="p-4 flex items-center gap-2">
