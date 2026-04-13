@@ -12,6 +12,8 @@ import { SocialConnectWidget } from "@/components/SocialConnectWidget";
 import { DashboardAnalytics } from "@/components/dashboard/DashboardAnalytics";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { TrialBanner } from "@/components/dashboard/TrialBanner";
+import { PlanBadge } from "@/components/dashboard/PlanBadge";
+import { ImpersonationBanner } from "@/components/admin/ImpersonationBanner";
 
 interface Business {
   id: string;
@@ -37,6 +39,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [subscription, setSubscription] = useState<any>(null);
 
   useEffect(() => {
     fetchBusinesses();
@@ -62,6 +65,13 @@ export default function Dashboard() {
         setLogoUrl(logoData[0].file_url);
       }
     }
+    // Fetch subscription
+    const { data: subData } = await supabase
+      .from("subscriptions")
+      .select("*")
+      .eq("user_id", user.id)
+      .limit(1);
+    if (subData && subData.length > 0) setSubscription(subData[0]);
     setLoading(false);
   };
 
@@ -98,7 +108,8 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background flex flex-col">
+      <ImpersonationBanner />
       {/* Sidebar */}
       <aside className={`${sidebarOpen ? "w-60" : "w-16"} bg-foreground transition-all duration-200 flex flex-col hidden md:flex`}>
         <div className="p-4 flex items-center gap-2">
@@ -153,9 +164,15 @@ export default function Dashboard() {
               <span className="text-sm font-bold text-foreground">SocioPilot</span>
             </div>
             {selectedBusiness && (
-              <span className="text-sm text-muted-foreground hidden sm:inline">
-                {businesses.find((b) => b.id === selectedBusiness)?.name}
-              </span>
+              <div className="flex items-center gap-2 hidden sm:flex">
+                <span className="text-sm text-muted-foreground">
+                  {businesses.find((b) => b.id === selectedBusiness)?.name}
+                </span>
+                <PlanBadge
+                  planName={subscription?.plan_name || "free_trial"}
+                  isTrial={subscription?.is_trial}
+                />
+              </div>
             )}
           </div>
           <div className="flex items-center gap-2">
