@@ -149,6 +149,36 @@ export default function AIStudio() {
       if (isTrial && weeklyGenCount >= 1) setShowUpgrade("trial_limit");
       return;
     }
+
+    // Auto-activate trial on first generation if no subscription exists
+    if (!subscription || (!subscription.plan_name && !subscription.is_trial)) {
+      const trialEnd = new Date();
+      trialEnd.setDate(trialEnd.getDate() + 7);
+      await supabase.from("subscriptions").upsert({
+        user_id: user!.id,
+        status: "active",
+        plan_name: "free_trial",
+        is_trial: true,
+        trial_started_at: new Date().toISOString(),
+        trial_ends_at: trialEnd.toISOString(),
+        starts_at: new Date().toISOString(),
+      }, { onConflict: "user_id" });
+      setSubscription({
+        plan_name: "free_trial",
+        is_trial: true,
+        status: "active",
+        trial_started_at: new Date().toISOString(),
+        trial_ends_at: trialEnd.toISOString(),
+      });
+      // Create notification
+      await supabase.from("notifications").insert({
+        user_id: user!.id,
+        title: "🎉 Free Trial Started!",
+        message: "Your 7-day free trial is now active. Enjoy generating content!",
+        type: "info",
+      });
+    }
+
     setStep("generating");
     setGenerating(true);
     try {
