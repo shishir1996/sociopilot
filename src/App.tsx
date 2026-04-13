@@ -8,6 +8,8 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import BusinessSetup from "./pages/BusinessSetup";
 import AdminDashboard from "./pages/AdminDashboard";
+import AdminAnalytics from "./pages/AdminAnalytics";
+import AdminUserDetail from "./pages/AdminUserDetail";
 import NotFound from "./pages/NotFound";
 import SocialSettings from "./pages/SocialSettings";
 import AccountSettings from "./pages/AccountSettings";
@@ -39,6 +41,8 @@ const App = () => (
             <Route path="/ai-studio" element={<AIStudio />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/analytics" element={<AdminAnalytics />} />
+            <Route path="/admin/user" element={<AdminUserDetail />} />
             <Route path="/admin/ai" element={<AdminAIControlCenter />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

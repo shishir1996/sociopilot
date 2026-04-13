@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_logs: {
+        Row: {
+          action: string
+          admin_id: string
+          created_at: string
+          details: Json | null
+          id: string
+          target_user_id: string | null
+        }
+        Insert: {
+          action: string
+          admin_id: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          target_user_id?: string | null
+        }
+        Update: {
+          action?: string
+          admin_id?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          target_user_id?: string | null
+        }
+        Relationships: []
+      }
       ai_brand_presets: {
         Row: {
           audience_profile: string | null
@@ -740,6 +767,45 @@ export type Database = {
         }
         Relationships: []
       }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          id: string
+          payment_provider: string | null
+          plan_name: string
+          provider_payment_id: string | null
+          region: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          payment_provider?: string | null
+          plan_name: string
+          provider_payment_id?: string | null
+          region?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          payment_provider?: string | null
+          plan_name?: string
+          provider_payment_id?: string | null
+          region?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       posting_schedules: {
         Row: {
           business_id: string
@@ -873,6 +939,7 @@ export type Database = {
           id: string
           is_trial: boolean
           plan_name: string | null
+          razorpay_payment_id: string | null
           starts_at: string | null
           status: string
           stripe_customer_id: string | null
@@ -888,6 +955,7 @@ export type Database = {
           id?: string
           is_trial?: boolean
           plan_name?: string | null
+          razorpay_payment_id?: string | null
           starts_at?: string | null
           status?: string
           stripe_customer_id?: string | null
@@ -903,6 +971,7 @@ export type Database = {
           id?: string
           is_trial?: boolean
           plan_name?: string | null
+          razorpay_payment_id?: string | null
           starts_at?: string | null
           status?: string
           stripe_customer_id?: string | null
@@ -934,6 +1003,42 @@ export type Database = {
           created_at?: string
           id?: string
           trigger_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      usage_tracking: {
+        Row: {
+          created_at: string
+          id: string
+          last_active_at: string | null
+          month_year: string
+          monthly_posts: number
+          regeneration_count: number
+          total_posts_generated: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_active_at?: string | null
+          month_year?: string
+          monthly_posts?: number
+          regeneration_count?: number
+          total_posts_generated?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_active_at?: string | null
+          month_year?: string
+          monthly_posts?: number
+          regeneration_count?: number
+          total_posts_generated?: number
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
