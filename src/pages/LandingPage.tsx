@@ -5,6 +5,7 @@ import {
   ArrowRight, Check, Star, ChevronRight, Play,
   Facebook, Instagram, Linkedin, Twitter
 } from "lucide-react";
+import PricingSection from "@/components/landing/PricingSection";
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -23,6 +24,7 @@ export default function LandingPage() {
           <div className="hidden md:flex items-center gap-8">
             <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Features</a>
             <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">How it Works</a>
+            <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
             <a href="#testimonials" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Testimonials</a>
           </div>
           <div className="flex items-center gap-3">
@@ -303,6 +305,9 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* Pricing Section */}
+      <PricingSection />
 
       {/* CTA Section */}
       <section className="py-20 px-4 sm:px-6 lg:px-8">
