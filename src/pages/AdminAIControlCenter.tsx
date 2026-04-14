@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Settings, Cpu, Image, FileText, Shield, ToggleLeft, Activity,
-  Plus, Trash2, Save, DollarSign,
+  Plus, Trash2, Save, DollarSign, Key, RefreshCw, Eye, EyeOff, Loader2,
 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -20,79 +20,205 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { GeoPricingPanel } from "@/components/admin/GeoPricingPanel";
+import { supabase } from "@/integrations/supabase/client";
+import { Slider } from "@/components/ui/slider";
+
+// Helper to call the ai-admin-settings edge function
+async function adminApi(body: any) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error("Not authenticated");
+  const res = await fetch(
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-admin-settings`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      },
+      body: JSON.stringify(body),
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Request failed" }));
+    throw new Error(err.error || "Request failed");
+  }
+  return res.json();
+}
+
+const TEXT_PROVIDERS = [
+  { label: "Lovable AI", value: "lovable" },
+  { label: "OpenAI", value: "openai" },
+  { label: "Google Gemini", value: "gemini" },
+  { label: "Anthropic (Claude)", value: "anthropic" },
+  { label: "Groq", value: "groq" },
+  { label: "OpenRouter", value: "openrouter" },
+  { label: "Custom API", value: "custom" },
+];
+
+const IMAGE_PROVIDERS = [
+  { label: "Lovable AI", value: "lovable" },
+  { label: "OpenAI (DALL-E)", value: "openai_image" },
+  { label: "Stability AI", value: "stability" },
+  { label: "Replicate", value: "replicate" },
+  { label: "Fal AI", value: "fal" },
+  { label: "Custom Image API", value: "custom_image" },
+];
 
 // ===================== TEXT MODELS =====================
 function TextModelsPanel() {
   const { toast } = useToast();
-  const [providers, setProviders] = useState([
-    { id: "1", name: "Lovable AI", model: "google/gemini-3-flash-preview", temp: 0.7, maxTokens: 2048, active: true, fallback: false },
-  ]);
+  const [providers, setProviders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
 
-  const save = () => {
-    if (!editing) return;
-    if (editing.id) {
-      setProviders(prev => prev.map(p => p.id === editing.id ? editing : p));
-    } else {
-      setProviders(prev => [...prev, { ...editing, id: Date.now().toString() }]);
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      const rows = await adminApi({ action: "list", table: "ai_provider_settings" });
+      setProviders((rows || []).filter((r: any) => r.provider_type === "text"));
+    } catch (e: any) {
+      toast({ title: "Error loading providers", description: e.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
     }
-    setEditing(null);
-    toast({ title: "Provider saved ✓" });
+  }, [toast]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const save = async () => {
+    if (!editing) return;
+    setSaving(true);
+    try {
+      const payload = {
+        provider_name: editing.provider_name,
+        provider_type: "text",
+        model_name: editing.model_name,
+        api_key_secret_name: editing.api_key_secret_name || null,
+        temperature: editing.temperature ?? 0.7,
+        max_tokens: editing.max_tokens ?? 2048,
+        top_p: editing.top_p ?? 1.0,
+        frequency_penalty: editing.frequency_penalty ?? 0,
+        presence_penalty: editing.presence_penalty ?? 0,
+        is_active: editing.is_active ?? false,
+        is_fallback: editing.is_fallback ?? false,
+        config_json: editing.config_json || {},
+      };
+      if (editing.id) {
+        await adminApi({ action: "update", table: "ai_provider_settings", id: editing.id, data: payload });
+      } else {
+        await adminApi({ action: "create", table: "ai_provider_settings", data: payload });
+      }
+      toast({ title: "Provider saved ✓" });
+      setEditing(null);
+      load();
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async (id: string) => {
+    try {
+      await adminApi({ action: "delete", table: "ai_provider_settings", id });
+      toast({ title: "Provider deleted" });
+      load();
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    }
   };
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="font-semibold text-foreground">Text AI Providers</h3>
-        <Button size="sm" onClick={() => setEditing({ name: "", model: "", temp: 0.7, maxTokens: 2048, active: false, fallback: false })}>
-          <Plus className="h-4 w-4 mr-1" /> Add Provider
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={load}><RefreshCw className="h-4 w-4" /></Button>
+          <Button size="sm" onClick={() => setEditing({
+            provider_name: "lovable", model_name: "", temperature: 0.7,
+            max_tokens: 2048, top_p: 1.0, frequency_penalty: 0, presence_penalty: 0,
+            is_active: false, is_fallback: false, api_key_secret_name: "",
+          })}>
+            <Plus className="h-4 w-4 mr-1" /> Add Provider
+          </Button>
+        </div>
       </div>
 
       {editing && (
         <Card className="border-primary/30">
-          <CardContent className="pt-4 space-y-3">
+          <CardContent className="pt-4 space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              <div><Label>Provider Name</Label><Input value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} placeholder="e.g. OpenAI" /></div>
-              <div><Label>Model Name</Label><Input value={editing.model} onChange={e => setEditing({ ...editing, model: e.target.value })} placeholder="google/gemini-3-flash-preview" /></div>
-              <div><Label>Temperature</Label><Input type="number" step="0.1" min="0" max="2" value={editing.temp} onChange={e => setEditing({ ...editing, temp: parseFloat(e.target.value) })} /></div>
-              <div><Label>Max Tokens</Label><Input type="number" value={editing.maxTokens} onChange={e => setEditing({ ...editing, maxTokens: parseInt(e.target.value) })} /></div>
-              <div><Label>API Key Secret Name</Label><Input value={editing.apiKey || ""} onChange={e => setEditing({ ...editing, apiKey: e.target.value })} placeholder="Leave empty for Lovable AI" /></div>
+              <div>
+                <Label>Provider</Label>
+                <Select value={editing.provider_name} onValueChange={v => setEditing({ ...editing, provider_name: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{TEXT_PROVIDERS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div><Label>Model Name</Label><Input value={editing.model_name} onChange={e => setEditing({ ...editing, model_name: e.target.value })} placeholder="e.g. gpt-4o, gemini-2.5-pro" /></div>
+              <div><Label>API Key Secret Name</Label><Input value={editing.api_key_secret_name || ""} onChange={e => setEditing({ ...editing, api_key_secret_name: e.target.value })} placeholder="e.g. OPENAI_API_KEY (leave blank for Lovable AI)" /></div>
+              <div><Label>Max Tokens</Label><Input type="number" value={editing.max_tokens} onChange={e => setEditing({ ...editing, max_tokens: parseInt(e.target.value) || 2048 })} /></div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <Label>Temperature: {editing.temperature}</Label>
+                <Slider min={0} max={2} step={0.1} value={[editing.temperature]} onValueChange={([v]) => setEditing({ ...editing, temperature: v })} />
+              </div>
+              <div>
+                <Label>Top P: {editing.top_p}</Label>
+                <Slider min={0} max={1} step={0.05} value={[editing.top_p]} onValueChange={([v]) => setEditing({ ...editing, top_p: v })} />
+              </div>
+              <div>
+                <Label>Freq Penalty: {editing.frequency_penalty}</Label>
+                <Slider min={0} max={2} step={0.1} value={[editing.frequency_penalty]} onValueChange={([v]) => setEditing({ ...editing, frequency_penalty: v })} />
+              </div>
             </div>
             <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2"><Switch checked={editing.active} onCheckedChange={v => setEditing({ ...editing, active: v })} /><Label>Active</Label></div>
-              <div className="flex items-center gap-2"><Switch checked={editing.fallback} onCheckedChange={v => setEditing({ ...editing, fallback: v })} /><Label>Fallback</Label></div>
+              <div className="flex items-center gap-2"><Switch checked={editing.is_active} onCheckedChange={v => setEditing({ ...editing, is_active: v })} /><Label>Active</Label></div>
+              <div className="flex items-center gap-2"><Switch checked={editing.is_fallback} onCheckedChange={v => setEditing({ ...editing, is_fallback: v })} /><Label>Fallback</Label></div>
             </div>
             <div className="flex gap-2">
-              <Button size="sm" onClick={save}><Save className="h-4 w-4 mr-1" /> Save</Button>
+              <Button size="sm" onClick={save} disabled={saving}>
+                {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />} Save
+              </Button>
               <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      <Table>
-        <TableHeader><TableRow>
-          <TableHead>Provider</TableHead><TableHead>Model</TableHead><TableHead>Temp</TableHead><TableHead>Status</TableHead><TableHead></TableHead>
-        </TableRow></TableHeader>
-        <TableBody>
-          {providers.map(p => (
-            <TableRow key={p.id}>
-              <TableCell className="font-medium">{p.name}</TableCell>
-              <TableCell className="text-sm text-muted-foreground">{p.model}</TableCell>
-              <TableCell>{p.temp}</TableCell>
-              <TableCell>
-                {p.active ? <Badge className="bg-green-500/10 text-green-600 border-green-500/20">Active</Badge> : <Badge variant="secondary">Inactive</Badge>}
-                {p.fallback && <Badge variant="outline" className="ml-1">Fallback</Badge>}
-              </TableCell>
-              <TableCell className="text-right">
-                <Button size="sm" variant="ghost" onClick={() => setEditing(p)}>Edit</Button>
-                <Button size="sm" variant="ghost" onClick={() => setProviders(prev => prev.filter(x => x.id !== p.id))}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      {loading ? (
+        <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : (
+        <Table>
+          <TableHeader><TableRow>
+            <TableHead>Provider</TableHead><TableHead>Model</TableHead><TableHead>Temp</TableHead><TableHead>API Key</TableHead><TableHead>Status</TableHead><TableHead></TableHead>
+          </TableRow></TableHeader>
+          <TableBody>
+            {providers.length === 0 && (
+              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No text providers configured. Add one above.</TableCell></TableRow>
+            )}
+            {providers.map(p => (
+              <TableRow key={p.id}>
+                <TableCell className="font-medium">{TEXT_PROVIDERS.find(x => x.value === p.provider_name)?.label || p.provider_name}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{p.model_name}</TableCell>
+                <TableCell>{p.temperature}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">{p.api_key_secret_name || "Lovable AI (built-in)"}</TableCell>
+                <TableCell>
+                  {p.is_active ? <Badge className="bg-green-500/10 text-green-600 border-green-500/20">Active</Badge> : <Badge variant="secondary">Inactive</Badge>}
+                  {p.is_fallback && <Badge variant="outline" className="ml-1">Fallback</Badge>}
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button size="sm" variant="ghost" onClick={() => setEditing(p)}>Edit</Button>
+                  <Button size="sm" variant="ghost" onClick={() => remove(p.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
     </div>
   );
 }
@@ -100,62 +226,201 @@ function TextModelsPanel() {
 // ===================== IMAGE MODELS =====================
 function ImageModelsPanel() {
   const { toast } = useToast();
-  const [providers, setProviders] = useState([
-    { id: "1", name: "Lovable AI", model: "google/gemini-3.1-flash-image-preview", active: true, fallback: false },
-  ]);
+  const [providers, setProviders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
 
-  const save = () => {
-    if (!editing) return;
-    if (editing.id) {
-      setProviders(prev => prev.map(p => p.id === editing.id ? editing : p));
-    } else {
-      setProviders(prev => [...prev, { ...editing, id: Date.now().toString() }]);
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      const rows = await adminApi({ action: "list", table: "ai_provider_settings" });
+      setProviders((rows || []).filter((r: any) => r.provider_type === "image"));
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
     }
-    setEditing(null);
-    toast({ title: "Provider saved ✓" });
+  }, [toast]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const save = async () => {
+    if (!editing) return;
+    setSaving(true);
+    try {
+      const payload = {
+        provider_name: editing.provider_name,
+        provider_type: "image",
+        model_name: editing.model_name,
+        api_key_secret_name: editing.api_key_secret_name || null,
+        is_active: editing.is_active ?? false,
+        is_fallback: editing.is_fallback ?? false,
+        config_json: editing.config_json || {},
+      };
+      if (editing.id) {
+        await adminApi({ action: "update", table: "ai_provider_settings", id: editing.id, data: payload });
+      } else {
+        await adminApi({ action: "create", table: "ai_provider_settings", data: payload });
+      }
+      toast({ title: "Image provider saved ✓" });
+      setEditing(null);
+      load();
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async (id: string) => {
+    try {
+      await adminApi({ action: "delete", table: "ai_provider_settings", id });
+      toast({ title: "Provider deleted" });
+      load();
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    }
   };
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="font-semibold text-foreground">Image AI Providers</h3>
-        <Button size="sm" onClick={() => setEditing({ name: "", model: "", active: false, fallback: false })}>
-          <Plus className="h-4 w-4 mr-1" /> Add Provider
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={load}><RefreshCw className="h-4 w-4" /></Button>
+          <Button size="sm" onClick={() => setEditing({
+            provider_name: "lovable", model_name: "", is_active: false, is_fallback: false, api_key_secret_name: "",
+          })}>
+            <Plus className="h-4 w-4 mr-1" /> Add Provider
+          </Button>
+        </div>
       </div>
       {editing && (
         <Card className="border-primary/30"><CardContent className="pt-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <div><Label>Provider Name</Label><Input value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} /></div>
-            <div><Label>Model Name</Label><Input value={editing.model} onChange={e => setEditing({ ...editing, model: e.target.value })} /></div>
+            <div>
+              <Label>Provider</Label>
+              <Select value={editing.provider_name} onValueChange={v => setEditing({ ...editing, provider_name: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{IMAGE_PROVIDERS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div><Label>Model Name</Label><Input value={editing.model_name} onChange={e => setEditing({ ...editing, model_name: e.target.value })} placeholder="e.g. dall-e-3, stable-diffusion-xl" /></div>
+            <div><Label>API Key Secret Name</Label><Input value={editing.api_key_secret_name || ""} onChange={e => setEditing({ ...editing, api_key_secret_name: e.target.value })} placeholder="e.g. STABILITY_API_KEY" /></div>
           </div>
           <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2"><Switch checked={editing.active} onCheckedChange={v => setEditing({ ...editing, active: v })} /><Label>Active</Label></div>
-            <div className="flex items-center gap-2"><Switch checked={editing.fallback} onCheckedChange={v => setEditing({ ...editing, fallback: v })} /><Label>Fallback</Label></div>
+            <div className="flex items-center gap-2"><Switch checked={editing.is_active} onCheckedChange={v => setEditing({ ...editing, is_active: v })} /><Label>Active</Label></div>
+            <div className="flex items-center gap-2"><Switch checked={editing.is_fallback} onCheckedChange={v => setEditing({ ...editing, is_fallback: v })} /><Label>Fallback</Label></div>
           </div>
           <div className="flex gap-2">
-            <Button size="sm" onClick={save}><Save className="h-4 w-4 mr-1" /> Save</Button>
+            <Button size="sm" onClick={save} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />} Save
+            </Button>
             <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
           </div>
         </CardContent></Card>
       )}
-      <Table>
-        <TableHeader><TableRow><TableHead>Provider</TableHead><TableHead>Model</TableHead><TableHead>Status</TableHead><TableHead></TableHead></TableRow></TableHeader>
-        <TableBody>
-          {providers.map(p => (
-            <TableRow key={p.id}>
-              <TableCell className="font-medium">{p.name}</TableCell>
-              <TableCell className="text-sm text-muted-foreground">{p.model}</TableCell>
-              <TableCell>{p.active ? <Badge className="bg-green-500/10 text-green-600 border-green-500/20">Active</Badge> : <Badge variant="secondary">Inactive</Badge>}</TableCell>
-              <TableCell className="text-right">
-                <Button size="sm" variant="ghost" onClick={() => setEditing(p)}>Edit</Button>
-                <Button size="sm" variant="ghost" onClick={() => setProviders(prev => prev.filter(x => x.id !== p.id))}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      {loading ? (
+        <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : (
+        <Table>
+          <TableHeader><TableRow><TableHead>Provider</TableHead><TableHead>Model</TableHead><TableHead>API Key</TableHead><TableHead>Status</TableHead><TableHead></TableHead></TableRow></TableHeader>
+          <TableBody>
+            {providers.length === 0 && (
+              <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No image providers configured.</TableCell></TableRow>
+            )}
+            {providers.map(p => (
+              <TableRow key={p.id}>
+                <TableCell className="font-medium">{IMAGE_PROVIDERS.find(x => x.value === p.provider_name)?.label || p.provider_name}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{p.model_name}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">{p.api_key_secret_name || "Lovable AI (built-in)"}</TableCell>
+                <TableCell>
+                  {p.is_active ? <Badge className="bg-green-500/10 text-green-600 border-green-500/20">Active</Badge> : <Badge variant="secondary">Inactive</Badge>}
+                  {p.is_fallback && <Badge variant="outline" className="ml-1">Fallback</Badge>}
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button size="sm" variant="ghost" onClick={() => setEditing(p)}>Edit</Button>
+                  <Button size="sm" variant="ghost" onClick={() => remove(p.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </div>
+  );
+}
+
+// ===================== API KEYS =====================
+function ApiKeysPanel() {
+  const { toast } = useToast();
+  const knownKeys = [
+    { name: "OPENAI_API_KEY", provider: "OpenAI", description: "Used for GPT models and DALL-E" },
+    { name: "GOOGLE_AI_API_KEY", provider: "Google Gemini", description: "Used for Gemini models" },
+    { name: "ANTHROPIC_API_KEY", provider: "Anthropic", description: "Used for Claude models" },
+    { name: "GROQ_API_KEY", provider: "Groq", description: "Used for Groq-hosted models" },
+    { name: "OPENROUTER_API_KEY", provider: "OpenRouter", description: "Access to 100+ models" },
+    { name: "STABILITY_API_KEY", provider: "Stability AI", description: "Used for Stable Diffusion" },
+    { name: "REPLICATE_API_TOKEN", provider: "Replicate", description: "Used for hosted models" },
+    { name: "FAL_KEY", provider: "Fal AI", description: "Used for Fal image models" },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="font-semibold text-foreground">API Key Management</h3>
+        <p className="text-sm text-muted-foreground mt-1">
+          API keys are stored as encrypted secrets and are never exposed in the frontend. 
+          To add or update a key, use the secret management system in your backend settings.
+        </p>
+      </div>
+
+      <Card className="border-amber-500/30 bg-amber-500/5">
+        <CardContent className="py-3">
+          <p className="text-sm text-amber-700 dark:text-amber-400">
+            <strong>Security Note:</strong> API keys are stored as encrypted backend secrets. 
+            The "API Key Secret Name" field in provider settings references these secrets by name. 
+            For Lovable AI (built-in), no key is needed.
+          </p>
+        </CardContent>
+      </Card>
+
+      <div className="space-y-3">
+        <h4 className="text-sm font-medium text-foreground">Supported Providers & Secret Names</h4>
+        <Table>
+          <TableHeader><TableRow>
+            <TableHead>Provider</TableHead>
+            <TableHead>Secret Name</TableHead>
+            <TableHead>Description</TableHead>
+            <TableHead>How to Add</TableHead>
+          </TableRow></TableHeader>
+          <TableBody>
+            {knownKeys.map(k => (
+              <TableRow key={k.name}>
+                <TableCell className="font-medium">{k.provider}</TableCell>
+                <TableCell><code className="text-xs bg-muted px-1.5 py-0.5 rounded">{k.name}</code></TableCell>
+                <TableCell className="text-sm text-muted-foreground">{k.description}</TableCell>
+                <TableCell>
+                  <Badge variant="outline" className="text-xs">Add via Backend Secrets</Badge>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      <Card>
+        <CardContent className="py-4 space-y-2">
+          <h4 className="font-medium text-foreground">How to Add API Keys</h4>
+          <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+            <li>Get your API key from the provider's dashboard (e.g., platform.openai.com)</li>
+            <li>Add it as a backend secret using the secret name shown above</li>
+            <li>In the Text/Image Models tab, set the "API Key Secret Name" field to match</li>
+            <li>The edge function will automatically use the correct key when calling that provider</li>
+          </ol>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -163,68 +428,116 @@ function ImageModelsPanel() {
 // ===================== PROMPT TEMPLATES =====================
 function PromptTemplatesPanel() {
   const { toast } = useToast();
-  const templateTypes = ["caption", "ad_copy", "hook", "cta", "carousel", "linkedin", "image_prompt", "hashtag_generation"];
-  const [templates, setTemplates] = useState([
-    { id: "1", name: "Default Caption Prompt", type: "caption", prompt: "You are a social media expert. Generate engaging captions...", hidden: "", active: true },
-    { id: "2", name: "Default Ad Copy Prompt", type: "ad_copy", prompt: "You are a conversion copywriter. Write compelling ad copy...", hidden: "", active: true },
-  ]);
+  const templateTypes = ["caption", "ad_copy", "hook", "cta", "carousel", "linkedin", "image_prompt", "hashtag_generation", "weekly_content"];
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
 
-  const save = () => {
-    if (!editing) return;
-    if (editing.id) {
-      setTemplates(prev => prev.map(t => t.id === editing.id ? editing : t));
-    } else {
-      setTemplates(prev => [...prev, { ...editing, id: Date.now().toString() }]);
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      const rows = await adminApi({ action: "list", table: "ai_prompt_templates" });
+      setTemplates(rows || []);
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
     }
-    setEditing(null);
-    toast({ title: "Template saved ✓" });
+  }, [toast]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const save = async () => {
+    if (!editing) return;
+    setSaving(true);
+    try {
+      const payload = {
+        name: editing.name,
+        template_type: editing.template_type,
+        system_prompt: editing.system_prompt,
+        hidden_instructions: editing.hidden_instructions || "",
+        is_active: editing.is_active ?? true,
+      };
+      if (editing.id) {
+        await adminApi({ action: "update", table: "ai_prompt_templates", id: editing.id, data: payload });
+      } else {
+        await adminApi({ action: "create", table: "ai_prompt_templates", data: payload });
+      }
+      toast({ title: "Template saved ✓" });
+      setEditing(null);
+      load();
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async (id: string) => {
+    try {
+      await adminApi({ action: "delete", table: "ai_prompt_templates", id });
+      toast({ title: "Template deleted" });
+      load();
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    }
   };
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="font-semibold text-foreground">Prompt Templates</h3>
-        <Button size="sm" onClick={() => setEditing({ name: "", type: "caption", prompt: "", hidden: "", active: true })}>
-          <Plus className="h-4 w-4 mr-1" /> Add Template
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={load}><RefreshCw className="h-4 w-4" /></Button>
+          <Button size="sm" onClick={() => setEditing({ name: "", template_type: "caption", system_prompt: "", hidden_instructions: "", is_active: true })}>
+            <Plus className="h-4 w-4 mr-1" /> Add Template
+          </Button>
+        </div>
       </div>
       {editing && (
         <Card className="border-primary/30"><CardContent className="pt-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Name</Label><Input value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} /></div>
             <div><Label>Type</Label>
-              <Select value={editing.type} onValueChange={v => setEditing({ ...editing, type: v })}>
+              <Select value={editing.template_type} onValueChange={v => setEditing({ ...editing, template_type: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{templateTypes.map(t => <SelectItem key={t} value={t}>{t.replace(/_/g, " ")}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </div>
-          <div><Label>System Prompt</Label><Textarea rows={4} value={editing.prompt} onChange={e => setEditing({ ...editing, prompt: e.target.value })} placeholder="Main AI instruction..." /></div>
-          <div><Label>Hidden Instructions</Label><Textarea rows={3} value={editing.hidden} onChange={e => setEditing({ ...editing, hidden: e.target.value })} placeholder="Additional hidden instructions..." /></div>
-          <div className="flex items-center gap-2"><Switch checked={editing.active} onCheckedChange={v => setEditing({ ...editing, active: v })} /><Label>Active</Label></div>
+          <div><Label>System Prompt</Label><Textarea rows={5} value={editing.system_prompt} onChange={e => setEditing({ ...editing, system_prompt: e.target.value })} placeholder="Main AI instruction..." /></div>
+          <div><Label>Hidden Instructions (appended but not shown to users)</Label><Textarea rows={3} value={editing.hidden_instructions} onChange={e => setEditing({ ...editing, hidden_instructions: e.target.value })} placeholder="Additional hidden context..." /></div>
+          <div className="flex items-center gap-2"><Switch checked={editing.is_active} onCheckedChange={v => setEditing({ ...editing, is_active: v })} /><Label>Active</Label></div>
           <div className="flex gap-2">
-            <Button size="sm" onClick={save}><Save className="h-4 w-4 mr-1" /> Save</Button>
+            <Button size="sm" onClick={save} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />} Save
+            </Button>
             <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
           </div>
         </CardContent></Card>
       )}
-      <div className="grid gap-3">
-        {templates.map(t => (
-          <Card key={t.id} className="cursor-pointer hover:border-primary/30 transition-colors" onClick={() => setEditing(t)}>
-            <CardContent className="py-3 flex items-center justify-between">
-              <div>
-                <p className="font-medium text-foreground">{t.name}</p>
-                <p className="text-xs text-muted-foreground">{t.type.replace(/_/g, " ")} • {t.prompt.substring(0, 80)}...</p>
-              </div>
-              <div className="flex items-center gap-2">
-                {t.active ? <Badge className="bg-green-500/10 text-green-600 border-green-500/20">Active</Badge> : <Badge variant="secondary">Inactive</Badge>}
-                <Button size="sm" variant="ghost" onClick={e => { e.stopPropagation(); setTemplates(prev => prev.filter(x => x.id !== t.id)); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {loading ? (
+        <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : (
+        <div className="grid gap-3">
+          {templates.length === 0 && <p className="text-center text-muted-foreground py-8">No prompt templates yet.</p>}
+          {templates.map(t => (
+            <Card key={t.id} className="cursor-pointer hover:border-primary/30 transition-colors" onClick={() => setEditing(t)}>
+              <CardContent className="py-3 flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-foreground">{t.name}</p>
+                  <p className="text-xs text-muted-foreground">{t.template_type?.replace(/_/g, " ")} • {(t.system_prompt || "").substring(0, 80)}...</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {t.is_active ? <Badge className="bg-green-500/10 text-green-600 border-green-500/20">Active</Badge> : <Badge variant="secondary">Inactive</Badge>}
+                  <Button size="sm" variant="ghost" onClick={e => { e.stopPropagation(); remove(t.id); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -232,137 +545,225 @@ function PromptTemplatesPanel() {
 // ===================== PLAN LIMITS =====================
 function PlanLimitsPanel() {
   const { toast } = useToast();
-  const [plans, setPlans] = useState([
-    { id: "1", name: "Free", textLimit: 5, imageLimit: 2, regenLimit: 3, canEditPrompts: false, canSelectModel: false, premiumModels: false },
-    { id: "2", name: "Starter", textLimit: 100, imageLimit: 20, regenLimit: 10, canEditPrompts: false, canSelectModel: false, premiumModels: false },
-    { id: "3", name: "Pro", textLimit: 500, imageLimit: 100, regenLimit: 50, canEditPrompts: true, canSelectModel: false, premiumModels: true },
-    { id: "4", name: "Agency", textLimit: 9999, imageLimit: 9999, regenLimit: 9999, canEditPrompts: true, canSelectModel: true, premiumModels: true },
-  ]);
+  const [plans, setPlans] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
 
-  const save = () => {
-    if (!editing) return;
-    if (editing.id) {
-      setPlans(prev => prev.map(p => p.id === editing.id ? editing : p));
-    } else {
-      setPlans(prev => [...prev, { ...editing, id: Date.now().toString() }]);
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      const rows = await adminApi({ action: "list", table: "ai_plan_limits" });
+      setPlans(rows || []);
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
     }
-    setEditing(null);
-    toast({ title: "Plan saved ✓" });
+  }, [toast]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const save = async () => {
+    if (!editing) return;
+    setSaving(true);
+    try {
+      const payload = {
+        plan_name: editing.plan_name,
+        text_generations_limit: editing.text_generations_limit ?? 5,
+        image_generations_limit: editing.image_generations_limit ?? 2,
+        regeneration_limit: editing.regeneration_limit ?? 3,
+        brand_preset_limit: editing.brand_preset_limit ?? 1,
+        can_edit_prompts: editing.can_edit_prompts ?? false,
+        can_select_model: editing.can_select_model ?? false,
+        premium_model_access: editing.premium_model_access ?? false,
+        premium_image_styles: editing.premium_image_styles ?? false,
+      };
+      if (editing.id) {
+        await adminApi({ action: "update", table: "ai_plan_limits", id: editing.id, data: payload });
+      } else {
+        await adminApi({ action: "create", table: "ai_plan_limits", data: payload });
+      }
+      toast({ title: "Plan saved ✓" });
+      setEditing(null);
+      load();
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async (id: string) => {
+    try {
+      await adminApi({ action: "delete", table: "ai_plan_limits", id });
+      toast({ title: "Plan deleted" }); load();
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    }
   };
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="font-semibold text-foreground">Plan Limits</h3>
-        <Button size="sm" onClick={() => setEditing({ name: "", textLimit: 5, imageLimit: 2, regenLimit: 3, canEditPrompts: false, canSelectModel: false, premiumModels: false })}>
-          <Plus className="h-4 w-4 mr-1" /> Add Plan
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={load}><RefreshCw className="h-4 w-4" /></Button>
+          <Button size="sm" onClick={() => setEditing({
+            plan_name: "", text_generations_limit: 5, image_generations_limit: 2,
+            regeneration_limit: 3, brand_preset_limit: 1, can_edit_prompts: false,
+            can_select_model: false, premium_model_access: false, premium_image_styles: false,
+          })}>
+            <Plus className="h-4 w-4 mr-1" /> Add Plan
+          </Button>
+        </div>
       </div>
       {editing && (
         <Card className="border-primary/30"><CardContent className="pt-4 space-y-3">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div><Label>Plan Name</Label><Input value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} /></div>
-            <div><Label>Text Limit /mo</Label><Input type="number" value={editing.textLimit} onChange={e => setEditing({ ...editing, textLimit: parseInt(e.target.value) })} /></div>
-            <div><Label>Image Limit /mo</Label><Input type="number" value={editing.imageLimit} onChange={e => setEditing({ ...editing, imageLimit: parseInt(e.target.value) })} /></div>
-            <div><Label>Regen Limit</Label><Input type="number" value={editing.regenLimit} onChange={e => setEditing({ ...editing, regenLimit: parseInt(e.target.value) })} /></div>
+            <div><Label>Plan Name</Label><Input value={editing.plan_name} onChange={e => setEditing({ ...editing, plan_name: e.target.value })} /></div>
+            <div><Label>Text Limit /mo</Label><Input type="number" value={editing.text_generations_limit} onChange={e => setEditing({ ...editing, text_generations_limit: parseInt(e.target.value) || 0 })} /></div>
+            <div><Label>Image Limit /mo</Label><Input type="number" value={editing.image_generations_limit} onChange={e => setEditing({ ...editing, image_generations_limit: parseInt(e.target.value) || 0 })} /></div>
+            <div><Label>Regen Limit</Label><Input type="number" value={editing.regeneration_limit} onChange={e => setEditing({ ...editing, regeneration_limit: parseInt(e.target.value) || 0 })} /></div>
           </div>
           <div className="flex flex-wrap gap-4">
-            <div className="flex items-center gap-2"><Switch checked={editing.canEditPrompts} onCheckedChange={v => setEditing({ ...editing, canEditPrompts: v })} /><Label>Can Edit Prompts</Label></div>
-            <div className="flex items-center gap-2"><Switch checked={editing.canSelectModel} onCheckedChange={v => setEditing({ ...editing, canSelectModel: v })} /><Label>Can Select Model</Label></div>
-            <div className="flex items-center gap-2"><Switch checked={editing.premiumModels} onCheckedChange={v => setEditing({ ...editing, premiumModels: v })} /><Label>Premium Models</Label></div>
+            <div className="flex items-center gap-2"><Switch checked={editing.can_edit_prompts} onCheckedChange={v => setEditing({ ...editing, can_edit_prompts: v })} /><Label>Can Edit Prompts</Label></div>
+            <div className="flex items-center gap-2"><Switch checked={editing.can_select_model} onCheckedChange={v => setEditing({ ...editing, can_select_model: v })} /><Label>Can Select Model</Label></div>
+            <div className="flex items-center gap-2"><Switch checked={editing.premium_model_access} onCheckedChange={v => setEditing({ ...editing, premium_model_access: v })} /><Label>Premium Models</Label></div>
           </div>
           <div className="flex gap-2">
-            <Button size="sm" onClick={save}><Save className="h-4 w-4 mr-1" /> Save</Button>
+            <Button size="sm" onClick={save} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />} Save
+            </Button>
             <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
           </div>
         </CardContent></Card>
       )}
-      <Table>
-        <TableHeader><TableRow><TableHead>Plan</TableHead><TableHead>Text</TableHead><TableHead>Image</TableHead><TableHead>Regen</TableHead><TableHead>Prompts</TableHead><TableHead></TableHead></TableRow></TableHeader>
-        <TableBody>
-          {plans.map(p => (
-            <TableRow key={p.id}>
-              <TableCell className="font-medium">{p.name}</TableCell>
-              <TableCell>{p.textLimit}/mo</TableCell>
-              <TableCell>{p.imageLimit}/mo</TableCell>
-              <TableCell>{p.regenLimit}</TableCell>
-              <TableCell>{p.canEditPrompts ? "✓" : "✗"}</TableCell>
-              <TableCell className="text-right">
-                <Button size="sm" variant="ghost" onClick={() => setEditing(p)}>Edit</Button>
-                <Button size="sm" variant="ghost" onClick={() => setPlans(prev => prev.filter(x => x.id !== p.id))}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      {loading ? (
+        <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : (
+        <Table>
+          <TableHeader><TableRow><TableHead>Plan</TableHead><TableHead>Text</TableHead><TableHead>Image</TableHead><TableHead>Regen</TableHead><TableHead>Prompts</TableHead><TableHead></TableHead></TableRow></TableHeader>
+          <TableBody>
+            {plans.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No plans configured.</TableCell></TableRow>}
+            {plans.map(p => (
+              <TableRow key={p.id}>
+                <TableCell className="font-medium">{p.plan_name}</TableCell>
+                <TableCell>{p.text_generations_limit}/mo</TableCell>
+                <TableCell>{p.image_generations_limit}/mo</TableCell>
+                <TableCell>{p.regeneration_limit}</TableCell>
+                <TableCell>{p.can_edit_prompts ? "✓" : "✗"}</TableCell>
+                <TableCell className="text-right">
+                  <Button size="sm" variant="ghost" onClick={() => setEditing(p)}>Edit</Button>
+                  <Button size="sm" variant="ghost" onClick={() => remove(p.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
     </div>
   );
 }
 
 // ===================== FEATURE FLAGS =====================
 function FeatureFlagsPanel() {
-  const [flags, setFlags] = useState([
-    { id: "1", key: "ai_studio_enabled", label: "AI Studio (Global)", enabled: true },
-    { id: "2", key: "text_gen_enabled", label: "Text Generation", enabled: true },
-    { id: "3", key: "image_gen_enabled", label: "Image Generation", enabled: true },
-    { id: "4", key: "user_prompt_editing", label: "User Prompt Editing", enabled: false },
-  ]);
+  const { toast } = useToast();
+  const [flags, setFlags] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const toggle = (id: string) => {
-    setFlags(prev => prev.map(f => f.id === id ? { ...f, enabled: !f.enabled } : f));
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      const rows = await adminApi({ action: "list", table: "ai_feature_flags" });
+      setFlags(rows || []);
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const toggle = async (flag: any) => {
+    try {
+      await adminApi({ action: "update", table: "ai_feature_flags", id: flag.id, data: { enabled: !flag.enabled } });
+      toast({ title: `${flag.feature_key} ${!flag.enabled ? "enabled" : "disabled"}` });
+      load();
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    }
   };
 
   return (
     <div className="space-y-4">
-      <h3 className="font-semibold text-foreground">Feature Flags</h3>
-      <p className="text-sm text-muted-foreground">Control what AI features are available platform-wide</p>
-      <div className="space-y-3">
-        {flags.map(f => (
-          <Card key={f.id}>
-            <CardContent className="py-3 flex items-center justify-between">
-              <div>
-                <p className="font-medium text-foreground">{f.label}</p>
-                <p className="text-xs text-muted-foreground">{f.key}</p>
-              </div>
-              <Switch checked={f.enabled} onCheckedChange={() => toggle(f.id)} />
-            </CardContent>
-          </Card>
-        ))}
+      <div className="flex justify-between items-center">
+        <div>
+          <h3 className="font-semibold text-foreground">Feature Flags</h3>
+          <p className="text-sm text-muted-foreground">Control what AI features are available platform-wide</p>
+        </div>
+        <Button size="sm" variant="outline" onClick={load}><RefreshCw className="h-4 w-4" /></Button>
       </div>
+      {loading ? (
+        <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : (
+        <div className="space-y-3">
+          {flags.length === 0 && <p className="text-center text-muted-foreground py-8">No feature flags configured.</p>}
+          {flags.map(f => (
+            <Card key={f.id}>
+              <CardContent className="py-3 flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-foreground">{f.feature_key?.replace(/_/g, " ")}</p>
+                  <p className="text-xs text-muted-foreground">{f.feature_key}</p>
+                </div>
+                <Switch checked={f.enabled} onCheckedChange={() => toggle(f)} />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
 // ===================== USAGE LOGS =====================
 function UsageLogsPanel() {
-  const stats = {
-    total: 1247,
-    month: 342,
-    week: 89,
-    text: 984,
-    image: 263,
-    errors: 12,
-  };
+  const { toast } = useToast();
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  const recentLogs = [
-    { id: "1", time: "2026-04-09 14:32", type: "text", model: "gemini-3-flash", status: "success", ms: 1240 },
-    { id: "2", time: "2026-04-09 14:28", type: "image", model: "gemini-3.1-flash-image", status: "success", ms: 8450 },
-    { id: "3", time: "2026-04-09 14:15", type: "text", model: "gemini-3-flash", status: "error", ms: 320 },
-    { id: "4", time: "2026-04-09 13:55", type: "text", model: "gemini-3-flash", status: "success", ms: 1580 },
-    { id: "5", time: "2026-04-09 13:40", type: "image", model: "gemini-3.1-flash-image", status: "success", ms: 9200 },
-  ];
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await adminApi({ action: "usage_stats", table: "ai_usage_logs" });
+      setStats(data);
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  if (!stats) return <p className="text-center text-muted-foreground py-8">No usage data available.</p>;
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h3 className="font-semibold text-foreground">Usage Logs</h3>
+        <Button size="sm" variant="outline" onClick={load}><RefreshCw className="h-4 w-4" /></Button>
+      </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
-          { label: "Total", value: stats.total },
-          { label: "This Month", value: stats.month },
-          { label: "This Week", value: stats.week },
-          { label: "Text", value: stats.text },
-          { label: "Image", value: stats.image },
-          { label: "Errors", value: stats.errors },
+          { label: "Total", value: stats.total_generations },
+          { label: "This Month", value: stats.month_generations },
+          { label: "This Week", value: stats.week_generations },
+          { label: "Text", value: stats.text_generations },
+          { label: "Image", value: stats.image_generations },
+          { label: "Errors", value: stats.total_errors },
         ].map(s => (
           <Card key={s.label}>
             <CardContent className="py-3 text-center">
@@ -377,18 +778,26 @@ function UsageLogsPanel() {
       <div className="overflow-x-auto">
         <Table>
           <TableHeader><TableRow>
-            <TableHead>Time</TableHead><TableHead>Type</TableHead><TableHead>Model</TableHead><TableHead>Status</TableHead><TableHead>Time (ms)</TableHead>
+            <TableHead>Time</TableHead><TableHead>Type</TableHead><TableHead>Provider</TableHead><TableHead>Model</TableHead><TableHead>Status</TableHead><TableHead>Time (ms)</TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {recentLogs.map(log => (
+            {(stats.recent_logs || []).map((log: any) => (
               <TableRow key={log.id}>
-                <TableCell className="text-xs">{log.time}</TableCell>
-                <TableCell><Badge variant="outline">{log.type}</Badge></TableCell>
-                <TableCell className="text-xs text-muted-foreground">{log.model}</TableCell>
-                <TableCell>{log.status === "success" ? <Badge className="bg-green-500/10 text-green-600 border-green-500/20">Success</Badge> : <Badge variant="destructive">Error</Badge>}</TableCell>
-                <TableCell className="text-xs">{log.ms}</TableCell>
+                <TableCell className="text-xs">{new Date(log.created_at).toLocaleString()}</TableCell>
+                <TableCell><Badge variant="outline">{log.generation_type}</Badge></TableCell>
+                <TableCell className="text-xs text-muted-foreground">{log.provider || "-"}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">{log.model || "-"}</TableCell>
+                <TableCell>
+                  {log.status === "success"
+                    ? <Badge className="bg-green-500/10 text-green-600 border-green-500/20">Success</Badge>
+                    : <Badge variant="destructive">Error</Badge>}
+                </TableCell>
+                <TableCell className="text-xs">{log.response_time_ms || "-"}</TableCell>
               </TableRow>
             ))}
+            {(stats.recent_logs || []).length === 0 && (
+              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-4">No logs yet.</TableCell></TableRow>
+            )}
           </TableBody>
         </Table>
       </div>
@@ -422,6 +831,7 @@ export default function AdminAIControlCenter() {
           <TabsList className="flex flex-wrap gap-1 h-auto mb-6">
             <TabsTrigger value="text-models" className="flex items-center gap-1"><Cpu className="h-3.5 w-3.5" /> Text Models</TabsTrigger>
             <TabsTrigger value="image-models" className="flex items-center gap-1"><Image className="h-3.5 w-3.5" /> Image Models</TabsTrigger>
+            <TabsTrigger value="api-keys" className="flex items-center gap-1"><Key className="h-3.5 w-3.5" /> API Keys</TabsTrigger>
             <TabsTrigger value="prompts" className="flex items-center gap-1"><FileText className="h-3.5 w-3.5" /> Prompts</TabsTrigger>
             <TabsTrigger value="plans" className="flex items-center gap-1"><Shield className="h-3.5 w-3.5" /> Plan Limits</TabsTrigger>
             <TabsTrigger value="pricing" className="flex items-center gap-1"><DollarSign className="h-3.5 w-3.5" /> Pricing</TabsTrigger>
@@ -430,6 +840,7 @@ export default function AdminAIControlCenter() {
           </TabsList>
           <TabsContent value="text-models"><TextModelsPanel /></TabsContent>
           <TabsContent value="image-models"><ImageModelsPanel /></TabsContent>
+          <TabsContent value="api-keys"><ApiKeysPanel /></TabsContent>
           <TabsContent value="prompts"><PromptTemplatesPanel /></TabsContent>
           <TabsContent value="plans"><PlanLimitsPanel /></TabsContent>
           <TabsContent value="pricing"><GeoPricingPanel /></TabsContent>
