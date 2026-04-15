@@ -6,19 +6,33 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, ArrowRight, Building2, Target, Palette, Megaphone } from "lucide-react";
+import {
+  ArrowLeft, ArrowRight, Building2, Target, Palette, Share2,
+  Loader2, Check, Sparkles, Facebook, Instagram, Linkedin,
+} from "lucide-react";
 
-const PLATFORMS = ["Instagram", "Facebook", "LinkedIn", "X (Twitter)", "Google Business Profile", "YouTube"];
-const GOALS = ["Brand Awareness", "Lead Generation", "Trust Building", "Engagement", "Conversions", "Local Visibility"];
-const CONTENT_TYPES = ["Image Posts", "Carousels", "Short Videos / Reels", "Text Posts", "GMB Posts", "LinkedIn Posts"];
-const TONES = ["Simple", "Premium", "Luxury", "Informative", "Viral", "Emotional", "Educational", "Promotional"];
+const INDUSTRIES = [
+  "Real Estate", "SaaS / Tech", "E-Commerce", "Coaching / Consulting",
+  "Healthcare", "Education", "Restaurant / Food", "Fitness / Wellness",
+  "Fashion / Beauty", "Finance / Insurance", "Travel / Hospitality", "Other",
+];
+
+const GOALS = ["Lead Generation", "Brand Awareness", "Sales & Conversions", "Engagement", "Trust Building", "Local Visibility"];
+const TONES = ["Professional", "Casual", "Luxury", "Friendly", "Bold & Viral", "Educational", "Emotional", "Promotional"];
 
 const TIMEZONES = [
   "Asia/Kolkata", "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",
   "Europe/London", "Europe/Paris", "Europe/Berlin", "Asia/Dubai", "Asia/Singapore",
   "Asia/Tokyo", "Australia/Sydney", "Pacific/Auckland", "America/Sao_Paulo", "Africa/Lagos",
+];
+
+const SOCIAL_PLATFORMS = [
+  { id: "linkedin", label: "LinkedIn", icon: Linkedin, color: "bg-sky-500/10 text-sky-600 border-sky-200 hover:bg-sky-500/20" },
+  { id: "instagram", label: "Instagram", icon: Instagram, color: "bg-pink-500/10 text-pink-600 border-pink-200 hover:bg-pink-500/20" },
+  { id: "facebook", label: "Facebook", icon: Facebook, color: "bg-blue-500/10 text-blue-600 border-blue-200 hover:bg-blue-500/20" },
 ];
 
 export default function BusinessSetup() {
@@ -31,27 +45,22 @@ export default function BusinessSetup() {
   const [form, setForm] = useState({
     name: "",
     industry: "",
-    products_services: "",
-    location: "",
     target_audience: "",
     goals: [] as string[],
-    competitors: "",
     brand_tone: "",
+    products_services: "",
     main_offers: "",
-    platforms: [] as string[],
-    posting_goals: [] as string[],
-    content_types: [] as string[],
-    content_style: "",
+    location: "",
     timezone: "Asia/Kolkata",
   });
 
   const updateField = (field: string, value: any) => setForm((p) => ({ ...p, [field]: value }));
 
-  const toggleArrayField = (field: string, value: string) => {
-    setForm((p) => {
-      const arr = (p as any)[field] as string[];
-      return { ...p, [field]: arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value] };
-    });
+  const toggleGoal = (goal: string) => {
+    setForm((p) => ({
+      ...p,
+      goals: p.goals.includes(goal) ? p.goals.filter((g) => g !== goal) : [...p.goals, goal],
+    }));
   };
 
   const handleSubmit = async () => {
@@ -62,21 +71,16 @@ export default function BusinessSetup() {
         user_id: user.id,
         name: form.name,
         industry: form.industry,
-        products_services: form.products_services,
-        location: form.location,
         target_audience: form.target_audience,
         goals: form.goals,
-        competitors: form.competitors,
         brand_tone: form.brand_tone,
+        products_services: form.products_services,
         main_offers: form.main_offers,
-        platforms: form.platforms,
-        posting_goals: form.posting_goals,
-        content_types: form.content_types,
-        content_style: form.content_style,
+        location: form.location,
         timezone: form.timezone,
       } as any);
       if (error) throw error;
-      toast({ title: "Business created!", description: "Now let's build your content plan." });
+      toast({ title: "🎉 You're all set!", description: "Head to your dashboard to generate your first content." });
       navigate("/");
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -85,165 +89,232 @@ export default function BusinessSetup() {
     }
   };
 
-  const steps = [
-    {
-      icon: <Building2 className="h-5 w-5" />,
-      title: "Business Basics",
-      description: "Tell us about your business",
-      content: (
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Business Name *</Label>
-            <Input value={form.name} onChange={(e) => updateField("name", e.target.value)} placeholder="Acme Corp" />
-          </div>
-          <div className="space-y-2">
-            <Label>Industry / Niche</Label>
-            <Input value={form.industry} onChange={(e) => updateField("industry", e.target.value)} placeholder="Real Estate, SaaS, Coaching..." />
-          </div>
-          <div className="space-y-2">
-            <Label>Products or Services</Label>
-            <Textarea value={form.products_services} onChange={(e) => updateField("products_services", e.target.value)} placeholder="What do you offer?" />
-          </div>
-          <div className="space-y-2">
-            <Label>Location / Target Market</Label>
-            <Input value={form.location} onChange={(e) => updateField("location", e.target.value)} placeholder="City, region, or global" />
-          </div>
-          <div className="space-y-2">
-            <Label>Timezone *</Label>
-            <select
-              value={form.timezone}
-              onChange={(e) => updateField("timezone", e.target.value)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              {TIMEZONES.map((tz) => (
-                <option key={tz} value={tz}>{tz.replace(/_/g, " ")}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-      ),
-    },
-    {
-      icon: <Target className="h-5 w-5" />,
-      title: "Audience & Goals",
-      description: "Who are you targeting?",
-      content: (
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Ideal Customers / Audience</Label>
-            <Textarea value={form.target_audience} onChange={(e) => updateField("target_audience", e.target.value)} placeholder="Demographics, interests, pain points..." />
-          </div>
-          <div className="space-y-2">
-            <Label>Business Goals</Label>
-            <div className="flex flex-wrap gap-2">
-              {GOALS.map((g) => (
-                <ChipToggle key={g} label={g} active={form.goals.includes(g)} onClick={() => toggleArrayField("goals", g)} />
-              ))}
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Main Competitors</Label>
-            <Input value={form.competitors} onChange={(e) => updateField("competitors", e.target.value)} placeholder="Competitor names (optional)" />
-          </div>
-          <div className="space-y-2">
-            <Label>Main Offers / USP</Label>
-            <Textarea value={form.main_offers} onChange={(e) => updateField("main_offers", e.target.value)} placeholder="What makes you unique?" />
-          </div>
-        </div>
-      ),
-    },
-    {
-      icon: <Megaphone className="h-5 w-5" />,
-      title: "Platforms & Content",
-      description: "Where should we post?",
-      content: (
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Platforms</Label>
-            <div className="flex flex-wrap gap-2">
-              {PLATFORMS.map((p) => (
-                <ChipToggle key={p} label={p} active={form.platforms.includes(p)} onClick={() => toggleArrayField("platforms", p)} />
-              ))}
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Content Types</Label>
-            <div className="flex flex-wrap gap-2">
-              {CONTENT_TYPES.map((c) => (
-                <ChipToggle key={c} label={c} active={form.content_types.includes(c)} onClick={() => toggleArrayField("content_types", c)} />
-              ))}
-            </div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      icon: <Palette className="h-5 w-5" />,
-      title: "Brand & Tone",
-      description: "Define your style",
-      content: (
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Brand Tone</Label>
-            <div className="flex flex-wrap gap-2">
-              {TONES.map((t) => (
-                <ChipToggle key={t} label={t} active={form.brand_tone === t} onClick={() => updateField("brand_tone", form.brand_tone === t ? "" : t)} />
-              ))}
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Content Style Notes</Label>
-            <Textarea value={form.content_style} onChange={(e) => updateField("content_style", e.target.value)} placeholder="Any specific style preferences or guidelines..." />
-          </div>
-        </div>
-      ),
-    },
+  const TOTAL_STEPS = 4;
+  const progress = ((step + 1) / TOTAL_STEPS) * 100;
+
+  const stepLabels = [
+    { icon: Building2, label: "Business" },
+    { icon: Target, label: "Goals & Tone" },
+    { icon: Palette, label: "Product Info" },
+    { icon: Share2, label: "Connect" },
   ];
 
-  const currentStep = steps[step];
-  const canProceed = step === 0 ? form.name.trim() !== "" : true;
+  const canProceed = () => {
+    if (step === 0) return form.name.trim() !== "";
+    return true;
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
-      <div className="w-full max-w-2xl">
-        {/* Progress */}
-        <div className="flex items-center justify-between mb-8">
-          {steps.map((s, i) => (
-            <div key={i} className="flex items-center">
-              <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
-                  i <= step ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                }`}
-              >
-                {s.icon}
-              </div>
-              {i < steps.length - 1 && (
-                <div className={`w-12 sm:w-24 h-0.5 mx-1 ${i < step ? "bg-primary" : "bg-muted"}`} />
-              )}
-            </div>
-          ))}
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-background to-primary/5">
+      <div className="w-full max-w-xl">
+        {/* Header */}
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium mb-3">
+            <Sparkles className="h-3.5 w-3.5" />
+            Step {step + 1} of {TOTAL_STEPS}
+          </div>
+          <h1 className="text-2xl font-bold text-foreground">Set up your business</h1>
+          <p className="text-sm text-muted-foreground mt-1">Takes less than 2 minutes</p>
         </div>
 
-        <Card className="shadow-elevated animate-fade-in">
-          <CardHeader>
-            <CardTitle className="font-heading">{currentStep.title}</CardTitle>
-            <CardDescription>{currentStep.description}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {currentStep.content}
+        {/* Progress Bar */}
+        <Progress value={progress} className="h-2 mb-6" />
 
-            <div className="flex justify-between mt-8">
-              <Button variant="outline" onClick={() => setStep((p) => p - 1)} disabled={step === 0}>
-                <ArrowLeft className="h-4 w-4 mr-2" /> Back
+        {/* Step Indicators */}
+        <div className="flex items-center justify-between mb-6">
+          {stepLabels.map((s, i) => {
+            const Icon = s.icon;
+            return (
+              <div key={i} className="flex flex-col items-center gap-1">
+                <div
+                  className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-medium transition-all ${
+                    i < step
+                      ? "bg-primary text-primary-foreground"
+                      : i === step
+                      ? "bg-primary text-primary-foreground ring-4 ring-primary/20"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {i < step ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
+                </div>
+                <span className={`text-[10px] font-medium ${i <= step ? "text-primary" : "text-muted-foreground"}`}>
+                  {s.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Card Content */}
+        <Card className="shadow-elevated border-border animate-fade-in">
+          <CardContent className="pt-6">
+            {/* Step 0: Business Details */}
+            {step === 0 && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Business Name *</Label>
+                  <Input
+                    value={form.name}
+                    onChange={(e) => updateField("name", e.target.value)}
+                    placeholder="e.g. Acme Corp"
+                    className="h-11"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Industry</Label>
+                  <select
+                    value={form.industry}
+                    onChange={(e) => updateField("industry", e.target.value)}
+                    className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <option value="">Select your industry</option>
+                    {INDUSTRIES.map((ind) => (
+                      <option key={ind} value={ind}>{ind}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Target Audience</Label>
+                  <Input
+                    value={form.target_audience}
+                    onChange={(e) => updateField("target_audience", e.target.value)}
+                    placeholder="e.g. Small business owners, 25-45"
+                    className="h-11"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Timezone *</Label>
+                  <select
+                    value={form.timezone}
+                    onChange={(e) => updateField("timezone", e.target.value)}
+                    className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {TIMEZONES.map((tz) => (
+                      <option key={tz} value={tz}>{tz.replace(/_/g, " ")}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {/* Step 1: Goals & Tone */}
+            {step === 1 && (
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">What are your goals?</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {GOALS.map((g) => (
+                      <ChipToggle key={g} label={g} active={form.goals.includes(g)} onClick={() => toggleGoal(g)} />
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Brand Tone</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {TONES.map((t) => (
+                      <ChipToggle key={t} label={t} active={form.brand_tone === t} onClick={() => updateField("brand_tone", form.brand_tone === t ? "" : t)} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: Product / Service Info */}
+            {step === 2 && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">What do you offer?</Label>
+                  <Textarea
+                    value={form.products_services}
+                    onChange={(e) => updateField("products_services", e.target.value)}
+                    placeholder="Describe your products or services..."
+                    rows={3}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Key Features / USP</Label>
+                  <Textarea
+                    value={form.main_offers}
+                    onChange={(e) => updateField("main_offers", e.target.value)}
+                    placeholder="What makes you unique?"
+                    rows={2}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Location (optional)</Label>
+                  <Input
+                    value={form.location}
+                    onChange={(e) => updateField("location", e.target.value)}
+                    placeholder="City, region, or global"
+                    className="h-11"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Social Connection (Optional) */}
+            {step === 3 && (
+              <div className="space-y-5">
+                <div className="text-center">
+                  <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                    <Share2 className="h-7 w-7 text-primary" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-foreground">Connect your social accounts</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Publish content directly to your platforms. You can skip this and connect later.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  {SOCIAL_PLATFORMS.map((platform) => {
+                    const Icon = platform.icon;
+                    return (
+                      <button
+                        key={platform.id}
+                        onClick={() => {
+                          toast({ title: "Coming Soon", description: `${platform.label} OAuth connection will be available soon.` });
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${platform.color}`}
+                      >
+                        <Icon className="h-5 w-5" />
+                        <span className="text-sm font-medium">Connect {platform.label}</span>
+                        <ArrowRight className="h-4 w-4 ml-auto opacity-50" />
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <p className="text-xs text-center text-muted-foreground">
+                  🔒 We use secure OAuth — no passwords stored
+                </p>
+              </div>
+            )}
+
+            {/* Navigation */}
+            <div className="flex justify-between mt-8 pt-4 border-t border-border">
+              <Button
+                variant="outline"
+                onClick={() => setStep((p) => p - 1)}
+                disabled={step === 0}
+                className="gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" /> Back
               </Button>
-              {step < steps.length - 1 ? (
-                <Button onClick={() => setStep((p) => p + 1)} disabled={!canProceed}>
-                  Next <ArrowRight className="h-4 w-4 ml-2" />
+
+              {step < TOTAL_STEPS - 1 ? (
+                <Button onClick={() => setStep((p) => p + 1)} disabled={!canProceed()} className="gap-2">
+                  Next <ArrowRight className="h-4 w-4" />
                 </Button>
               ) : (
-                <Button onClick={handleSubmit} disabled={loading || !canProceed}>
-                  {loading ? "Creating..." : "Create Business"}
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={handleSubmit} disabled={loading}>
+                    Skip & Finish
+                  </Button>
+                  <Button onClick={handleSubmit} disabled={loading} className="gap-2">
+                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    {loading ? "Creating..." : "Finish Setup"}
+                  </Button>
+                </div>
               )}
             </div>
           </CardContent>
@@ -258,10 +329,10 @@ function ChipToggle({ label, active, onClick }: { label: string; active: boolean
     <button
       type="button"
       onClick={onClick}
-      className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+      className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${
         active
-          ? "bg-primary text-primary-foreground"
-          : "bg-muted text-muted-foreground hover:bg-secondary"
+          ? "bg-primary text-primary-foreground border-primary"
+          : "bg-muted text-muted-foreground border-transparent hover:bg-secondary"
       }`}
     >
       {label}
