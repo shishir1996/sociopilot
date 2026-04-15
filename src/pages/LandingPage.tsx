@@ -54,8 +54,8 @@ export default function LandingPage() {
             Auto-replies, engagement handling, and analytics — all in one place.
           </p>
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Button size="lg" onClick={() => navigate("/auth")} className="gradient-primary border-0 h-12 px-8 text-base shadow-glow">
-              Start Your Trial <ArrowRight className="h-5 w-5 ml-2" />
+            <Button size="lg" onClick={() => navigate("/auth")} className="gradient-primary border-0 h-14 px-10 text-lg shadow-glow">
+              Start Free Trial in 10 Seconds <ArrowRight className="h-5 w-5 ml-2" />
             </Button>
             <Button variant="outline" size="lg" className="h-12 px-8 text-base">
               <Play className="h-4 w-4 mr-2" /> Watch Demo
