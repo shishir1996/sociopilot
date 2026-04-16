@@ -272,7 +272,10 @@ export default function BusinessSetup() {
                       <button
                         key={platform.id}
                         onClick={() => {
-                          toast({ title: "Coming Soon", description: `${platform.label} OAuth connection will be available soon.` });
+                          toast({
+                            title: "Connect after setup",
+                            description: `Complete setup first, then connect ${platform.label} from your dashboard.`,
+                          });
                         }}
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${platform.color}`}
                       >
