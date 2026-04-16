@@ -182,6 +182,9 @@ export default function AdminDashboard() {
             <Button variant="outline" size="sm" onClick={() => navigate("/admin/ai")} className="text-xs">
               <Cpu className="h-3.5 w-3.5 mr-1" /> AI Control
             </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate("/admin/integrations")} className="text-xs">
+              🔗 Integrations
+            </Button>
             <Button variant="outline" size="sm" onClick={() => navigate("/")}>
               <ArrowLeft className="h-4 w-4 mr-1" /> Back
             </Button>

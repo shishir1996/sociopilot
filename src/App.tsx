@@ -17,6 +17,7 @@ import BrandAssets from "./pages/BrandAssets";
 import ContentPage from "./pages/ContentPage";
 import ScheduleSettings from "./pages/ScheduleSettings";
 import AdminAIControlCenter from "./pages/AdminAIControlCenter";
+import AdminSocialIntegrations from "./pages/AdminSocialIntegrations";
 import AIStudio from "./pages/AIStudio";
 import Pricing from "./pages/Pricing";
 
@@ -44,6 +45,7 @@ const App = () => (
             <Route path="/admin/analytics" element={<AdminAnalytics />} />
             <Route path="/admin/user" element={<AdminUserDetail />} />
             <Route path="/admin/ai" element={<AdminAIControlCenter />} />
+            <Route path="/admin/integrations" element={<AdminSocialIntegrations />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
