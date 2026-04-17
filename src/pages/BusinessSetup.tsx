@@ -75,6 +75,19 @@ export default function BusinessSetup() {
     } catch {
       setEnabledPlatforms([]);
     }
+    // Also count platforms the user already connected (e.g. returning from OAuth)
+    if (user) {
+      const { data: biz } = await supabase
+        .from("businesses").select("id").eq("user_id", user.id).maybeSingle();
+      if (biz) {
+        const { count } = await supabase
+          .from("social_accounts")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .eq("business_id", biz.id);
+        setConnectedCount(count || 0);
+      }
+    }
   };
 
   const handleSubmit = async () => {
