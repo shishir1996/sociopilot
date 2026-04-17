@@ -42,6 +42,7 @@ export default function BusinessSetup() {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [enabledPlatforms, setEnabledPlatforms] = useState<string[]>([]);
+  const [connectedCount, setConnectedCount] = useState(0);
 
   const [form, setForm] = useState({
     name: "",
