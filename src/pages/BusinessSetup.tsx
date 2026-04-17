@@ -42,6 +42,7 @@ export default function BusinessSetup() {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [enabledPlatforms, setEnabledPlatforms] = useState<string[]>([]);
+  const [connectedCount, setConnectedCount] = useState(0);
 
   const [form, setForm] = useState({
     name: "",
@@ -73,6 +74,19 @@ export default function BusinessSetup() {
       setEnabledPlatforms(data?.platforms || []);
     } catch {
       setEnabledPlatforms([]);
+    }
+    // Also count platforms the user already connected (e.g. returning from OAuth)
+    if (user) {
+      const { data: biz } = await supabase
+        .from("businesses").select("id").eq("user_id", user.id).maybeSingle();
+      if (biz) {
+        const { count } = await supabase
+          .from("social_accounts")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .eq("business_id", biz.id);
+        setConnectedCount(count || 0);
+      }
     }
   };
 
@@ -368,7 +382,7 @@ export default function BusinessSetup() {
                           ? handleConnectPlatform(platform.id)
                           : toast({
                               title: "Not available yet",
-                              description: "Platform setup is not available yet. Please contact admin.",
+                              description: "This platform isn't enabled yet. You can skip and finish — connect it later from your dashboard's Accounts page.",
                             })}
                         disabled={loading}
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${
@@ -384,6 +398,12 @@ export default function BusinessSetup() {
                     );
                   })}
                 </div>
+
+                {enabledPlatforms.length === 0 && (
+                  <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-foreground">
+                    No platforms are enabled yet. You can <strong>Skip & Finish</strong> and connect them later from your dashboard → <strong>Accounts</strong>.
+                  </div>
+                )}
 
                 <p className="text-xs text-center text-muted-foreground">
                   🔒 We use secure OAuth — no passwords stored
@@ -419,7 +439,12 @@ export default function BusinessSetup() {
                   <Button variant="outline" onClick={handleSubmit} disabled={loading}>
                     Skip & Finish
                   </Button>
-                  <Button onClick={handleSubmit} disabled={loading} className="gap-2">
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={loading || connectedCount === 0}
+                    className="gap-2"
+                    title={connectedCount === 0 ? "Connect at least one platform to finish, or use Skip & Finish" : undefined}
+                  >
                     {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                     {loading ? "Creating..." : "Finish Setup"}
                   </Button>
