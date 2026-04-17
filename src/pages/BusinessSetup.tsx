@@ -11,7 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, ArrowRight, Building2, Target, Palette, Share2,
-  Loader2, Check, Sparkles, Facebook, Instagram, Linkedin,
+  Loader2, Check, Sparkles, Facebook, Instagram, Linkedin, Lock,
 } from "lucide-react";
 
 const INDUSTRIES = [
@@ -41,6 +41,7 @@ export default function BusinessSetup() {
   const { toast } = useToast();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [enabledPlatforms, setEnabledPlatforms] = useState<string[]>([]);
 
   const [form, setForm] = useState({
     name: "",
@@ -63,28 +64,118 @@ export default function BusinessSetup() {
     }));
   };
 
+  // Load admin-enabled platforms when reaching the connect step
+  const loadEnabledPlatforms = async () => {
+    try {
+      const { data } = await supabase.functions.invoke("social-oauth", {
+        body: { action: "check_platforms" },
+      });
+      setEnabledPlatforms(data?.platforms || []);
+    } catch {
+      setEnabledPlatforms([]);
+    }
+  };
+
   const handleSubmit = async () => {
+    if (!user) {
+      console.warn("[Onboarding] No user, redirecting to /auth");
+      navigate("/auth");
+      return;
+    }
+    if (!form.name.trim()) {
+      toast({ title: "Business name required", description: "Please go back and enter your business name.", variant: "destructive" });
+      setStep(0);
+      return;
+    }
+    setLoading(true);
+    console.log("[Onboarding] Submitting business setup", { user_id: user.id, name: form.name });
+    try {
+      // Check if business already exists (idempotent)
+      const { data: existing } = await supabase
+        .from("businesses")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (existing) {
+        const { error } = await supabase.from("businesses").update({
+          name: form.name,
+          industry: form.industry,
+          target_audience: form.target_audience,
+          goals: form.goals,
+          brand_tone: form.brand_tone,
+          products_services: form.products_services,
+          main_offers: form.main_offers,
+          location: form.location,
+          timezone: form.timezone,
+        } as any).eq("id", existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("businesses").insert({
+          user_id: user.id,
+          name: form.name,
+          industry: form.industry,
+          target_audience: form.target_audience,
+          goals: form.goals,
+          brand_tone: form.brand_tone,
+          products_services: form.products_services,
+          main_offers: form.main_offers,
+          location: form.location,
+          timezone: form.timezone,
+        } as any);
+        if (error) throw error;
+      }
+      console.log("[Onboarding] Saved successfully → navigating to /");
+      toast({ title: "🎉 You're all set!", description: "Head to your dashboard to generate your first content." });
+      navigate("/", { replace: true });
+    } catch (error: any) {
+      console.error("[Onboarding] Save failed:", error);
+      toast({ title: "Setup failed", description: error.message || "Please try again.", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Save business first, then trigger OAuth connect
+  const handleConnectPlatform = async (platformId: string) => {
     if (!user) return;
+    if (!enabledPlatforms.includes(platformId === "instagram" ? "facebook" : platformId)) {
+      toast({
+        title: "Platform not available",
+        description: "Platform setup is not available yet. Please contact admin.",
+        variant: "destructive",
+      });
+      return;
+    }
     setLoading(true);
     try {
-      const { error } = await supabase.from("businesses").insert({
-        user_id: user.id,
-        name: form.name,
-        industry: form.industry,
-        target_audience: form.target_audience,
-        goals: form.goals,
-        brand_tone: form.brand_tone,
-        products_services: form.products_services,
-        main_offers: form.main_offers,
-        location: form.location,
-        timezone: form.timezone,
-      } as any);
+      // Persist business first so user_id + business_id exist
+      let businessId: string | null = null;
+      const { data: existing } = await supabase
+        .from("businesses").select("id").eq("user_id", user.id).maybeSingle();
+      if (existing) {
+        businessId = existing.id;
+      } else {
+        const { data, error } = await supabase.from("businesses").insert({
+          user_id: user.id, name: form.name, industry: form.industry,
+          target_audience: form.target_audience, goals: form.goals,
+          brand_tone: form.brand_tone, products_services: form.products_services,
+          main_offers: form.main_offers, location: form.location, timezone: form.timezone,
+        } as any).select("id").single();
+        if (error) throw error;
+        businessId = data!.id;
+      }
+
+      const platform = platformId === "instagram" ? "facebook" : platformId;
+      const redirectUri = `${window.location.origin}/settings`;
+      const { data, error } = await supabase.functions.invoke("social-oauth", {
+        body: { action: "get_oauth_url", platform, redirect_uri: redirectUri, business_id: businessId },
+      });
       if (error) throw error;
-      toast({ title: "🎉 You're all set!", description: "Head to your dashboard to generate your first content." });
-      navigate("/");
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } finally {
+      if (data?.error) throw new Error(data.error);
+      if (data?.url) window.location.href = data.url;
+    } catch (err: any) {
+      toast({ title: "Connection failed", description: err.message, variant: "destructive" });
       setLoading(false);
     }
   };

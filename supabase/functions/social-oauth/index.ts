@@ -101,25 +101,43 @@ Deno.serve(async (req) => {
       case "save_admin_settings": {
         const { platform, enabled, credentials } = body;
 
+        if (!platform || typeof credentials !== "object") {
+          return new Response(JSON.stringify({ error: "Missing platform or credentials" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
         // Upsert into ai_provider_settings
-        const { data: existing } = await supabaseAdmin
+        const { data: existing, error: selErr } = await supabaseAdmin
           .from("ai_provider_settings")
           .select("id")
           .eq("provider_type", "social_oauth")
           .eq("provider_name", platform)
           .maybeSingle();
 
+        if (selErr) {
+          console.error("Select error:", selErr);
+          return new Response(JSON.stringify({ error: `DB read failed: ${selErr.message}` }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        let writeErr: any = null;
         if (existing) {
-          await supabaseAdmin
+          const { error } = await supabaseAdmin
             .from("ai_provider_settings")
             .update({
               is_active: enabled,
               config_json: credentials,
               updated_at: new Date().toISOString(),
             })
-            .eq("id", existing.id);
+            .eq("id", existing.id)
+            .select()
+            .single();
+          writeErr = error;
         } else {
-          await supabaseAdmin
+          const { error } = await supabaseAdmin
             .from("ai_provider_settings")
             .insert({
               provider_type: "social_oauth",
@@ -127,17 +145,27 @@ Deno.serve(async (req) => {
               model_name: platform,
               is_active: enabled,
               config_json: credentials,
-            });
+            })
+            .select()
+            .single();
+          writeErr = error;
         }
 
-        // Log admin action
+        if (writeErr) {
+          console.error("Write error:", writeErr);
+          return new Response(JSON.stringify({ error: `Save failed: ${writeErr.message}` }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // Log admin action (non-blocking)
         await supabaseAdmin.from("admin_logs").insert({
           admin_id: user.id,
           action: `social_oauth_${enabled ? "enabled" : "disabled"}_${platform}`,
           details: { platform },
         });
 
-        return new Response(JSON.stringify({ ok: true }), {
+        return new Response(JSON.stringify({ ok: true, saved: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
