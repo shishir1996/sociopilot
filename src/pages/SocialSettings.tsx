@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Loader2, Check, RefreshCw, Trash2, ExternalLink, AlertCircle } from "lucide-react";
+import { ArrowLeft, Loader2, Check, RefreshCw, Trash2, ExternalLink, AlertCircle, Lock, Crown } from "lucide-react";
 
 const PLATFORMS = [
   { value: "facebook", label: "Facebook", icon: "📘", color: "bg-blue-500/10 text-blue-600 border-blue-200" },
