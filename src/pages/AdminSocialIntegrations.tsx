@@ -237,6 +237,7 @@ export default function AdminSocialIntegrations() {
 
         {PLATFORM_CONFIGS.map((config) => {
           const state = platforms[config.platform];
+          const hasCredentials = config.fields.every(f => (state.values[f.key] || "").trim().length > 0);
           return (
             <Card key={config.platform} className="shadow-card border-border">
               <CardHeader className="pb-3">
@@ -248,7 +249,8 @@ export default function AdminSocialIntegrations() {
                       <CardDescription className="text-xs">OAuth app credentials</CardDescription>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    {hasCredentials && <Badge variant="outline" className="text-[10px]">Configured</Badge>}
                     <Badge variant={state.enabled ? "default" : "secondary"}>
                       {state.enabled ? "Active" : "Inactive"}
                     </Badge>
