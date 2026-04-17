@@ -1,0 +1,2 @@
+ALTER TABLE public.ai_provider_settings DROP CONSTRAINT IF EXISTS ai_provider_settings_provider_type_check;
+ALTER TABLE public.ai_provider_settings ADD CONSTRAINT ai_provider_settings_provider_type_check CHECK (provider_type = ANY (ARRAY['text'::text, 'image'::text, 'social_oauth'::text]));
