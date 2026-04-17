@@ -359,20 +359,27 @@ export default function BusinessSetup() {
                 <div className="space-y-3">
                   {SOCIAL_PLATFORMS.map((platform) => {
                     const Icon = platform.icon;
+                    const oauthKey = platform.id === "instagram" ? "facebook" : platform.id;
+                    const isAvailable = enabledPlatforms.includes(oauthKey);
                     return (
                       <button
                         key={platform.id}
-                        onClick={() => {
-                          toast({
-                            title: "Connect after setup",
-                            description: `Complete setup first, then connect ${platform.label} from your dashboard.`,
-                          });
-                        }}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${platform.color}`}
+                        onClick={() => isAvailable
+                          ? handleConnectPlatform(platform.id)
+                          : toast({
+                              title: "Not available yet",
+                              description: "Platform setup is not available yet. Please contact admin.",
+                            })}
+                        disabled={loading}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${
+                          isAvailable ? platform.color : "border-dashed border-border opacity-60 cursor-not-allowed"
+                        }`}
                       >
                         <Icon className="h-5 w-5" />
                         <span className="text-sm font-medium">Connect {platform.label}</span>
-                        <ArrowRight className="h-4 w-4 ml-auto opacity-50" />
+                        {isAvailable
+                          ? <ArrowRight className="h-4 w-4 ml-auto opacity-50" />
+                          : <Lock className="h-4 w-4 ml-auto opacity-50" />}
                       </button>
                     );
                   })}
@@ -396,7 +403,15 @@ export default function BusinessSetup() {
               </Button>
 
               {step < TOTAL_STEPS - 1 ? (
-                <Button onClick={() => setStep((p) => p + 1)} disabled={!canProceed()} className="gap-2">
+                <Button
+                  onClick={() => {
+                    const next = step + 1;
+                    setStep(next);
+                    if (next === 3) loadEnabledPlatforms();
+                  }}
+                  disabled={!canProceed()}
+                  className="gap-2"
+                >
                   Next <ArrowRight className="h-4 w-4" />
                 </Button>
               ) : (
