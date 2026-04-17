@@ -382,7 +382,7 @@ export default function BusinessSetup() {
                           ? handleConnectPlatform(platform.id)
                           : toast({
                               title: "Not available yet",
-                              description: "Platform setup is not available yet. Please contact admin.",
+                              description: "This platform isn't enabled yet. You can skip and finish — connect it later from your dashboard's Accounts page.",
                             })}
                         disabled={loading}
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${
@@ -398,6 +398,12 @@ export default function BusinessSetup() {
                     );
                   })}
                 </div>
+
+                {enabledPlatforms.length === 0 && (
+                  <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-foreground">
+                    No platforms are enabled yet. You can <strong>Skip & Finish</strong> and connect them later from your dashboard → <strong>Accounts</strong>.
+                  </div>
+                )}
 
                 <p className="text-xs text-center text-muted-foreground">
                   🔒 We use secure OAuth — no passwords stored
