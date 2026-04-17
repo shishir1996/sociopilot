@@ -439,7 +439,12 @@ export default function BusinessSetup() {
                   <Button variant="outline" onClick={handleSubmit} disabled={loading}>
                     Skip & Finish
                   </Button>
-                  <Button onClick={handleSubmit} disabled={loading} className="gap-2">
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={loading || connectedCount === 0}
+                    className="gap-2"
+                    title={connectedCount === 0 ? "Connect at least one platform to finish, or use Skip & Finish" : undefined}
+                  >
                     {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                     {loading ? "Creating..." : "Finish Setup"}
                   </Button>
