@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Loader2, Check, RefreshCw, Trash2, ExternalLink, AlertCircle } from "lucide-react";
+import { ArrowLeft, Loader2, Check, RefreshCw, Trash2, ExternalLink, AlertCircle, Lock, Crown } from "lucide-react";
 
 const PLATFORMS = [
   { value: "facebook", label: "Facebook", icon: "📘", color: "bg-blue-500/10 text-blue-600 border-blue-200" },
@@ -32,6 +32,11 @@ export default function SocialSettings() {
   const [enabledPlatforms, setEnabledPlatforms] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState<string | null>(null);
+  const [planName, setPlanName] = useState<string>("free_trial");
+
+  const isPro = planName === "pro";
+  const platformLimit = isPro ? Infinity : 1;
+  const reachedLimit = connected.length >= platformLimit;
 
   useEffect(() => {
     if (user) init();
@@ -54,11 +59,12 @@ export default function SocialSettings() {
   }, []);
 
   const init = async () => {
-    const { data: businesses } = await supabase
-      .from("businesses")
-      .select("id")
-      .eq("user_id", user!.id)
-      .limit(1) as any;
+    const [bizRes, subRes] = await Promise.all([
+      supabase.from("businesses").select("id").eq("user_id", user!.id).limit(1),
+      supabase.from("subscriptions").select("plan_name").eq("user_id", user!.id).maybeSingle(),
+    ]);
+    const businesses = (bizRes as any).data;
+    setPlanName((subRes as any).data?.plan_name || "free_trial");
 
     if (businesses && businesses.length > 0) {
       const bid = businesses[0].id;
@@ -89,6 +95,16 @@ export default function SocialSettings() {
 
   const handleConnect = async (platform: string) => {
     if (!user || !businessId) return;
+    // Plan-based platform cap (Trial/Basic = 1)
+    const alreadyConnected = connected.some(c => c.platform === platform);
+    if (!isPro && reachedLimit && !alreadyConnected) {
+      toast({
+        title: "Upgrade to Pro",
+        description: "You can connect only 1 platform on your current plan. Upgrade to Pro for multi-platform posting.",
+        variant: "destructive",
+      });
+      return;
+    }
     setConnecting(platform);
     try {
       const redirectUri = `${window.location.origin}/settings`;
