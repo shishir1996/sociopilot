@@ -25,7 +25,7 @@ export default function AccountSettings() {
   const [upgrading, setUpgrading] = useState(false);
   const { currencySymbol, basicPrice, proPrice, region } = useGeoPricing();
 
-  const upgradePlan = searchParams.get("upgrade");
+  const upgradePlan = searchParams.get("plan");
   const paymentStatus = searchParams.get("payment");
 
   useEffect(() => {
@@ -34,27 +34,39 @@ export default function AccountSettings() {
 
   useEffect(() => {
     if (paymentStatus === "success" && upgradePlan && user) {
-      // Confirm payment on backend
-      confirmPayment(upgradePlan);
+      verifyAndRefresh();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paymentStatus, upgradePlan, user]);
 
   const fetchSubscription = async () => {
     if (!user) return;
-    const { data } = await supabase.from("subscriptions").select("*").eq("user_id", user.id).limit(1).single();
+    const { data } = await supabase.from("subscriptions").select("*").eq("user_id", user.id).limit(1).maybeSingle();
     setSubscription(data);
   };
 
-  const confirmPayment = async (plan: string) => {
-    try {
-      await supabase.functions.invoke("payment-webhook", {
-        body: { user_id: user!.id, plan, gateway: "stripe" },
-      });
-      toast({ title: "🎉 Plan Upgraded!", description: `Welcome to the ${plan} plan!` });
-      fetchSubscription();
-    } catch {
-      toast({ title: "Payment verification failed", variant: "destructive" });
+  const verifyAndRefresh = async () => {
+    toast({ title: "Verifying payment…", description: "Please wait a moment." });
+    for (let i = 0; i < 8; i++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      const { data } = await supabase
+        .from("subscriptions")
+        .select("*")
+        .eq("user_id", user!.id)
+        .limit(1)
+        .maybeSingle();
+      if (data?.status === "active" && data?.plan_name === upgradePlan) {
+        setSubscription(data);
+        toast({ title: "🎉 Plan Upgraded!", description: `Welcome to the ${upgradePlan} plan!` });
+        return;
+      }
     }
+    toast({
+      title: "Still processing",
+      description: "If your plan doesn't update shortly, contact support.",
+      variant: "destructive",
+    });
+    fetchSubscription();
   };
 
   const handleUpgrade = async (plan: string) => {
@@ -64,48 +76,12 @@ export default function AccountSettings() {
         body: { plan, region },
       });
       if (error) throw error;
-      if (data?.error && data?.fallback !== "stripe") throw new Error(data.error);
+      if (data?.error) throw new Error(data.error);
 
-      if (data?.gateway === "stripe" && data?.url) {
-        window.location.href = data.url;
-      } else if (data?.gateway === "razorpay") {
-        // Load Razorpay
-        const script = document.createElement("script");
-        script.src = "https://checkout.razorpay.com/v1/checkout.js";
-        script.onload = () => {
-          const options = {
-            key: data.key_id,
-            amount: data.amount,
-            currency: data.currency,
-            name: "Socio Pilot",
-            description: `${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan`,
-            order_id: data.order_id,
-            handler: async (response: any) => {
-              await supabase.functions.invoke("payment-webhook", {
-                body: {
-                  user_id: user!.id,
-                  plan,
-                  gateway: "razorpay",
-                  payment_id: response.razorpay_payment_id,
-                  order_id: response.razorpay_order_id,
-                },
-              });
-              toast({ title: "🎉 Plan Upgraded!", description: `Welcome to the ${plan} plan!` });
-              fetchSubscription();
-            },
-            prefill: { email: data.user_email },
-            theme: { color: "#2563EB" },
-          };
-          const rzp = new (window as any).Razorpay(options);
-          rzp.open();
-        };
-        document.body.appendChild(script);
-      } else if (data?.fallback === "stripe") {
-        // Razorpay not configured, fall back to Stripe
-        const { data: stripeData } = await supabase.functions.invoke("create-checkout", {
-          body: { plan, region: "global" },
-        });
-        if (stripeData?.url) window.location.href = stripeData.url;
+      if (data?.payment_link) {
+        window.location.href = data.payment_link;
+      } else {
+        throw new Error("No payment link returned");
       }
     } catch (err: any) {
       toast({ title: "Upgrade failed", description: err.message, variant: "destructive" });
