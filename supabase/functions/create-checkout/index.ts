@@ -6,6 +6,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const CASHFREE_BASE = "https://api.cashfree.com/pg"; // Production
+const API_VERSION = "2023-08-01";
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -32,6 +35,14 @@ serve(async (req) => {
       });
     }
 
+    const appId = Deno.env.get("CASHFREE_APP_ID");
+    const secretKey = Deno.env.get("CASHFREE_SECRET_KEY");
+    if (!appId || !secretKey) {
+      return new Response(JSON.stringify({ error: "Cashfree not configured" }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Get pricing
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const adminClient = createClient(supabaseUrl, serviceKey);
@@ -48,98 +59,79 @@ serve(async (req) => {
       });
     }
 
-    if (region === "india") {
-      // Razorpay flow
-      const razorpayKey = Deno.env.get("RAZORPAY_KEY_ID");
-      const razorpaySecret = Deno.env.get("RAZORPAY_KEY_SECRET");
-      
-      if (!razorpayKey || !razorpaySecret) {
-        return new Response(JSON.stringify({
-          error: "Razorpay not configured",
-          fallback: "stripe",
-        }), {
-          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+    const origin = req.headers.get("origin") || "https://sociopilot.lovable.app";
+    const orderId = `sp_${user.id.slice(0, 8)}_${plan}_${Date.now()}`;
+    const customerPhone = (user.user_metadata as any)?.phone || user.phone || "9999999999";
+    const customerName = (user.user_metadata as any)?.full_name || user.email?.split("@")[0] || "Customer";
 
-      // Create Razorpay order
-      const orderRes = await fetch("https://api.razorpay.com/v1/orders", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Basic ${btoa(`${razorpayKey}:${razorpaySecret}`)}`,
-        },
-        body: JSON.stringify({
-          amount: pricing.monthly_price * 100, // paise
-          currency: "INR",
-          receipt: `${user.id}_${plan}`,
-          notes: { user_id: user.id, plan, email: user.email },
-        }),
-      });
-
-      const order = await orderRes.json();
-      if (!orderRes.ok) {
-        throw new Error(order.error?.description || "Razorpay order failed");
-      }
-
-      return new Response(JSON.stringify({
-        gateway: "razorpay",
-        order_id: order.id,
-        amount: order.amount,
-        currency: order.currency,
-        key_id: razorpayKey,
-        user_email: user.email,
+    const orderPayload = {
+      order_id: orderId,
+      order_amount: Number(pricing.monthly_price),
+      order_currency: pricing.currency, // INR or USD
+      customer_details: {
+        customer_id: user.id,
+        customer_email: user.email,
+        customer_phone: customerPhone,
+        customer_name: customerName,
+      },
+      order_meta: {
+        return_url: `${origin}/account?payment=success&plan=${plan}&order_id={order_id}`,
+        notify_url: `${supabaseUrl}/functions/v1/cashfree-webhook`,
+      },
+      order_note: `SocioPilot ${plan} plan (${region})`,
+      order_tags: {
+        user_id: user.id,
         plan,
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    } else {
-      // Stripe flow
-      const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-      if (!stripeKey) {
-        return new Response(JSON.stringify({ error: "Stripe not configured" }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+        region,
+      },
+    };
 
-      // Create Stripe Checkout session
-      const origin = req.headers.get("origin") || "https://sociopilot.lovable.app";
-      const params = new URLSearchParams();
-      params.append("mode", "subscription");
-      params.append("success_url", `${origin}/account?payment=success&plan=${plan}`);
-      params.append("cancel_url", `${origin}/pricing`);
-      params.append("customer_email", user.email || "");
-      params.append("line_items[0][price_data][currency]", "usd");
-      params.append("line_items[0][price_data][product_data][name]", `Socio Pilot ${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan`);
-      params.append("line_items[0][price_data][unit_amount]", String(pricing.monthly_price * 100));
-      params.append("line_items[0][price_data][recurring][interval]", "month");
-      params.append("line_items[0][quantity]", "1");
-      params.append("metadata[user_id]", user.id);
-      params.append("metadata[plan]", plan);
+    const cfRes = await fetch(`${CASHFREE_BASE}/orders`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-version": API_VERSION,
+        "x-client-id": appId,
+        "x-client-secret": secretKey,
+      },
+      body: JSON.stringify(orderPayload),
+    });
 
-      const stripeRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${stripeKey}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: params.toString(),
-      });
-
-      const session = await stripeRes.json();
-      if (!stripeRes.ok) {
-        throw new Error(session.error?.message || "Stripe session failed");
-      }
-
+    const order = await cfRes.json();
+    if (!cfRes.ok) {
+      console.error("Cashfree order error:", order);
       return new Response(JSON.stringify({
-        gateway: "stripe",
-        url: session.url,
-        session_id: session.id,
+        error: order.message || "Cashfree order failed",
+        details: order,
       }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Record pending payment
+    await adminClient.from("payments").insert({
+      user_id: user.id,
+      plan_name: plan,
+      amount: pricing.monthly_price,
+      currency: pricing.currency,
+      region,
+      payment_provider: "cashfree",
+      provider_payment_id: orderId,
+      status: "pending",
+    });
+
+    return new Response(JSON.stringify({
+      gateway: "cashfree",
+      payment_session_id: order.payment_session_id,
+      order_id: order.order_id,
+      payment_link: order.payment_link, // hosted page (for redirect)
+      currency: pricing.currency,
+      amount: pricing.monthly_price,
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (err: any) {
+    console.error("create-checkout error:", err);
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
