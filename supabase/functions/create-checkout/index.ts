@@ -9,17 +9,27 @@ const corsHeaders = {
 const CASHFREE_BASE = "https://api.cashfree.com/pg"; // Production
 const API_VERSION = "2023-08-01";
 
+// Approx USD→INR conversion for merchants without USD enabled.
+// Cashfree India merchants accept INR only by default; we convert global pricing to INR
+// so payments succeed for everyone. Adjust rate as needed (or fetch live).
+const USD_TO_INR = 84;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  let paymentRecordId: string | null = null;
+  let adminClient: any = null;
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey, {
       global: { headers: { Authorization: req.headers.get("Authorization")! } },
     });
+    adminClient = createClient(supabaseUrl, serviceKey);
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
@@ -38,14 +48,12 @@ serve(async (req) => {
     const appId = Deno.env.get("CASHFREE_APP_ID");
     const secretKey = Deno.env.get("CASHFREE_SECRET_KEY");
     if (!appId || !secretKey) {
-      return new Response(JSON.stringify({ error: "Cashfree not configured" }), {
+      return new Response(JSON.stringify({ error: "Payment gateway not configured. Please contact support." }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     // Get pricing
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const adminClient = createClient(supabaseUrl, serviceKey);
     const { data: pricing } = await adminClient
       .from("geo_pricing")
       .select("*")
@@ -59,15 +67,37 @@ serve(async (req) => {
       });
     }
 
+    // Resolve charge currency. Cashfree India merchants accept INR by default.
+    // If pricing is USD, convert to INR for the actual charge so all customers can pay.
+    let chargeCurrency = pricing.currency as string;
+    let chargeAmount = Number(pricing.monthly_price);
+    if (chargeCurrency === "USD") {
+      chargeAmount = Math.round(chargeAmount * USD_TO_INR);
+      chargeCurrency = "INR";
+    }
+
     const origin = req.headers.get("origin") || "https://sociopilot.lovable.app";
     const orderId = `sp_${user.id.slice(0, 8)}_${plan}_${Date.now()}`;
     const customerPhone = (user.user_metadata as any)?.phone || user.phone || "9999999999";
     const customerName = (user.user_metadata as any)?.full_name || user.email?.split("@")[0] || "Customer";
 
+    // Insert pending payment FIRST so we can mark it failed if anything goes wrong
+    const { data: paymentRecord } = await adminClient.from("payments").insert({
+      user_id: user.id,
+      plan_name: plan,
+      amount: chargeAmount,
+      currency: chargeCurrency,
+      region,
+      payment_provider: "cashfree",
+      provider_payment_id: orderId,
+      status: "pending",
+    }).select("id").single();
+    paymentRecordId = paymentRecord?.id || null;
+
     const orderPayload = {
       order_id: orderId,
-      order_amount: Number(pricing.monthly_price),
-      order_currency: pricing.currency, // INR or USD
+      order_amount: chargeAmount,
+      order_currency: chargeCurrency,
       customer_details: {
         customer_id: user.id,
         customer_email: user.email,
@@ -83,6 +113,8 @@ serve(async (req) => {
         user_id: user.id,
         plan,
         region,
+        original_currency: pricing.currency,
+        original_amount: String(pricing.monthly_price),
       },
     };
 
@@ -100,39 +132,42 @@ serve(async (req) => {
     const order = await cfRes.json();
     if (!cfRes.ok) {
       console.error("Cashfree order error:", order);
+      // Mark pending payment as failed immediately to allow retry
+      if (paymentRecordId) {
+        await adminClient.from("payments").update({ status: "failed" }).eq("id", paymentRecordId);
+      }
+      const friendly =
+        order?.message?.includes("Currency not enabled")
+          ? "This currency isn't enabled on the payment gateway yet. Please contact support."
+          : order?.message || "Could not create payment order. Please try again.";
       return new Response(JSON.stringify({
-        error: order.message || "Cashfree order failed",
+        error: friendly,
         details: order,
       }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    // Record pending payment
-    await adminClient.from("payments").insert({
-      user_id: user.id,
-      plan_name: plan,
-      amount: pricing.monthly_price,
-      currency: pricing.currency,
-      region,
-      payment_provider: "cashfree",
-      provider_payment_id: orderId,
-      status: "pending",
-    });
 
     return new Response(JSON.stringify({
       gateway: "cashfree",
       payment_session_id: order.payment_session_id,
       order_id: order.order_id,
-      payment_link: order.payment_link, // hosted page (for redirect)
-      currency: pricing.currency,
-      amount: pricing.monthly_price,
+      payment_link: order.payment_link,
+      currency: chargeCurrency,
+      amount: chargeAmount,
+      original_currency: pricing.currency,
+      original_amount: pricing.monthly_price,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err: any) {
     console.error("create-checkout error:", err);
-    return new Response(JSON.stringify({ error: err.message }), {
+    if (paymentRecordId && adminClient) {
+      try {
+        await adminClient.from("payments").update({ status: "failed" }).eq("id", paymentRecordId);
+      } catch (_) { /* ignore */ }
+    }
+    return new Response(JSON.stringify({ error: err.message || "Unexpected error" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

@@ -88,6 +88,19 @@ serve(async (req) => {
 
     const isPaid = orderData.order_status === "PAID" || paymentStatus === "SUCCESS";
 
+    // Idempotency: skip if already completed
+    const { data: existingPayment } = await supabase
+      .from("payments")
+      .select("status")
+      .eq("provider_payment_id", orderId)
+      .maybeSingle();
+    if (existingPayment?.status === "completed") {
+      console.log(`Webhook for ${orderId} already processed — skipping`);
+      return new Response(JSON.stringify({ ok: true, status: "already_processed" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Update payment record
     await supabase
       .from("payments")
