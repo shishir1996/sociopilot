@@ -38,15 +38,40 @@ export function useGeoPricing(): GeoPricingResult {
       return;
     }
 
-    try {
-      const res = await fetch("https://ip-api.com/json/?fields=countryCode");
-      const data = await res.json();
-      const detected = data.countryCode === "IN" ? "india" : "global";
-      setRegion(detected);
-      localStorage.setItem("sp_region", detected);
-    } catch {
-      setRegion("global");
+    // Fast, reliable fallback: timezone (works offline, no CORS, no rate limits)
+    const tzIsIndia = (() => {
+      try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+        return tz === "Asia/Kolkata" || tz === "Asia/Calcutta";
+      } catch { return false; }
+    })();
+
+    // Try multiple geo IP services in order; first success wins.
+    const services = [
+      { url: "https://ipapi.co/json/", key: "country_code" },
+      { url: "https://ipwho.is/", key: "country_code" },
+      { url: "https://get.geojs.io/v1/ip/country.json", key: "country" },
+    ];
+
+    for (const svc of services) {
+      try {
+        const res = await fetch(svc.url);
+        if (!res.ok) continue;
+        const data = await res.json();
+        const cc = (data?.[svc.key] || "").toString().toUpperCase();
+        if (cc) {
+          const detected = cc === "IN" ? "india" : "global";
+          setRegion(detected);
+          localStorage.setItem("sp_region", detected);
+          return;
+        }
+      } catch { /* try next */ }
     }
+
+    // All services failed → fall back to timezone heuristic
+    const detected = tzIsIndia ? "india" : "global";
+    setRegion(detected);
+    localStorage.setItem("sp_region", detected);
   };
 
   const fetchPrices = async () => {
