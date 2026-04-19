@@ -78,11 +78,18 @@ export default function AccountSettings() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      if (data?.payment_link) {
-        window.location.href = data.payment_link;
-      } else {
-        throw new Error("No payment link returned");
-      }
+      const sessionId = data?.payment_session_id;
+      if (!sessionId) throw new Error("No payment session returned");
+
+      // @ts-ignore - Cashfree SDK loaded via index.html script tag
+      const Cashfree = (window as any).Cashfree;
+      if (!Cashfree) throw new Error("Payment SDK failed to load. Please refresh and retry.");
+
+      const cashfree = Cashfree({ mode: data?.mode === "sandbox" ? "sandbox" : "production" });
+      await cashfree.checkout({
+        paymentSessionId: sessionId,
+        redirectTarget: "_self",
+      });
     } catch (err: any) {
       toast({ title: "Upgrade failed", description: err.message, variant: "destructive" });
     }
