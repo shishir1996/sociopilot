@@ -31,20 +31,30 @@ export function useGeoPricing(): GeoPricingResult {
   }, []);
 
   const detectRegion = async () => {
-    // Check localStorage first
-    const cached = localStorage.getItem("sp_region");
-    if (cached) {
-      setRegion(cached);
-      return;
-    }
-
-    // Fast, reliable fallback: timezone (works offline, no CORS, no rate limits)
+    // Timezone check (works offline, no CORS, no rate limits)
     const tzIsIndia = (() => {
       try {
         const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
         return tz === "Asia/Kolkata" || tz === "Asia/Calcutta";
       } catch { return false; }
     })();
+
+    // Check cache (v2 — invalidates old "global" entries that may have been wrong)
+    const CACHE_KEY = "sp_region_v2";
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      setRegion(cached);
+      return;
+    }
+    // Clean up old cache key
+    localStorage.removeItem("sp_region");
+
+    // Timezone is the most reliable signal for India — trust it immediately
+    if (tzIsIndia) {
+      setRegion("india");
+      localStorage.setItem(CACHE_KEY, "india");
+      return;
+    }
 
     // Try multiple geo IP services in order; first success wins.
     const services = [
@@ -62,16 +72,15 @@ export function useGeoPricing(): GeoPricingResult {
         if (cc) {
           const detected = cc === "IN" ? "india" : "global";
           setRegion(detected);
-          localStorage.setItem("sp_region", detected);
+          localStorage.setItem("sp_region_v2", detected);
           return;
         }
       } catch { /* try next */ }
     }
 
-    // All services failed → fall back to timezone heuristic
-    const detected = tzIsIndia ? "india" : "global";
-    setRegion(detected);
-    localStorage.setItem("sp_region", detected);
+    // All services failed → default global (timezone India already handled above)
+    setRegion("global");
+    localStorage.setItem("sp_region_v2", "global");
   };
 
   const fetchPrices = async () => {
