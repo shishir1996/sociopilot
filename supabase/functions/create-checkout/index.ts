@@ -130,6 +130,7 @@ serve(async (req) => {
     });
 
     const order = await cfRes.json();
+    console.log("Cashfree order response:", JSON.stringify(order));
     if (!cfRes.ok) {
       console.error("Cashfree order error:", order);
       // Mark pending payment as failed immediately to allow retry
@@ -148,11 +149,27 @@ serve(async (req) => {
       });
     }
 
+    // Cashfree Orders API returns payment_session_id; build hosted checkout URL ourselves.
+    // (payment_link is only present on the separate Payment Links API.)
+    const sessionId = order.payment_session_id;
+    if (!sessionId) {
+      if (paymentRecordId) {
+        await adminClient.from("payments").update({ status: "failed" }).eq("id", paymentRecordId);
+      }
+      return new Response(JSON.stringify({
+        error: "Payment gateway did not return a session. Please try again or contact support.",
+        details: order,
+      }), {
+        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const hostedCheckoutUrl = `https://payments.cashfree.com/pay/${sessionId}`;
+
     return new Response(JSON.stringify({
       gateway: "cashfree",
-      payment_session_id: order.payment_session_id,
+      payment_session_id: sessionId,
       order_id: order.order_id,
-      payment_link: order.payment_link,
+      payment_link: hostedCheckoutUrl,
       currency: chargeCurrency,
       amount: chargeAmount,
       original_currency: pricing.currency,
