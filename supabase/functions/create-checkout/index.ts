@@ -170,6 +170,7 @@ serve(async (req) => {
       payment_session_id: sessionId,
       order_id: order.order_id,
       payment_link: hostedCheckoutUrl,
+      mode: "production",
       currency: chargeCurrency,
       amount: chargeAmount,
       original_currency: pricing.currency,
