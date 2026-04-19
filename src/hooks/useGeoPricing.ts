@@ -72,16 +72,15 @@ export function useGeoPricing(): GeoPricingResult {
         if (cc) {
           const detected = cc === "IN" ? "india" : "global";
           setRegion(detected);
-          localStorage.setItem("sp_region", detected);
+          localStorage.setItem("sp_region_v2", detected);
           return;
         }
       } catch { /* try next */ }
     }
 
-    // All services failed → fall back to timezone heuristic
-    const detected = tzIsIndia ? "india" : "global";
-    setRegion(detected);
-    localStorage.setItem("sp_region", detected);
+    // All services failed → default global (timezone India already handled above)
+    setRegion("global");
+    localStorage.setItem("sp_region_v2", "global");
   };
 
   const fetchPrices = async () => {
