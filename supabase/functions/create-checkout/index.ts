@@ -130,6 +130,7 @@ serve(async (req) => {
     });
 
     const order = await cfRes.json();
+    console.log("Cashfree order response:", JSON.stringify(order));
     if (!cfRes.ok) {
       console.error("Cashfree order error:", order);
       // Mark pending payment as failed immediately to allow retry
