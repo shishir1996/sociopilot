@@ -153,7 +153,8 @@ export default function SocialSettings() {
   const handleDisconnect = async (id: string) => {
     await supabase.from("social_accounts").delete().eq("id", id) as any;
     toast({ title: "Disconnected" });
-    if (businessId) fetchConnected(businessId);
+    if (businessId) await fetchConnected(businessId);
+    planLimits.refresh();
   };
 
   const isExpired = (expiresAt: string | null) => {
@@ -183,6 +184,23 @@ export default function SocialSettings() {
       </header>
 
       <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+        {/* Plan usage banner */}
+        <div className="rounded-xl border border-border bg-card px-4 py-3 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-foreground">
+              Platforms connected: <span className="font-bold">{planLimits.platformsConnected} / {platformLimit}</span>
+            </p>
+            <p className="text-xs text-muted-foreground capitalize">
+              {planLimits.planName.replace("_", " ")} plan
+            </p>
+          </div>
+          {!planLimits.isPro && (
+            <Button size="sm" variant="outline" onClick={() => navigate("/pricing")} className="text-xs">
+              <Crown className="h-3.5 w-3.5 mr-1" /> Upgrade
+            </Button>
+          )}
+        </div>
+
         {/* Connected Accounts */}
         <Card className="shadow-card">
           <CardHeader>
@@ -238,24 +256,39 @@ export default function SocialSettings() {
               const isEnabled = enabledPlatforms.includes(platform.value);
               const isMeta = platform.value === "instagram" && enabledPlatforms.includes("facebook");
               const available = isEnabled || isMeta;
+              const lockedByPlan = reachedLimit;
 
               return (
                 <button
                   key={platform.value}
-                  onClick={() => available ? handleConnect(platform.value === "instagram" ? "facebook" : platform.value) : undefined}
-                  disabled={!available || connecting === platform.value}
+                  onClick={() => {
+                    if (lockedByPlan) {
+                      setLimitDialogOpen(true);
+                      return;
+                    }
+                    if (available) {
+                      handleConnect(platform.value === "instagram" ? "facebook" : platform.value);
+                    }
+                  }}
+                  disabled={(!available && !lockedByPlan) || connecting === platform.value}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${
-                    available
+                    lockedByPlan
+                      ? "border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10"
+                      : available
                       ? "border-dashed border-border hover:border-primary/40 hover:bg-primary/5"
                       : "border-dashed border-border/50 opacity-40 cursor-not-allowed"
                   }`}
                 >
-                  <span className="text-xl opacity-60">{platform.icon}</span>
-                  <span className="text-sm text-muted-foreground font-medium">
+                  <span className={`text-xl ${lockedByPlan ? "opacity-50" : "opacity-60"}`}>{platform.icon}</span>
+                  <span className={`text-sm font-medium ${lockedByPlan ? "text-foreground" : "text-muted-foreground"}`}>
                     {connecting === platform.value ? "Redirecting..." : `Connect ${platform.label}`}
                   </span>
                   {connecting === platform.value ? (
                     <Loader2 className="h-4 w-4 ml-auto animate-spin text-primary" />
+                  ) : lockedByPlan ? (
+                    <Badge variant="outline" className="ml-auto text-[10px] gap-1">
+                      <Lock className="h-3 w-3" /> Upgrade
+                    </Badge>
                   ) : available ? (
                     <ExternalLink className="h-4 w-4 ml-auto text-muted-foreground" />
                   ) : (
@@ -271,6 +304,15 @@ export default function SocialSettings() {
           🔒 We use secure OAuth authentication — your passwords and credentials are never stored on our servers.
         </p>
       </main>
+
+      <LimitReachedDialog
+        open={limitDialogOpen}
+        onClose={() => setLimitDialogOpen(false)}
+        type="platform"
+        current={planLimits.platformsConnected}
+        limit={platformLimit}
+        planName={planLimits.planName}
+      />
     </div>
   );
 }
