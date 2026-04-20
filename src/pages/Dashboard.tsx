@@ -14,6 +14,7 @@ import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { TrialBanner } from "@/components/dashboard/TrialBanner";
 import { PlanBadge } from "@/components/dashboard/PlanBadge";
 import { ImpersonationBanner } from "@/components/admin/ImpersonationBanner";
+import { UsageIndicators } from "@/components/dashboard/UsageIndicators";
 
 interface Business {
   id: string;
@@ -202,6 +203,11 @@ export default function Dashboard() {
             <div className="mb-4">
               <TrialBanner />
             </div>
+
+            {/* Usage Indicators */}
+            {selectedBusiness && (
+              <UsageIndicators businessId={selectedBusiness} />
+            )}
 
             {/* Social Connect Widget */}
             {selectedBusiness && (
