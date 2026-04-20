@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Loader2, Check, RefreshCw, Trash2, ExternalLink, AlertCircle, Lock, Crown } from "lucide-react";
+import { usePlanLimits } from "@/hooks/usePlanLimits";
+import { LimitReachedDialog } from "@/components/upgrade/LimitReachedDialog";
+import { Badge } from "@/components/ui/badge";
 
 const PLATFORMS = [
   { value: "facebook", label: "Facebook", icon: "📘", color: "bg-blue-500/10 text-blue-600 border-blue-200" },
@@ -32,11 +35,11 @@ export default function SocialSettings() {
   const [enabledPlatforms, setEnabledPlatforms] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState<string | null>(null);
-  const [planName, setPlanName] = useState<string>("free_trial");
+  const [limitDialogOpen, setLimitDialogOpen] = useState(false);
+  const planLimits = usePlanLimits(businessId);
 
-  const isPro = planName === "pro";
-  const platformLimit = isPro ? Infinity : 1;
-  const reachedLimit = connected.length >= platformLimit;
+  const platformLimit = planLimits.platformLimit;
+  const reachedLimit = planLimits.platformsConnected >= platformLimit;
 
   useEffect(() => {
     if (user) init();
