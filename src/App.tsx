@@ -20,6 +20,11 @@ import AdminAIControlCenter from "./pages/AdminAIControlCenter";
 import AdminSocialIntegrations from "./pages/AdminSocialIntegrations";
 import AIStudio from "./pages/AIStudio";
 import Pricing from "./pages/Pricing";
+import AboutUs from "./pages/legal/AboutUs";
+import TermsConditions from "./pages/legal/TermsConditions";
+import RefundPolicy from "./pages/legal/RefundPolicy";
+import PrivacyPolicy from "./pages/legal/PrivacyPolicy";
+import Disclaimer from "./pages/legal/Disclaimer";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +46,11 @@ const App = () => (
             <Route path="/schedule" element={<ScheduleSettings />} />
             <Route path="/ai-studio" element={<AIStudio />} />
             <Route path="/pricing" element={<Pricing />} />
+            <Route path="/about" element={<AboutUs />} />
+            <Route path="/terms" element={<TermsConditions />} />
+            <Route path="/refund-policy" element={<RefundPolicy />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/disclaimer" element={<Disclaimer />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/analytics" element={<AdminAnalytics />} />
             <Route path="/admin/user" element={<AdminUserDetail />} />
