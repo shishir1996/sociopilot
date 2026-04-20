@@ -62,12 +62,12 @@ export default function SocialSettings() {
   }, []);
 
   const init = async () => {
-    const [bizRes, subRes] = await Promise.all([
-      supabase.from("businesses").select("id").eq("user_id", user!.id).limit(1),
-      supabase.from("subscriptions").select("plan_name").eq("user_id", user!.id).maybeSingle(),
-    ]);
-    const businesses = (bizRes as any).data;
-    setPlanName((subRes as any).data?.plan_name || "free_trial");
+    const { data: bizData } = await supabase
+      .from("businesses")
+      .select("id")
+      .eq("user_id", user!.id)
+      .limit(1) as any;
+    const businesses = bizData;
 
     if (businesses && businesses.length > 0) {
       const bid = businesses[0].id;
@@ -98,14 +98,10 @@ export default function SocialSettings() {
 
   const handleConnect = async (platform: string) => {
     if (!user || !businessId) return;
-    // Plan-based platform cap (Trial/Basic = 1)
+    // Plan-based platform cap
     const alreadyConnected = connected.some(c => c.platform === platform);
-    if (!isPro && reachedLimit && !alreadyConnected) {
-      toast({
-        title: "Upgrade to Pro",
-        description: "You can connect only 1 platform on your current plan. Upgrade to Pro for multi-platform posting.",
-        variant: "destructive",
-      });
+    if (reachedLimit && !alreadyConnected) {
+      setLimitDialogOpen(true);
       return;
     }
     setConnecting(platform);
