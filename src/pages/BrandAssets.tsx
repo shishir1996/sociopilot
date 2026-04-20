@@ -16,6 +16,9 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { usePlanLimits } from "@/hooks/usePlanLimits";
+import { LimitReachedDialog } from "@/components/upgrade/LimitReachedDialog";
+import { Badge } from "@/components/ui/badge";
 
 interface BrandAsset {
   id: string;
