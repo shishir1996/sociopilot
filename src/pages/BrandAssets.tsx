@@ -48,7 +48,9 @@ export default function BrandAssets() {
   const [slogan, setSlogan] = useState("");
   const [creativeDirection, setCreativeDirection] = useState("");
   const [savingBrand, setSavingBrand] = useState(false);
+  const [limitDialogOpen, setLimitDialogOpen] = useState(false);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const planLimits = usePlanLimits(businessId);
 
   useEffect(() => {
     if (user?.id) fetchData();
@@ -100,6 +102,13 @@ export default function BrandAssets() {
 
   const handleUpload = async (assetType: string, file: File) => {
     if (!user || !businessId) return;
+
+    // Enforce product limit for product/service images
+    if ((assetType === "product_image" || assetType === "service_image") && !planLimits.canAddProduct) {
+      setLimitDialogOpen(true);
+      return;
+    }
+
     setUploading(assetType);
 
     try {
@@ -128,6 +137,7 @@ export default function BrandAssets() {
 
       toast({ title: "Uploaded!", description: `${assetType.replace("_", " ")} uploaded successfully.` });
       fetchData();
+      planLimits.refresh();
     } catch (err: any) {
       toast({ title: "Upload failed", description: err.message, variant: "destructive" });
     }
