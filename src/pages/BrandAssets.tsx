@@ -16,6 +16,9 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { usePlanLimits } from "@/hooks/usePlanLimits";
+import { LimitReachedDialog } from "@/components/upgrade/LimitReachedDialog";
+import { Badge } from "@/components/ui/badge";
 
 interface BrandAsset {
   id: string;
@@ -45,7 +48,9 @@ export default function BrandAssets() {
   const [slogan, setSlogan] = useState("");
   const [creativeDirection, setCreativeDirection] = useState("");
   const [savingBrand, setSavingBrand] = useState(false);
+  const [limitDialogOpen, setLimitDialogOpen] = useState(false);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const planLimits = usePlanLimits(businessId);
 
   useEffect(() => {
     if (user?.id) fetchData();
@@ -97,6 +102,13 @@ export default function BrandAssets() {
 
   const handleUpload = async (assetType: string, file: File) => {
     if (!user || !businessId) return;
+
+    // Enforce product limit for product/service images
+    if ((assetType === "product_image" || assetType === "service_image") && !planLimits.canAddProduct) {
+      setLimitDialogOpen(true);
+      return;
+    }
+
     setUploading(assetType);
 
     try {
@@ -125,6 +137,7 @@ export default function BrandAssets() {
 
       toast({ title: "Uploaded!", description: `${assetType.replace("_", " ")} uploaded successfully.` });
       fetchData();
+      planLimits.refresh();
     } catch (err: any) {
       toast({ title: "Upload failed", description: err.message, variant: "destructive" });
     }
@@ -141,6 +154,7 @@ export default function BrandAssets() {
       if (error) throw error;
       toast({ title: "Deleted", description: "Asset removed." });
       fetchData();
+      planLimits.refresh();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
@@ -311,6 +325,8 @@ export default function BrandAssets() {
         {ASSET_TYPES.map((type) => {
           const typeAssets = assets.filter((a) => a.asset_type === type.value);
           const isUploading = uploading === type.value;
+          const isProductType = type.value === "product_image" || type.value === "service_image";
+          const blocked = isProductType && !planLimits.canAddProduct;
 
           return (
             <Card key={type.value} className="shadow-card">
@@ -319,8 +335,15 @@ export default function BrandAssets() {
                   <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                     <type.icon className="h-5 w-5 text-primary" />
                   </div>
-                  <div>
-                    <CardTitle className="text-base">{type.label}</CardTitle>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <CardTitle className="text-base">{type.label}</CardTitle>
+                      {isProductType && (
+                        <Badge variant={blocked ? "destructive" : "outline"} className="text-[10px]">
+                          {planLimits.productsUsed} / {planLimits.productLimit} used
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground">{type.description}</p>
                   </div>
                 </div>
@@ -388,6 +411,15 @@ export default function BrandAssets() {
           );
         })}
       </main>
+
+      <LimitReachedDialog
+        open={limitDialogOpen}
+        onClose={() => setLimitDialogOpen(false)}
+        type="product"
+        current={planLimits.productsUsed}
+        limit={planLimits.productLimit}
+        planName={planLimits.planName}
+      />
     </div>
   );
 }

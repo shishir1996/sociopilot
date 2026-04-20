@@ -184,8 +184,10 @@ export type Database = {
           id: string
           image_generations_limit: number | null
           plan_name: string
+          platform_limit: number | null
           premium_image_styles: boolean | null
           premium_model_access: boolean | null
+          product_limit: number | null
           regeneration_limit: number | null
           text_generations_limit: number | null
           updated_at: string
@@ -198,8 +200,10 @@ export type Database = {
           id?: string
           image_generations_limit?: number | null
           plan_name: string
+          platform_limit?: number | null
           premium_image_styles?: boolean | null
           premium_model_access?: boolean | null
+          product_limit?: number | null
           regeneration_limit?: number | null
           text_generations_limit?: number | null
           updated_at?: string
@@ -212,8 +216,10 @@ export type Database = {
           id?: string
           image_generations_limit?: number | null
           plan_name?: string
+          platform_limit?: number | null
           premium_image_styles?: boolean | null
           premium_model_access?: boolean | null
+          product_limit?: number | null
           regeneration_limit?: number | null
           text_generations_limit?: number | null
           updated_at?: string
