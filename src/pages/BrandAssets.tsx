@@ -325,6 +325,8 @@ export default function BrandAssets() {
         {ASSET_TYPES.map((type) => {
           const typeAssets = assets.filter((a) => a.asset_type === type.value);
           const isUploading = uploading === type.value;
+          const isProductType = type.value === "product_image" || type.value === "service_image";
+          const blocked = isProductType && !planLimits.canAddProduct;
 
           return (
             <Card key={type.value} className="shadow-card">
@@ -333,8 +335,15 @@ export default function BrandAssets() {
                   <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                     <type.icon className="h-5 w-5 text-primary" />
                   </div>
-                  <div>
-                    <CardTitle className="text-base">{type.label}</CardTitle>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <CardTitle className="text-base">{type.label}</CardTitle>
+                      {isProductType && (
+                        <Badge variant={blocked ? "destructive" : "outline"} className="text-[10px]">
+                          {planLimits.productsUsed} / {planLimits.productLimit} used
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground">{type.description}</p>
                   </div>
                 </div>
@@ -402,6 +411,15 @@ export default function BrandAssets() {
           );
         })}
       </main>
+
+      <LimitReachedDialog
+        open={limitDialogOpen}
+        onClose={() => setLimitDialogOpen(false)}
+        type="product"
+        current={planLimits.productsUsed}
+        limit={planLimits.productLimit}
+        planName={planLimits.planName}
+      />
     </div>
   );
 }
