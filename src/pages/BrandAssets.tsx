@@ -154,6 +154,7 @@ export default function BrandAssets() {
       if (error) throw error;
       toast({ title: "Deleted", description: "Asset removed." });
       fetchData();
+      planLimits.refresh();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
