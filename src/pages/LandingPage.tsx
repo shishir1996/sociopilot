@@ -6,6 +6,7 @@ import {
   Facebook, Instagram, Linkedin, Twitter
 } from "lucide-react";
 import PricingSection from "@/components/landing/PricingSection";
+import { LegalFooter } from "@/components/legal/LegalPageLayout";
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -331,17 +332,7 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg gradient-primary flex items-center justify-center">
-              <Zap className="h-3.5 w-3.5 text-primary-foreground" />
-            </div>
-            <span className="text-lg font-bold text-foreground">SocioPilot</span>
-          </div>
-          <p className="text-sm text-muted-foreground">© 2026 SocioPilot. All rights reserved.</p>
-        </div>
-      </footer>
+      <LegalFooter />
     </div>
   );
 }
