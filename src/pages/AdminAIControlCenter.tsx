@@ -47,22 +47,11 @@ async function adminApi(body: any) {
 }
 
 const TEXT_PROVIDERS = [
-  { label: "Lovable AI", value: "lovable" },
-  { label: "OpenAI", value: "openai" },
-  { label: "Google Gemini", value: "gemini" },
-  { label: "Anthropic (Claude)", value: "anthropic" },
-  { label: "Groq", value: "groq" },
-  { label: "OpenRouter", value: "openrouter" },
-  { label: "Custom API", value: "custom" },
+  { label: "OpenRouter (only supported provider)", value: "openrouter" },
 ];
 
 const IMAGE_PROVIDERS = [
-  { label: "Lovable AI", value: "lovable" },
-  { label: "OpenAI (DALL-E)", value: "openai_image" },
-  { label: "Stability AI", value: "stability" },
-  { label: "Replicate", value: "replicate" },
-  { label: "Fal AI", value: "fal" },
-  { label: "Custom Image API", value: "custom_image" },
+  { label: "OpenRouter (only supported provider)", value: "openrouter" },
 ];
 
 // ===================== TEXT MODELS =====================
@@ -137,13 +126,20 @@ function TextModelsPanel() {
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={load}><RefreshCw className="h-4 w-4" /></Button>
           <Button size="sm" onClick={() => setEditing({
-            provider_name: "lovable", model_name: "", temperature: 0.7,
+            provider_name: "openrouter", model_name: "google/gemma-2-9b-it:free", temperature: 0.7,
             max_tokens: 2048, top_p: 1.0, frequency_penalty: 0, presence_penalty: 0,
             is_active: false, is_fallback: false, api_key_secret_name: "",
           })}>
             <Plus className="h-4 w-4 mr-1" /> Add Provider
           </Button>
         </div>
+      </div>
+
+      <div className="text-xs text-muted-foreground bg-muted/40 border border-border rounded-md p-3">
+        Only <strong>OpenRouter</strong> is supported for content generation (text, image, video).
+        Paste your OpenRouter API key directly into the <em>OpenRouter API Key</em> field below
+        (it must start with <code>sk-or-...</code>) and use a valid model slug like
+        <code> google/gemma-2-9b-it:free</code> or <code>openai/gpt-4o-mini</code>.
       </div>
 
       {editing && (
@@ -157,8 +153,8 @@ function TextModelsPanel() {
                   <SelectContent>{TEXT_PROVIDERS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div><Label>Model Name</Label><Input value={editing.model_name} onChange={e => setEditing({ ...editing, model_name: e.target.value })} placeholder="e.g. gpt-4o, gemini-2.5-pro" /></div>
-              <div><Label>API Key Secret Name</Label><Input value={editing.api_key_secret_name || ""} onChange={e => setEditing({ ...editing, api_key_secret_name: e.target.value })} placeholder="e.g. OPENAI_API_KEY (leave blank for Lovable AI)" /></div>
+              <div><Label>OpenRouter Model Slug</Label><Input value={editing.model_name} onChange={e => setEditing({ ...editing, model_name: e.target.value })} placeholder="e.g. google/gemma-2-9b-it:free" /></div>
+              <div><Label>OpenRouter API Key</Label><Input type="password" value={editing.api_key_secret_name || ""} onChange={e => setEditing({ ...editing, api_key_secret_name: e.target.value })} placeholder="sk-or-..." /></div>
               <div><Label>Max Tokens</Label><Input type="number" value={editing.max_tokens} onChange={e => setEditing({ ...editing, max_tokens: parseInt(e.target.value) || 2048 })} /></div>
             </div>
             <div className="grid grid-cols-3 gap-4">
@@ -290,11 +286,16 @@ function ImageModelsPanel() {
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={load}><RefreshCw className="h-4 w-4" /></Button>
           <Button size="sm" onClick={() => setEditing({
-            provider_name: "lovable", model_name: "", is_active: false, is_fallback: false, api_key_secret_name: "",
+            provider_name: "openrouter", model_name: "google/gemini-2.5-flash-image", is_active: false, is_fallback: false, api_key_secret_name: "",
           })}>
             <Plus className="h-4 w-4 mr-1" /> Add Provider
           </Button>
         </div>
+      </div>
+      <div className="text-xs text-muted-foreground bg-muted/40 border border-border rounded-md p-3">
+        Only <strong>OpenRouter</strong> is supported for image generation. Use an
+        OpenRouter image-capable model slug (e.g. <code>google/gemini-2.5-flash-image</code>) and
+        paste your OpenRouter API key (<code>sk-or-...</code>) below.
       </div>
       {editing && (
         <Card className="border-primary/30"><CardContent className="pt-4 space-y-3">
@@ -306,8 +307,8 @@ function ImageModelsPanel() {
                 <SelectContent>{IMAGE_PROVIDERS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div><Label>Model Name</Label><Input value={editing.model_name} onChange={e => setEditing({ ...editing, model_name: e.target.value })} placeholder="e.g. dall-e-3, stable-diffusion-xl" /></div>
-            <div><Label>API Key Secret Name</Label><Input value={editing.api_key_secret_name || ""} onChange={e => setEditing({ ...editing, api_key_secret_name: e.target.value })} placeholder="e.g. STABILITY_API_KEY" /></div>
+            <div><Label>OpenRouter Model Slug</Label><Input value={editing.model_name} onChange={e => setEditing({ ...editing, model_name: e.target.value })} placeholder="e.g. google/gemini-2.5-flash-image" /></div>
+            <div><Label>OpenRouter API Key</Label><Input type="password" value={editing.api_key_secret_name || ""} onChange={e => setEditing({ ...editing, api_key_secret_name: e.target.value })} placeholder="sk-or-..." /></div>
           </div>
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2"><Switch checked={editing.is_active} onCheckedChange={v => setEditing({ ...editing, is_active: v })} /><Label>Active</Label></div>

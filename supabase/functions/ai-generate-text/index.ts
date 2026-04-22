@@ -118,12 +118,20 @@ function getAdapter(providerName: string): ProviderAdapter {
 }
 
 function getApiKey(provider: any): string {
-  if (provider.api_key_secret_name) {
-    const key = Deno.env.get(provider.api_key_secret_name);
+  const raw = (provider.api_key_secret_name || "").trim();
+  if (raw) {
+    // If admin pasted the raw API key directly (e.g. "sk-or-...") use it as-is.
+    const looksLikeRawKey = /^(sk-|pk-|key-|Bearer\s)/i.test(raw) || raw.length > 40;
+    if (looksLikeRawKey) return raw.replace(/^Bearer\s+/i, "");
+    // Otherwise treat it as the name of an env-var/secret.
+    const key = Deno.env.get(raw);
     if (key) return key;
   }
-  // Fall back to Lovable AI key
-  return Deno.env.get("LOVABLE_API_KEY") || "";
+  // Only the Lovable provider may fall back to the built-in Lovable AI key.
+  if (provider.provider_name === "lovable") {
+    return Deno.env.get("LOVABLE_API_KEY") || "";
+  }
+  return "";
 }
 
 serve(async (req) => {

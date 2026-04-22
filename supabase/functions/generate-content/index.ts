@@ -6,6 +6,42 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// ---- Provider helpers ---------------------------------------------------
+// We support OpenRouter (preferred) and the built-in Lovable AI gateway as
+// a transparent fallback. Both are OpenAI-compatible chat-completions APIs.
+function resolveApiKey(provider: any): string {
+  const raw = (provider?.api_key_secret_name || "").trim();
+  if (raw) {
+    const looksLikeRawKey = /^(sk-|pk-|key-|Bearer\s)/i.test(raw) || raw.length > 40;
+    if (looksLikeRawKey) return raw.replace(/^Bearer\s+/i, "");
+    const k = Deno.env.get(raw);
+    if (k) return k;
+  }
+  if (provider?.provider_name === "lovable") return Deno.env.get("LOVABLE_API_KEY") || "";
+  return "";
+}
+
+function providerEndpoint(name: string): string {
+  if (name === "openrouter") return "https://openrouter.ai/api/v1/chat/completions";
+  if (name === "openai") return "https://api.openai.com/v1/chat/completions";
+  if (name === "groq") return "https://api.groq.com/openai/v1/chat/completions";
+  // default -> Lovable AI gateway
+  return "https://ai.gateway.lovable.dev/v1/chat/completions";
+}
+
+async function callTextProvider(provider: any, body: any) {
+  const url = providerEndpoint(provider?.provider_name || "lovable");
+  const apiKey = resolveApiKey(provider);
+  if (!apiKey) {
+    throw new Error(`Missing API key for provider "${provider?.provider_name}". Configure it in Admin → AI Control Center.`);
+  }
+  return fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
 async function ensureBucketExists(supabaseAdmin: any) {
   const { data: buckets } = await supabaseAdmin.storage.listBuckets();
   const exists = buckets?.some((b: any) => b.id === "content-images");
@@ -14,7 +50,27 @@ async function ensureBucketExists(supabaseAdmin: any) {
   }
 }
 
-async function generateImage(prompt: string, apiKey: string, maxRetries = 3): Promise<{ data: string | null; rateLimited: boolean }> {
+async function generateImage(
+  prompt: string,
+  imageProvider: any | null,
+  lovableApiKey: string,
+  maxRetries = 3,
+): Promise<{ data: string | null; rateLimited: boolean; error?: string }> {
+  // Image generation requires an image-capable provider. OpenRouter text-only
+  // models cannot produce images — fall back to Lovable AI image gateway only
+  // when an image provider isn't explicitly configured AND the Lovable key exists.
+  const useLovable = !imageProvider || imageProvider.provider_name === "lovable";
+  if (useLovable && !lovableApiKey) {
+    return { data: null, rateLimited: false, error: "no_image_provider" };
+  }
+  const url = useLovable
+    ? "https://ai.gateway.lovable.dev/v1/chat/completions"
+    : providerEndpoint(imageProvider.provider_name);
+  const apiKey = useLovable ? lovableApiKey : resolveApiKey(imageProvider);
+  const model = useLovable
+    ? "google/gemini-3.1-flash-image-preview"
+    : (imageProvider.model_name || "google/gemini-3.1-flash-image-preview");
+
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       if (attempt > 0) {
@@ -23,14 +79,14 @@ async function generateImage(prompt: string, apiKey: string, maxRetries = 3): Pr
         await new Promise((r) => setTimeout(r, delay));
       }
 
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const response = await fetch(url, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-3.1-flash-image-preview",
+          model,
           messages: [{ role: "user", content: prompt }],
           modalities: ["image", "text"],
         }),
@@ -97,7 +153,8 @@ async function generateImagesInBackground(
   planId: string,
   supabaseUrl: string,
   supabaseKey: string,
-  apiKey: string,
+  imageProvider: any | null,
+  lovableApiKey: string,
 ) {
   const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
   await ensureBucketExists(supabaseAdmin);
@@ -109,8 +166,13 @@ async function generateImagesInBackground(
 
   for (const item of imageItems) {
     try {
-      const result = await generateImage(item.image_prompt, apiKey);
-      if (!result.data) continue;
+      const result = await generateImage(item.image_prompt, imageProvider, lovableApiKey);
+      if (!result.data) {
+        if (result.error === "no_image_provider") {
+          console.warn("Skipping image gen — no image provider configured.");
+        }
+        continue;
+      }
 
       const fileName = `${planId}/day-${item.day_number}-${Date.now()}.png`;
       const publicUrl = await uploadBase64Image(supabaseAdmin, result.data, fileName, supabaseUrl);
@@ -165,8 +227,7 @@ serve(async (req) => {
   });
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY") || "";
 
     const authHeader = req.headers.get("Authorization");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -182,12 +243,32 @@ serve(async (req) => {
 
     const body = await req.json();
 
+    // Resolve admin-configured providers (text + image). The text provider
+    // is required; the image provider is optional and only used when posts
+    // need images.
+    const { data: providerRows } = await supabaseAdmin
+      .from("ai_provider_settings")
+      .select("*")
+      .eq("is_active", true);
+    const textProvider =
+      (providerRows || []).find((p: any) => p.provider_type === "text") ||
+      { provider_name: "lovable", model_name: "google/gemini-2.5-flash" };
+    const imageProvider =
+      (providerRows || []).find((p: any) => p.provider_type === "image") || null;
+
     // Handle image regeneration for a single content item
     if (body.regenerate_image && body.content_item_id && body.image_prompt) {
       await ensureBucketExists(supabaseAdmin);
-      const result = await generateImage(body.image_prompt, LOVABLE_API_KEY);
+      const result = await generateImage(body.image_prompt, imageProvider, LOVABLE_API_KEY);
       if (result.rateLimited) {
         return fail("AI rate limit reached. Please try again in a minute.", 429, "regenerate_image_rate_limit");
+      }
+      if (result.error === "no_image_provider") {
+        return fail(
+          "No image provider configured. Add an image-capable provider in Admin → AI Control Center → Image Models.",
+          400,
+          "no_image_provider",
+        );
       }
       if (!result.data) {
         return fail("Image generation failed. Please try again.", 500, "regenerate_image_failed");
@@ -349,15 +430,9 @@ Every caption must be ready to copy-paste with emojis, line breaks, and a clear 
 For text_only posts: focus on powerful writing, no image_prompt needed.
 For text_with_image and image_carousel: include detailed, brand-aligned image prompts.`;
 
-    // Call Lovable AI for content plan
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+    // Call the configured text provider for the content plan
+    const aiResponse = await callTextProvider(textProvider, {
+        model: textProvider.model_name || "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -405,8 +480,7 @@ For text_with_image and image_carousel: include detailed, brand-aligned image pr
           },
         }],
         tool_choice: { type: "function", function: { name: "create_content_plan" } },
-      }),
-    });
+      });
 
     if (!aiResponse.ok) {
       const errText = await aiResponse.text();
@@ -549,6 +623,7 @@ For text_with_image and image_carousel: include detailed, brand-aligned image pr
           newPlan.id,
           supabaseUrl,
           supabaseKey,
+          imageProvider,
           LOVABLE_API_KEY,
         )
       );

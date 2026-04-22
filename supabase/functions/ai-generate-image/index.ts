@@ -120,9 +120,34 @@ const falAdapter: ImageAdapter = {
   },
 };
 
+const openrouterImageAdapter: ImageAdapter = {
+  async generate(apiKey, model, prompt) {
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: model || "google/gemini-2.5-flash-image",
+        messages: [{ role: "user", content: prompt }],
+        modalities: ["image", "text"],
+      }),
+    });
+    if (res.status === 429) throw Object.assign(new Error("Rate limit"), { status: 429 });
+    if (res.status === 402) throw Object.assign(new Error("Credits exhausted"), { status: 402 });
+    if (!res.ok) throw new Error(`OpenRouter image error: ${res.status} ${await res.text()}`);
+    const data = await res.json();
+    // OpenRouter image-capable models return image in choices[0].message.images[0]
+    const img =
+      data.choices?.[0]?.message?.images?.[0]?.image_url?.url ||
+      data.choices?.[0]?.message?.content?.find?.((p: any) => p.type === "image_url")?.image_url?.url;
+    if (img) return { base64: img.replace(/^data:image\/\w+;base64,/, "") };
+    return {};
+  },
+};
+
 function getImageAdapter(providerName: string): ImageAdapter {
   const adapters: Record<string, ImageAdapter> = {
     lovable: lovableImageAdapter,
+    openrouter: openrouterImageAdapter,
     openai_image: openaiImageAdapter,
     stability: stabilityAdapter,
     replicate: replicateAdapter,
@@ -133,11 +158,17 @@ function getImageAdapter(providerName: string): ImageAdapter {
 }
 
 function getApiKey(provider: any): string {
-  if (provider.api_key_secret_name) {
-    const key = Deno.env.get(provider.api_key_secret_name);
+  const raw = (provider.api_key_secret_name || "").trim();
+  if (raw) {
+    const looksLikeRawKey = /^(sk-|pk-|key-|Bearer\s)/i.test(raw) || raw.length > 40;
+    if (looksLikeRawKey) return raw.replace(/^Bearer\s+/i, "");
+    const key = Deno.env.get(raw);
     if (key) return key;
   }
-  return Deno.env.get("LOVABLE_API_KEY") || "";
+  if (provider.provider_name === "lovable") {
+    return Deno.env.get("LOVABLE_API_KEY") || "";
+  }
+  return "";
 }
 
 serve(async (req) => {
