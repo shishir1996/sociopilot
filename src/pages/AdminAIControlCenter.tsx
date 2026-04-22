@@ -47,22 +47,11 @@ async function adminApi(body: any) {
 }
 
 const TEXT_PROVIDERS = [
-  { label: "Lovable AI", value: "lovable" },
-  { label: "OpenAI", value: "openai" },
-  { label: "Google Gemini", value: "gemini" },
-  { label: "Anthropic (Claude)", value: "anthropic" },
-  { label: "Groq", value: "groq" },
-  { label: "OpenRouter", value: "openrouter" },
-  { label: "Custom API", value: "custom" },
+  { label: "OpenRouter (only supported provider)", value: "openrouter" },
 ];
 
 const IMAGE_PROVIDERS = [
-  { label: "Lovable AI", value: "lovable" },
-  { label: "OpenAI (DALL-E)", value: "openai_image" },
-  { label: "Stability AI", value: "stability" },
-  { label: "Replicate", value: "replicate" },
-  { label: "Fal AI", value: "fal" },
-  { label: "Custom Image API", value: "custom_image" },
+  { label: "OpenRouter (only supported provider)", value: "openrouter" },
 ];
 
 // ===================== TEXT MODELS =====================
