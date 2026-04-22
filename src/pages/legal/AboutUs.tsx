@@ -35,9 +35,9 @@ export default function AboutUs() {
 
       <h2>Business Information</h2>
       <ul>
-        <li><strong>Business Name:</strong> Offdx (operating SocioPilot)</li>
-        <li><strong>GSTIN:</strong> 19AAACO9456P1ZA</li>
-        <li><strong>Registered Address:</strong> Kolkata, West Bengal, India</li>
+        <li><strong>Parent Company:</strong> Offdx (operating SocioPilot)</li>
+        <li><strong>GSTIN:</strong> 20DCSPM1849C1ZP</li>
+        <li><strong>Registered Address:</strong> Dhanbad, Jharkhand, India</li>
         <li><strong>Support Email:</strong> support@sociopilot.in</li>
       </ul>
 
