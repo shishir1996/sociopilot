@@ -126,7 +126,7 @@ function TextModelsPanel() {
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={load}><RefreshCw className="h-4 w-4" /></Button>
           <Button size="sm" onClick={() => setEditing({
-            provider_name: "openrouter", model_name: "google/gemma-2-9b-it:free", temperature: 0.7,
+            provider_name: "openrouter", model_name: "openrouter/auto", temperature: 0.7,
             max_tokens: 2048, top_p: 1.0, frequency_penalty: 0, presence_penalty: 0,
             is_active: false, is_fallback: false, api_key_secret_name: "",
           })}>
@@ -135,11 +135,11 @@ function TextModelsPanel() {
         </div>
       </div>
 
-      <div className="text-xs text-muted-foreground bg-muted/40 border border-border rounded-md p-3">
+        <div className="text-xs text-muted-foreground bg-muted/40 border border-border rounded-md p-3">
         Only <strong>OpenRouter</strong> is supported for content generation (text, image, video).
         Paste your OpenRouter API key directly into the <em>OpenRouter API Key</em> field below
         (it must start with <code>sk-or-...</code>) and use a valid model slug like
-        <code> google/gemma-2-9b-it:free</code> or <code>openai/gpt-4o-mini</code>.
+          <code> openrouter/auto</code> or <code>google/gemini-2.5-flash</code>.
       </div>
 
       {editing && (
@@ -150,10 +150,10 @@ function TextModelsPanel() {
                 <Label>Provider</Label>
                 <Select value={editing.provider_name} onValueChange={v => setEditing({ ...editing, provider_name: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{TEXT_PROVIDERS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}</SelectContent>
+                <SelectContent>{TEXT_PROVIDERS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div><Label>OpenRouter Model Slug</Label><Input value={editing.model_name} onChange={e => setEditing({ ...editing, model_name: e.target.value })} placeholder="e.g. google/gemma-2-9b-it:free" /></div>
+              <div><Label>OpenRouter Model Slug</Label><Input value={editing.model_name} onChange={e => setEditing({ ...editing, model_name: e.target.value })} placeholder="e.g. openrouter/auto" /></div>
               <div><Label>OpenRouter API Key</Label><Input type="password" value={editing.api_key_secret_name || ""} onChange={e => setEditing({ ...editing, api_key_secret_name: e.target.value })} placeholder="sk-or-..." /></div>
               <div><Label>Max Tokens</Label><Input type="number" value={editing.max_tokens} onChange={e => setEditing({ ...editing, max_tokens: parseInt(e.target.value) || 2048 })} /></div>
             </div>
