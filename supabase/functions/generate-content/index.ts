@@ -153,7 +153,8 @@ async function generateImagesInBackground(
   planId: string,
   supabaseUrl: string,
   supabaseKey: string,
-  apiKey: string,
+  imageProvider: any | null,
+  lovableApiKey: string,
 ) {
   const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
   await ensureBucketExists(supabaseAdmin);
@@ -165,8 +166,13 @@ async function generateImagesInBackground(
 
   for (const item of imageItems) {
     try {
-      const result = await generateImage(item.image_prompt, apiKey);
-      if (!result.data) continue;
+      const result = await generateImage(item.image_prompt, imageProvider, lovableApiKey);
+      if (!result.data) {
+        if (result.error === "no_image_provider") {
+          console.warn("Skipping image gen — no image provider configured.");
+        }
+        continue;
+      }
 
       const fileName = `${planId}/day-${item.day_number}-${Date.now()}.png`;
       const publicUrl = await uploadBase64Image(supabaseAdmin, result.data, fileName, supabaseUrl);
