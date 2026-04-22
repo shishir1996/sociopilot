@@ -133,11 +133,17 @@ function getImageAdapter(providerName: string): ImageAdapter {
 }
 
 function getApiKey(provider: any): string {
-  if (provider.api_key_secret_name) {
-    const key = Deno.env.get(provider.api_key_secret_name);
+  const raw = (provider.api_key_secret_name || "").trim();
+  if (raw) {
+    const looksLikeRawKey = /^(sk-|pk-|key-|Bearer\s)/i.test(raw) || raw.length > 40;
+    if (looksLikeRawKey) return raw.replace(/^Bearer\s+/i, "");
+    const key = Deno.env.get(raw);
     if (key) return key;
   }
-  return Deno.env.get("LOVABLE_API_KEY") || "";
+  if (provider.provider_name === "lovable") {
+    return Deno.env.get("LOVABLE_API_KEY") || "";
+  }
+  return "";
 }
 
 serve(async (req) => {
