@@ -50,7 +50,27 @@ async function ensureBucketExists(supabaseAdmin: any) {
   }
 }
 
-async function generateImage(prompt: string, apiKey: string, maxRetries = 3): Promise<{ data: string | null; rateLimited: boolean }> {
+async function generateImage(
+  prompt: string,
+  imageProvider: any | null,
+  lovableApiKey: string,
+  maxRetries = 3,
+): Promise<{ data: string | null; rateLimited: boolean; error?: string }> {
+  // Image generation requires an image-capable provider. OpenRouter text-only
+  // models cannot produce images — fall back to Lovable AI image gateway only
+  // when an image provider isn't explicitly configured AND the Lovable key exists.
+  const useLovable = !imageProvider || imageProvider.provider_name === "lovable";
+  if (useLovable && !lovableApiKey) {
+    return { data: null, rateLimited: false, error: "no_image_provider" };
+  }
+  const url = useLovable
+    ? "https://ai.gateway.lovable.dev/v1/chat/completions"
+    : providerEndpoint(imageProvider.provider_name);
+  const apiKey = useLovable ? lovableApiKey : resolveApiKey(imageProvider);
+  const model = useLovable
+    ? "google/gemini-3.1-flash-image-preview"
+    : (imageProvider.model_name || "google/gemini-3.1-flash-image-preview");
+
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       if (attempt > 0) {
@@ -59,14 +79,14 @@ async function generateImage(prompt: string, apiKey: string, maxRetries = 3): Pr
         await new Promise((r) => setTimeout(r, delay));
       }
 
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const response = await fetch(url, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-3.1-flash-image-preview",
+          model,
           messages: [{ role: "user", content: prompt }],
           modalities: ["image", "text"],
         }),
