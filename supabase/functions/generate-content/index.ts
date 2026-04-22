@@ -430,15 +430,9 @@ Every caption must be ready to copy-paste with emojis, line breaks, and a clear 
 For text_only posts: focus on powerful writing, no image_prompt needed.
 For text_with_image and image_carousel: include detailed, brand-aligned image prompts.`;
 
-    // Call Lovable AI for content plan
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+    // Call the configured text provider for the content plan
+    const aiResponse = await callTextProvider(textProvider, {
+        model: textProvider.model_name || "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -486,8 +480,7 @@ For text_with_image and image_carousel: include detailed, brand-aligned image pr
           },
         }],
         tool_choice: { type: "function", function: { name: "create_content_plan" } },
-      }),
-    });
+      });
 
     if (!aiResponse.ok) {
       const errText = await aiResponse.text();
@@ -630,6 +623,7 @@ For text_with_image and image_carousel: include detailed, brand-aligned image pr
           newPlan.id,
           supabaseUrl,
           supabaseKey,
+          imageProvider,
           LOVABLE_API_KEY,
         )
       );
