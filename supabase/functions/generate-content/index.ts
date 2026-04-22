@@ -227,8 +227,7 @@ serve(async (req) => {
   });
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY") || "";
 
     const authHeader = req.headers.get("Authorization");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -244,12 +243,32 @@ serve(async (req) => {
 
     const body = await req.json();
 
+    // Resolve admin-configured providers (text + image). The text provider
+    // is required; the image provider is optional and only used when posts
+    // need images.
+    const { data: providerRows } = await supabaseAdmin
+      .from("ai_provider_settings")
+      .select("*")
+      .eq("is_active", true);
+    const textProvider =
+      (providerRows || []).find((p: any) => p.provider_type === "text") ||
+      { provider_name: "lovable", model_name: "google/gemini-2.5-flash" };
+    const imageProvider =
+      (providerRows || []).find((p: any) => p.provider_type === "image") || null;
+
     // Handle image regeneration for a single content item
     if (body.regenerate_image && body.content_item_id && body.image_prompt) {
       await ensureBucketExists(supabaseAdmin);
-      const result = await generateImage(body.image_prompt, LOVABLE_API_KEY);
+      const result = await generateImage(body.image_prompt, imageProvider, LOVABLE_API_KEY);
       if (result.rateLimited) {
         return fail("AI rate limit reached. Please try again in a minute.", 429, "regenerate_image_rate_limit");
+      }
+      if (result.error === "no_image_provider") {
+        return fail(
+          "No image provider configured. Add an image-capable provider in Admin → AI Control Center → Image Models.",
+          400,
+          "no_image_provider",
+        );
       }
       if (!result.data) {
         return fail("Image generation failed. Please try again.", 500, "regenerate_image_failed");
