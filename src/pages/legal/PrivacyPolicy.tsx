@@ -86,6 +86,10 @@ export default function PrivacyPolicy() {
         For privacy questions or data requests, email{" "}
         <a href="mailto:support@sociopilot.in">support@sociopilot.in</a>.
       </p>
+      <p>
+        <strong>Data Controller:</strong> Offdx (parent company of SocioPilot),
+        Dhanbad, Jharkhand, India. GSTIN: 20DCSPM1849C1ZP.
+      </p>
     </LegalPageLayout>
   );
 }

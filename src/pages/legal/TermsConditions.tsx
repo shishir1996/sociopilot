@@ -15,7 +15,7 @@ export default function TermsConditions() {
       <h2>1. Acceptance of Terms</h2>
       <p>
         By accessing or using SocioPilot ("Service"), operated by <strong>Offdx</strong>
-        (GSTIN: 19AAACO9456P1ZA, registered in Kolkata, West Bengal, India), you agree
+        (GSTIN: 20DCSPM1849C1ZP, registered in Dhanbad, Jharkhand, India), you agree
         to be bound by these Terms & Conditions. If you do not agree, please do not use
         the Service.
       </p>
@@ -83,7 +83,7 @@ export default function TermsConditions() {
       <h2>10. Governing Law</h2>
       <p>
         These terms are governed by the laws of India. Disputes shall be subject to the
-        exclusive jurisdiction of the courts of Kolkata, West Bengal.
+        exclusive jurisdiction of the courts of Dhanbad, Jharkhand.
       </p>
 
       <h2>11. Contact</h2>

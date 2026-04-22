@@ -208,6 +208,12 @@ export function LegalFooter() {
                 support@sociopilot.in
               </a>
             </p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Offdx · Dhanbad, Jharkhand, India
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              GSTIN: 20DCSPM1849C1ZP
+            </p>
           </div>
         </div>
         <div className="border-t border-border pt-6 flex flex-col md:flex-row items-center justify-between gap-3">
