@@ -434,9 +434,10 @@ For text_with_image and image_carousel: include detailed, brand-aligned image pr
     const aiResponse = await callTextProvider(textProvider, {
         model: textProvider.model_name || "google/gemini-2.5-flash",
         messages: [
-          { role: "system", content: systemPrompt },
+          { role: "system", content: systemPrompt + "\n\nIMPORTANT: Return ONLY the raw JSON object described above. Do not wrap it in markdown code fences. Do not include any explanation before or after the JSON." },
           { role: "user", content: userPrompt },
         ],
+        response_format: { type: "json_object" },
         tools: [{
           type: "function",
           function: {
@@ -479,7 +480,9 @@ For text_with_image and image_carousel: include detailed, brand-aligned image pr
             },
           },
         }],
-        tool_choice: { type: "function", function: { name: "create_content_plan" } },
+        // NOTE: tool_choice is NOT forced. Many OpenRouter free models (e.g. gemma)
+        // do not support tool calling. We accept either tool_calls OR a JSON
+        // string in message.content and parse whichever is returned.
       });
 
     if (!aiResponse.ok) {
@@ -498,18 +501,46 @@ For text_with_image and image_carousel: include detailed, brand-aligned image pr
     }
 
     const aiData = await aiResponse.json();
-    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall) {
-      console.error("AI response had no tool call:", JSON.stringify(aiData).slice(0, 500));
-      return fail("No structured response from AI. Please try again.", 502, "missing_tool_call");
+    const choice = aiData.choices?.[0]?.message;
+    const toolCall = choice?.tool_calls?.[0];
+
+    // Extract JSON from either a tool call (preferred) or the message content
+    // (used by models without function-calling support, e.g. gemma free tier).
+    let rawJson: string | undefined;
+    if (toolCall?.function?.arguments) {
+      rawJson = toolCall.function.arguments;
+    } else if (typeof choice?.content === "string" && choice.content.trim().length > 0) {
+      rawJson = choice.content.trim();
+      // Strip ```json ... ``` fences if present
+      const fenceMatch = rawJson.match(/```(?:json)?\s*([\s\S]*?)```/i);
+      if (fenceMatch) rawJson = fenceMatch[1].trim();
+      // Slice between the first { and the last } for safety
+      const firstBrace = rawJson.indexOf("{");
+      const lastBrace = rawJson.lastIndexOf("}");
+      if (firstBrace !== -1 && lastBrace > firstBrace) {
+        rawJson = rawJson.slice(firstBrace, lastBrace + 1);
+      }
+    }
+
+    if (!rawJson) {
+      console.error("AI response had no parsable content:", JSON.stringify(aiData).slice(0, 800));
+      return fail(
+        "AI returned an empty response. Try a more capable model in Admin → AI Control Center (e.g. google/gemini-2.5-flash via OpenRouter).",
+        502,
+        "missing_tool_call",
+      );
     }
 
     let plan;
     try {
-      plan = JSON.parse(toolCall.function.arguments);
+      plan = JSON.parse(rawJson);
     } catch (parseErr) {
-      console.error("Failed to parse AI response:", toolCall.function.arguments?.slice(0, 500));
-      return fail("AI returned invalid content. Please try again.", 502, "invalid_ai_response");
+      console.error("Failed to parse AI response:", rawJson.slice(0, 800));
+      return fail(
+        "AI returned invalid JSON. Please try again or switch to a model that supports structured output.",
+        502,
+        "invalid_ai_response",
+      );
     }
 
     if (!plan.days || !Array.isArray(plan.days) || plan.days.length === 0) {
