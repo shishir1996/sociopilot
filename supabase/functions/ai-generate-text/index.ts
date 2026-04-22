@@ -284,7 +284,25 @@ Return a JSON object with this exact structure:
       aiData = await adapter.call(apiKey, modelName, messages, callOpts);
     } catch (primaryErr: any) {
       console.error("Primary provider failed:", primaryErr.message);
-      if (primaryErr.status === 429 || primaryErr.status === 402) {
+      const shouldRetryOpenRouterAuto =
+        provider.provider_name === "openrouter" &&
+        primaryErr.message?.includes("404") &&
+        modelName !== "openrouter/auto";
+
+      if (shouldRetryOpenRouterAuto) {
+        try {
+          console.log("Configured OpenRouter model unavailable, retrying with openrouter/auto");
+          aiData = await adapter.call(apiKey, "openrouter/auto", messages, callOpts);
+          usedProvider = { ...provider, model_name: "openrouter/auto" };
+        } catch (autoRetryErr: any) {
+          console.error("OpenRouter auto retry failed:", autoRetryErr.message);
+          primaryErr = autoRetryErr;
+        }
+      }
+
+      if (aiData) {
+        // noop: the OpenRouter auto retry succeeded.
+      } else if (primaryErr.status === 429 || primaryErr.status === 402) {
         // Check if we have a fallback
         if (fallbackProvider) {
           console.log("Trying fallback provider:", fallbackProvider.provider_name);

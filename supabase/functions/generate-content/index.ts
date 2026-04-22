@@ -431,8 +431,8 @@ For text_only posts: focus on powerful writing, no image_prompt needed.
 For text_with_image and image_carousel: include detailed, brand-aligned image prompts.`;
 
     // Call the configured text provider for the content plan
-    const aiResponse = await callTextProvider(textProvider, {
-        model: textProvider.model_name || "google/gemini-2.5-flash",
+    const contentPlanRequest = {
+        model: textProvider.model_name || "openrouter/auto",
         messages: [
           { role: "system", content: systemPrompt + "\n\nIMPORTANT: Return ONLY the raw JSON object described above. Do not wrap it in markdown code fences. Do not include any explanation before or after the JSON." },
           { role: "user", content: userPrompt },
@@ -483,7 +483,18 @@ For text_with_image and image_carousel: include detailed, brand-aligned image pr
         // NOTE: tool_choice is NOT forced. Many OpenRouter free models (e.g. gemma)
         // do not support tool calling. We accept either tool_calls OR a JSON
         // string in message.content and parse whichever is returned.
-      });
+      };
+
+    let aiResponse = await callTextProvider(textProvider, contentPlanRequest);
+
+    if (!aiResponse.ok && aiResponse.status === 404 && textProvider.provider_name === "openrouter" && contentPlanRequest.model !== "openrouter/auto") {
+      const invalidModelError = await aiResponse.text();
+      console.warn(`Configured OpenRouter model "${contentPlanRequest.model}" returned 404. Retrying with openrouter/auto.`, invalidModelError);
+      aiResponse = await callTextProvider(
+        { ...textProvider, model_name: "openrouter/auto" },
+        { ...contentPlanRequest, model: "openrouter/auto" },
+      );
+    }
 
     if (!aiResponse.ok) {
       const errText = await aiResponse.text();
