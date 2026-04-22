@@ -6,6 +6,42 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// ---- Provider helpers ---------------------------------------------------
+// We support OpenRouter (preferred) and the built-in Lovable AI gateway as
+// a transparent fallback. Both are OpenAI-compatible chat-completions APIs.
+function resolveApiKey(provider: any): string {
+  const raw = (provider?.api_key_secret_name || "").trim();
+  if (raw) {
+    const looksLikeRawKey = /^(sk-|pk-|key-|Bearer\s)/i.test(raw) || raw.length > 40;
+    if (looksLikeRawKey) return raw.replace(/^Bearer\s+/i, "");
+    const k = Deno.env.get(raw);
+    if (k) return k;
+  }
+  if (provider?.provider_name === "lovable") return Deno.env.get("LOVABLE_API_KEY") || "";
+  return "";
+}
+
+function providerEndpoint(name: string): string {
+  if (name === "openrouter") return "https://openrouter.ai/api/v1/chat/completions";
+  if (name === "openai") return "https://api.openai.com/v1/chat/completions";
+  if (name === "groq") return "https://api.groq.com/openai/v1/chat/completions";
+  // default -> Lovable AI gateway
+  return "https://ai.gateway.lovable.dev/v1/chat/completions";
+}
+
+async function callTextProvider(provider: any, body: any) {
+  const url = providerEndpoint(provider?.provider_name || "lovable");
+  const apiKey = resolveApiKey(provider);
+  if (!apiKey) {
+    throw new Error(`Missing API key for provider "${provider?.provider_name}". Configure it in Admin → AI Control Center.`);
+  }
+  return fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
 async function ensureBucketExists(supabaseAdmin: any) {
   const { data: buckets } = await supabaseAdmin.storage.listBuckets();
   const exists = buckets?.some((b: any) => b.id === "content-images");
