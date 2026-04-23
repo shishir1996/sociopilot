@@ -122,7 +122,7 @@ export default function Dashboard() {
               <Zap className="h-4 w-4 text-primary-foreground" />
             </div>
           )}
-          {sidebarOpen && <span className="text-sm font-bold text-primary-foreground">SocioPilot</span>}
+          {sidebarOpen && <span className="text-sm font-bold text-primary-foreground">Growvix</span>}
         </div>
         <nav className="flex-1 px-2 mt-4 space-y-1">
           {sidebarNav.map((item) => (
@@ -163,7 +163,7 @@ export default function Dashboard() {
                   <Zap className="h-3.5 w-3.5 text-primary-foreground" />
                 </div>
               )}
-              <span className="text-sm font-bold text-foreground">SocioPilot</span>
+              <span className="text-sm font-bold text-foreground">Growvix</span>
             </div>
             {selectedBusiness && (
               <div className="flex items-center gap-2 hidden sm:flex">

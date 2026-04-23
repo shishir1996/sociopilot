@@ -65,7 +65,7 @@ export default function LandingPage() {
             <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3 shadow-glow">
               <Antenna className="h-4 w-4 text-primary-foreground" />
             </div>
-            <span className="text-base font-bold tracking-tight text-foreground">SocioPilot <span className="text-muted-foreground font-medium">By Offdx</span></span>
+            <span className="text-base font-bold tracking-tight text-foreground">Growvix <span className="text-muted-foreground font-medium">By Offdx</span></span>
           </div>
           <div className="hidden md:flex items-center gap-8">
             {[
@@ -111,7 +111,7 @@ export default function LandingPage() {
           <Reveal delay={80}>
             <h1 className="text-4xl sm:text-5xl lg:text-7xl font-extrabold tracking-tight text-foreground max-w-4xl mx-auto leading-[1.05]">
               Run Your Social Media on{" "}
-              <span className="gradient-text">Autopilot — SocioPilot</span>
+              <span className="gradient-text">Autopilot — Growvix</span>
             </h1>
           </Reveal>
           <Reveal delay={160}>
@@ -173,7 +173,7 @@ export default function LandingPage() {
               <div className="w-3 h-3 rounded-full bg-destructive/60" />
               <div className="w-3 h-3 rounded-full bg-warning/60" />
               <div className="w-3 h-3 rounded-full bg-success/60" />
-              <span className="ml-4 text-xs text-muted-foreground">app.sociopilot.com</span>
+              <span className="ml-4 text-xs text-muted-foreground">app.growvix.com</span>
             </div>
             <div className="flex min-h-[400px]">
               {/* Mock Sidebar */}
@@ -182,7 +182,7 @@ export default function LandingPage() {
                   <div className="w-7 h-7 rounded-lg gradient-primary flex items-center justify-center">
                     <Zap className="h-3.5 w-3.5 text-primary-foreground" />
                   </div>
-                  <span className="text-sm font-semibold text-primary-foreground">SocioPilot</span>
+                  <span className="text-sm font-semibold text-primary-foreground">Growvix</span>
                 </div>
                 {["Dashboard", "Content", "Calendar", "Analytics", "Inbox", "Settings"].map((item, i) => (
                   <div key={item} className={`px-3 py-2 rounded-lg text-sm mb-1 ${i === 0 ? "bg-primary/20 text-primary" : "text-muted-foreground/60 hover:text-muted-foreground/80"}`}>
@@ -252,7 +252,7 @@ export default function LandingPage() {
               Everything you need to <span className="gradient-text">automate social</span>
             </h2>
             <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-              From content creation to engagement — SocioPilot handles it all with AI intelligence.
+              From content creation to engagement — Growvix handles it all with AI intelligence.
             </p>
           </Reveal>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -358,13 +358,13 @@ export default function LandingPage() {
               {
                 name: "Sarah Chen",
                 role: "Founder, LocalBites",
-                text: "SocioPilot saves me 15+ hours a week. The AI content is better than what I was writing myself!",
+                text: "Growvix saves me 15+ hours a week. The AI content is better than what I was writing myself!",
                 rating: 5,
               },
               {
                 name: "Marcus Rodriguez",
                 role: "Marketing Agency Owner",
-                text: "We manage 20+ clients with SocioPilot. The multi-platform posting and auto-replies are game changers.",
+                text: "We manage 20+ clients with Growvix. The multi-platform posting and auto-replies are game changers.",
                 rating: 5,
               },
               {

@@ -193,7 +193,7 @@ export default function Auth() {
               <Zap className="h-5 w-5 text-primary-foreground" />
             </div>
             <h1 className="text-2xl font-bold text-primary-foreground tracking-tight">
-              SocioPilot
+              Growvix
             </h1>
           </div>
           <p className="mt-2 text-sm text-muted-foreground" style={{ color: 'hsl(215 20% 55%)' }}>
@@ -220,7 +220,7 @@ export default function Auth() {
         </div>
 
         <p className="text-xs" style={{ color: 'hsl(215 20% 40%)' }}>
-          © 2026 SocioPilot. All rights reserved.
+          © 2026 Growvix. All rights reserved.
         </p>
       </div>
 
@@ -232,7 +232,7 @@ export default function Auth() {
               <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
                 <Zap className="h-4 w-4 text-primary-foreground" />
               </div>
-              <span className="text-xl font-bold text-foreground">SocioPilot</span>
+              <span className="text-xl font-bold text-foreground">Growvix</span>
             </div>
             <h2 className="text-2xl font-bold text-foreground">
               {isLogin ? "Welcome back" : "Create your account"}

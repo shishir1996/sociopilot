@@ -7,14 +7,14 @@ export default function RefundPolicy() {
       title="Refund Policy"
       subtitle="Our policy on subscription payments, refunds, and exceptions."
       icon={<Wallet />}
-      metaTitle="Refund Policy — SocioPilot By Offdx"
-      metaDescription="SocioPilot's refund policy for SaaS subscriptions. Learn about our no-refund policy and limited exceptions."
+      metaTitle="Refund Policy — Growvix By Offdx"
+      metaDescription="Growvix's refund policy for SaaS subscriptions. Learn about our no-refund policy and limited exceptions."
     >
       <p><em>Last updated: {new Date().toLocaleDateString("en-IN", { year: "numeric", month: "long", day: "numeric" })}</em></p>
 
       <h2>1. Subscription Model</h2>
       <p>
-        SocioPilot operates on a <strong>SaaS subscription model</strong>, available on
+        Growvix operates on a <strong>SaaS subscription model</strong>, available on
         monthly and annual billing cycles. Customers are charged at the start of each
         billing period, and access continues until the end of that period.
       </p>
@@ -62,7 +62,7 @@ export default function RefundPolicy() {
       <p>
         Eligible refund requests must be submitted within <strong>7 days</strong> of the
         transaction. Email{" "}
-        <a href="mailto:support@sociopilot.in">support@sociopilot.in</a> with your
+        <a href="mailto:support@growvix.offdx.in">support@growvix.offdx.in</a> with your
         registered email, transaction ID, and reason. Approved refunds are processed
         within <strong>7–10 business days</strong> to the original payment method.
       </p>
@@ -70,7 +70,7 @@ export default function RefundPolicy() {
       <h2>7. Contact</h2>
       <p>
         Questions about this policy?{" "}
-        <a href="mailto:support@sociopilot.in">support@sociopilot.in</a>
+        <a href="mailto:support@growvix.offdx.in">support@growvix.offdx.in</a>
       </p>
     </LegalPageLayout>
   );

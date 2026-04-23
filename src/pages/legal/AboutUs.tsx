@@ -7,12 +7,12 @@ export default function AboutUs() {
       title="About Us"
       subtitle="Building the AI engine that powers social media for ambitious businesses worldwide."
       icon={<Users />}
-      metaTitle="About SocioPilot — AI Social Media Automation by Offdx"
-      metaDescription="SocioPilot By Offdx is an AI-powered social media automation SaaS helping businesses plan, generate, and publish content effortlessly."
+      metaTitle="About Growvix — AI Social Media Automation by Offdx"
+      metaDescription="Growvix By Offdx is an AI-powered social media automation SaaS helping businesses plan, generate, and publish content effortlessly."
     >
       <h2>Who We Are</h2>
       <p>
-        <strong>SocioPilot By Offdx</strong> is an AI-powered Social Media Content Engine
+        <strong>Growvix By Offdx</strong> is an AI-powered Social Media Content Engine
         designed to help businesses, creators, and agencies run their social presence on
         autopilot. We blend strategy, creativity, and automation into a single platform
         so you can focus on growing your business while we handle the content.
@@ -35,15 +35,15 @@ export default function AboutUs() {
 
       <h2>Business Information</h2>
       <ul>
-        <li><strong>Parent Company:</strong> Offdx (operating SocioPilot)</li>
+        <li><strong>Parent Company:</strong> Offdx (operating Growvix)</li>
         <li><strong>GSTIN:</strong> 20DCSPM1849C1ZP</li>
         <li><strong>Registered Address:</strong> Dhanbad, Jharkhand, India</li>
-        <li><strong>Support Email:</strong> support@sociopilot.in</li>
+        <li><strong>Support Email:</strong> support@growvix.offdx.in</li>
       </ul>
 
       <h2>Why Businesses Trust Us</h2>
       <p>
-        SocioPilot operates on a transparent <strong>SaaS subscription model</strong> with
+        Growvix operates on a transparent <strong>SaaS subscription model</strong> with
         monthly and annual billing. We are fully compliant with international payment
         regulations and applicable <strong>GST</strong> requirements in India. Our
         infrastructure is built on enterprise-grade cloud services to ensure your data

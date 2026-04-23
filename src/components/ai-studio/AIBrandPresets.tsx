@@ -27,12 +27,12 @@ export default function AIBrandPresets() {
   const [presets, setPresets] = useState<BrandPreset[]>([
     {
       id: "demo-1",
-      name: "SocioPilot Brand",
+      name: "Growvix Brand",
       tone: "Professional",
       audience: "Small business owners & marketers",
       voice: "Confident, helpful, data-driven",
       ctaStyle: "Soft CTA",
-      hashtags: "#SocioPilot, #SocialMedia, #Marketing",
+      hashtags: "#Growvix, #SocialMedia, #Marketing",
       imageStyle: "Minimal",
       colorTheme: "Blue & Purple",
       isDefault: true,
