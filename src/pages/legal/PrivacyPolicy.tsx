@@ -5,10 +5,10 @@ export default function PrivacyPolicy() {
   return (
     <LegalPageLayout
       title="Privacy Policy"
-      subtitle="How we collect, use, and protect your data on SocioPilot."
+      subtitle="How we collect, use, and protect your data on Growvix."
       icon={<ShieldCheck />}
-      metaTitle="Privacy Policy — SocioPilot By Offdx"
-      metaDescription="Learn how SocioPilot By Offdx collects, uses, stores, and protects your personal and business data."
+      metaTitle="Privacy Policy — Growvix By Offdx"
+      metaDescription="Learn how Growvix By Offdx collects, uses, stores, and protects your personal and business data."
     >
       <p><em>Last updated: {new Date().toLocaleDateString("en-IN", { year: "numeric", month: "long", day: "numeric" })}</em></p>
 
@@ -77,17 +77,17 @@ export default function PrivacyPolicy() {
 
       <h2>9. Children's Privacy</h2>
       <p>
-        SocioPilot is not intended for users under 18. We do not knowingly collect data
+        Growvix is not intended for users under 18. We do not knowingly collect data
         from children.
       </p>
 
       <h2>10. Contact</h2>
       <p>
         For privacy questions or data requests, email{" "}
-        <a href="mailto:support@sociopilot.in">support@sociopilot.in</a>.
+        <a href="mailto:support@growvix.offdx.in">support@growvix.offdx.in</a>.
       </p>
       <p>
-        <strong>Data Controller:</strong> Offdx (parent company of SocioPilot),
+        <strong>Data Controller:</strong> Offdx (parent company of Growvix),
         Dhanbad, Jharkhand, India. GSTIN: 20DCSPM1849C1ZP.
       </p>
     </LegalPageLayout>

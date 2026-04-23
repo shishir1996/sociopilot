@@ -76,7 +76,7 @@ serve(async (req) => {
       chargeCurrency = "INR";
     }
 
-    const origin = req.headers.get("origin") || "https://sociopilot.lovable.app";
+    const origin = req.headers.get("origin") || "https://growvix.offdx.in";
     const orderId = `sp_${user.id.slice(0, 8)}_${plan}_${Date.now()}`;
     const customerPhone = (user.user_metadata as any)?.phone || user.phone || "9999999999";
     const customerName = (user.user_metadata as any)?.full_name || user.email?.split("@")[0] || "Customer";
@@ -108,7 +108,7 @@ serve(async (req) => {
         return_url: `${origin}/account?payment=success&plan=${plan}&order_id={order_id}`,
         notify_url: `${supabaseUrl}/functions/v1/cashfree-webhook`,
       },
-      order_note: `SocioPilot ${plan} plan (${region})`,
+      order_note: `Growvix ${plan} plan (${region})`,
       order_tags: {
         user_id: user.id,
         plan,

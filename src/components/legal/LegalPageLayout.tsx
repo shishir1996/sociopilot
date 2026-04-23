@@ -61,7 +61,7 @@ export default function LegalPageLayout({
             <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
               <Antenna className="h-4 w-4 text-primary-foreground" />
             </div>
-            <span className="text-base font-bold text-primary">SocioPilot By Offdx</span>
+            <span className="text-base font-bold text-primary">Growvix By Offdx</span>
           </Link>
           <div className="hidden md:flex items-center gap-6">
             {FOOTER_LINKS.map((l) => (
@@ -148,7 +148,7 @@ export default function LegalPageLayout({
             Ready to put your social media on autopilot?
           </h2>
           <p className="text-primary-foreground/80 mb-7 max-w-xl mx-auto">
-            Join thousands of businesses growing with SocioPilot's AI-powered content engine.
+            Join thousands of businesses growing with Growvix's AI-powered content engine.
           </p>
           <Button
             size="lg"
@@ -176,7 +176,7 @@ export function LegalFooter() {
               <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
                 <Antenna className="h-4 w-4 text-primary-foreground" />
               </div>
-              <span className="text-base font-bold text-foreground">SocioPilot By Offdx</span>
+              <span className="text-base font-bold text-foreground">Growvix By Offdx</span>
             </Link>
             <p className="text-sm text-muted-foreground max-w-xs">
               AI-powered social media automation for modern businesses.
@@ -202,10 +202,10 @@ export function LegalFooter() {
             <p className="text-sm text-muted-foreground">
               Support:{" "}
               <a
-                href="mailto:support@sociopilot.in"
+                href="mailto:support@growvix.offdx.in"
                 className="text-primary hover:underline"
               >
-                support@sociopilot.in
+                support@growvix.offdx.in
               </a>
             </p>
             <p className="text-sm text-muted-foreground mt-2">
@@ -218,7 +218,7 @@ export function LegalFooter() {
         </div>
         <div className="border-t border-border pt-6 flex flex-col md:flex-row items-center justify-between gap-3">
           <p className="text-xs text-muted-foreground">
-            © {new Date().getFullYear()} SocioPilot By Offdx. All rights reserved.
+            © {new Date().getFullYear()} Growvix By Offdx. All rights reserved.
           </p>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 justify-center">
             {FOOTER_LINKS.map((l) => (
