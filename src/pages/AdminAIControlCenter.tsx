@@ -211,8 +211,17 @@ function TextModelsPanel() {
               <Button size="sm" onClick={save} disabled={saving}>
                 {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />} Save
               </Button>
+              <Button size="sm" variant="outline" onClick={testKey} disabled={testing}>
+                {testing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Key className="h-4 w-4 mr-1" />} Test Key
+              </Button>
               <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
             </div>
+            {testResult && (
+              <div className={`flex items-center gap-2 text-sm rounded-md px-3 py-2 ${testResult.ok ? "bg-green-500/10 text-green-700 border border-green-500/20" : "bg-destructive/10 text-destructive border border-destructive/20"}`}>
+                {testResult.ok ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+                <span>{testResult.msg}</span>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
