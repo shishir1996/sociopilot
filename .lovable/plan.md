@@ -1,95 +1,65 @@
-# Socio Pilot — Weekly Content Engine Upgrade Plan
+This is a very large request spanning OAuth for 8+ providers, AI infrastructure, dynamic model fetching, and a full Google My Business product. Implementing it all "completely and correctly" in one shot is not realistic — each platform requires its own OAuth app credentials (Client ID/Secret) from you, and GMB alone is a multi-week feature. I'll deliver it in clearly-scoped phases, asking only for credentials when blocked.
 
-## Overview
-Transform the existing platform into a structured "Generate → Review → Schedule" weekly content engine with plan-based restrictions, upgrade prompts, and notification system.
+## Phase 1 — Ship now (no new credentials needed)
 
----
+**Fix 1: Instagram connect**
+- Update `SocialConnectWidget` and `SocialSettings` so the Connect Instagram button passes `platform: 'instagram'` (not `'facebook'`) into `social-oauth`.
+- Update `social-oauth` edge function: when state.platform === 'instagram', use Facebook OAuth flow under the hood but persist the row with `platform = 'instagram'` and IG-specific fields (ig_account_id, ig_username) in `social_accounts`. Facebook stays `platform = 'facebook'` with FB page fields.
+- Result: each card shows its own Connected/Disconnect state.
 
-## Phase 1: Database & Plan Infrastructure
+**Fix 2: AI 401 hardening**
+- Audit `ai-generate-text`, `ai-generate-image`, `generate-content` to confirm: keys come only from Deno.env / `ai_provider_settings.api_key_secret_name`; Authorization header is `Bearer ${key}`; never read from client.
+- Add structured 200-OK error responses with friendly `error` + `diagnostics` (matches our existing pattern) instead of bubbling raw 401.
+- Add a "Test Key" button in `AdminAIControlCenter` that calls a new `ai-validate-key` edge function which pings the provider's models endpoint and returns ok/fail + reason.
 
-### New/Modified Tables (via migration)
+**Fix 4 (partial): Add platform cards to UI**
+- Add cards for Twitter/X, Pinterest, TikTok, Threads, Reddit, Tumblr, Snapchat Business, Google Business Profile, plus a disabled "YouTube — Coming Soon" card.
+- For platforms we don't yet have OAuth secrets for, the card shows "Not configured — admin setup required" (same pattern used today for unconfigured platforms). The composer/scheduler already filters by connected platforms, so this just works.
 
-1. **New: `weekly_generation_requests`** — Tracks each weekly generation request
-   - `user_id`, `business_id`, `plan_type`, `selected_days` (jsonb), `selected_platforms` (jsonb), `status`, `content_plan_id`, `created_at`
-2. **New: `regeneration_logs`** — Tracks each regeneration event
-   - `user_id`, `content_item_id`, `plan_type`, `created_at`
-3. **New: `upgrade_events`** — Tracks upgrade prompts shown & actions taken
-   - `user_id`, `trigger_type`, `action_taken`, `created_at`
-4. **New: `notifications`** — In-app notification system
-   - `user_id`, `type`, `title`, `message`, `read`, `action_url`, `created_at`
-5. **Modify `subscriptions`** — Add trial tracking fields
+**Fix 5 (partial): Plan-gating + GMB tab shell**
+- Add a Google My Business tab to the dashboard that is locked behind Basic/Pro using existing `usePlanLimits`. Free users see the upgrade overlay.
+- Inside the tab, show "Connect Google My Business" wired through the same `social-oauth` flow with scope `business.manage` (Google OAuth credentials are already managed by Lovable Cloud).
+- Admin portal: add a "Google My Business" panel under admin showing connected user count and a sortable user table (data we have today). Per-plan toggle added to plan limits.
 
-### Seed Data
-- Insert plan limits into `ai_plan_limits` for `free_trial`, `basic`, `pro`
+## Phase 2 — Needs your input (one message after Phase 1 lands)
 
----
+For each of these I need OAuth Client ID + Client Secret from the platform's developer portal. I'll request them via the secure secret prompt in batches:
 
-## Phase 2: AI Studio — Weekly Content Generation UI
+```text
+Twitter/X        TWITTER_CLIENT_ID, TWITTER_CLIENT_SECRET
+Pinterest        PINTEREST_CLIENT_ID, PINTEREST_CLIENT_SECRET
+TikTok           TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET
+Threads          THREADS_CLIENT_ID, THREADS_CLIENT_SECRET
+Reddit           REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET
+Tumblr           TUMBLR_CONSUMER_KEY, TUMBLR_CONSUMER_SECRET
+Snapchat Biz     SNAPCHAT_CLIENT_ID, SNAPCHAT_CLIENT_SECRET
+```
 
-### AI Studio Page (`/ai-studio`) — Restored with new structure
-- **Step 1: Calendar Selection** — Mon-Sun grid
-  - Basic: 1 platform per day (radio select)
-  - Pro: Multi-platform per day (checkbox select)
-- **Step 2: Business Context** — Auto-filled from business profile, editable
-- **Step 3: Generate** — "Generate Weekly Content" button
-- **Step 4: Results** — Content cards per day with platform badge, caption, image preview, hashtags, CTA
-  - Edit, Regenerate, Save, Schedule buttons
+Once a secret pair is provided, I'll wire up the matching branch in `social-oauth` (auth URL, token exchange, profile fetch) and persist to `social_accounts`.
 
-### Plan Enforcement
-- Check plan type before generation
-- Block multi-platform for Basic users with upgrade prompt
-- Track usage counts and enforce limits
-- Cooldown between regenerations
+**Fix 3: Dynamic model selection per provider**
+- Schema change: extend `ai_provider_settings` (or add `ai_provider_models`) with `available_models jsonb`, `selected_text_models text[]`, `selected_image_models text[]`, `selected_video_models text[]`.
+- New edge function `ai-list-models` that, given a provider + stored key, calls the provider's list-models endpoint:
+  - OpenRouter: `GET https://openrouter.ai/api/v1/models` (returns id, context_length, pricing.prompt/completion).
+  - OpenAI: `GET https://api.openai.com/v1/models`.
+  - Anthropic: hardcoded curated list (no public list endpoint).
+  - Gemini: `GET https://generativelanguage.googleapis.com/v1beta/models`.
+- Admin UI: provider dropdown → spinner → three multi-select panels (Text / Image / Video) with name, context window, pricing. Save persists selected arrays.
+- User-facing model pickers in AI Studio read from `selected_*_models` instead of a hardcoded list.
 
----
+## Phase 3 — Full Google My Business product
 
-## Phase 3: Upgrade & Trial System
+This is the largest piece. After Phase 1 ships the connect + tab + lock:
+- Schema: `gmb_profiles` (business_id, gmb_location_id, name, address, phone, website, category, rating, review_count, photo_count, completeness_score, verified, published, last_synced_at), `gmb_reviews`, `gmb_qa`, `gmb_optimizations`.
+- Edge functions:
+  - `gmb-sync` — pulls location, reviews, Q&A, photos via Business Profile APIs.
+  - `gmb-optimize` — runs AI to draft description + 10 local SEO keywords.
+  - `gmb-push` — PATCHes location fields back to Google.
+- UI: dashboard tab with the full data list you described, "Optimize Profile" full-screen panel with completeness bar, checklist of missing fields with inline editors, AI-generated description, keyword suggestions, local SEO tips, "Push Updates" button, before/after score comparison.
+- Admin: connected count, avg completeness, optimizations this month, sortable user table, per-plan GMB toggle.
 
-### Trial Logic
-- 7-day trial = Basic features + 1 weekly generation + 2 regenerations
-- After limits hit → lock with upgrade prompt
-- Day 5+: Show countdown banner
-- Day 7+: Full-screen block
+Note: Google's Business Profile APIs are gated — your Google Cloud project must be approved by Google for `business.manage` scope before live data flows. I'll wire the integration so it works the moment approval lands; until then it will show "Awaiting Google API approval".
 
-### Upgrade Prompts (integrated into dashboard)
-1. Post-generation: "Your free week is ready 🚀 Next week locked 🔒"
-2. Trial countdown banner (Day 5+)
-3. Trial expired full-screen overlay
-4. Basic user tries Pro feature → popup
-5. Limit reached → inline message
+## What I need from you to start
 
----
-
-## Phase 4: Notification System
-
-### In-App Notifications
-- Bell icon in header with unread count
-- Notification dropdown with mark-as-read
-
-### Triggers
-- Trial countdown (Day 5, 6, 7)
-- Limit reached
-- Generation complete
-- Upgrade suggestion
-
----
-
-## Phase 5: Edge Functions & Backend
-
-- Update `generate-content` with plan validation & usage tracking
-- New `check-plan-limits` edge function
-- Update `auto-generate-weekly` to respect plan limits
-
----
-
-## Phase 6: Admin AI Control Center Updates
-
-- Trial settings management
-- Plan limit management
-- Upgrade event analytics
-- Notification management
-
----
-
-## Implementation Order
-Phase 1 → 2 → 3 → 4 → 5 → 6 (incremental, each phase delivers working functionality)
+Just reply "go" and I'll ship Phase 1 immediately. After Phase 1 is in preview I'll come back with the secret prompts for Phase 2 and the migration for Phase 3.

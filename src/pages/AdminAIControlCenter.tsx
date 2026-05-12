@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Settings, Cpu, Image, FileText, Shield, ToggleLeft, Activity,
-  Plus, Trash2, Save, DollarSign, Key, RefreshCw, Eye, EyeOff, Loader2,
+  Plus, Trash2, Save, DollarSign, Key, RefreshCw, Eye, EyeOff, Loader2, CheckCircle2, XCircle,
 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -61,6 +61,38 @@ function TextModelsPanel() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<any>(null);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  const testKey = async () => {
+    if (!editing?.api_key_secret_name) {
+      setTestResult({ ok: false, msg: "Enter an API key first" });
+      return;
+    }
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-validate-key`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session?.access_token}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ provider: editing.provider_name, api_key: editing.api_key_secret_name }),
+        }
+      );
+      const json = await res.json();
+      setTestResult({ ok: !!json.ok, msg: json.ok ? json.message : (json.error || "Unknown error") });
+    } catch (e: any) {
+      setTestResult({ ok: false, msg: e?.message || "Validation failed" });
+    } finally {
+      setTesting(false);
+    }
+  };
 
   const load = useCallback(async () => {
     try {
@@ -179,8 +211,17 @@ function TextModelsPanel() {
               <Button size="sm" onClick={save} disabled={saving}>
                 {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />} Save
               </Button>
+              <Button size="sm" variant="outline" onClick={testKey} disabled={testing}>
+                {testing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Key className="h-4 w-4 mr-1" />} Test Key
+              </Button>
               <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
             </div>
+            {testResult && (
+              <div className={`flex items-center gap-2 text-sm rounded-md px-3 py-2 ${testResult.ok ? "bg-green-500/10 text-green-700 border border-green-500/20" : "bg-destructive/10 text-destructive border border-destructive/20"}`}>
+                {testResult.ok ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+                <span>{testResult.msg}</span>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

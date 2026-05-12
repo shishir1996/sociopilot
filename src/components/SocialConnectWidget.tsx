@@ -232,7 +232,7 @@ export function SocialConnectWidget({ businessId }: SocialConnectWidgetProps) {
               return (
                 <button
                   key={platform.value}
-                  onClick={() => available ? handleConnect(platform.value === "instagram" ? "facebook" : platform.value) : null}
+                  onClick={() => available ? handleConnect(platform.value) : null}
                   disabled={!available || connecting === platform.value}
                   className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border transition-colors ${
                     available

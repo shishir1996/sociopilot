@@ -364,6 +364,19 @@ Return a JSON object with this exact structure:
   } catch (error: any) {
     const responseTimeMs = Date.now() - startTime;
     console.error("ai-generate-text error:", error);
+    const msg = String(error?.message || error);
+    let friendly = msg;
+    if (/401|unauthor/i.test(msg)) {
+      friendly = "AI provider rejected the API key (401 Unauthorized). Please ask the admin to check the API key in Admin → AI Control Center.";
+    } else if (/403/i.test(msg)) {
+      friendly = "AI provider denied access (403). The API key may be missing required permissions.";
+    } else if (/429/i.test(msg)) {
+      friendly = "AI provider rate limit reached. Please wait a moment and try again.";
+    } else if (/402/i.test(msg)) {
+      friendly = "AI provider credits exhausted. Please top up the account or switch providers.";
+    } else if (/404/i.test(msg)) {
+      friendly = "Configured AI model was not found. Please ask the admin to update the model in AI Control Center.";
+    }
     try {
       const authHeader = req.headers.get("Authorization");
       if (authHeader) {
@@ -374,13 +387,13 @@ Return a JSON object with this exact structure:
         if (user) {
           await supabaseAdmin.from("ai_usage_logs").insert({
             user_id: user.id, generation_type: "text", status: "error",
-            error_message: error.message, response_time_ms: responseTimeMs,
+            error_message: msg, response_time_ms: responseTimeMs,
           });
         }
       }
     } catch {}
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return new Response(JSON.stringify({ ok: false, error: friendly, diagnostics: msg }), {
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

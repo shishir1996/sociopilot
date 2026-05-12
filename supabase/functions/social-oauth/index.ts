@@ -16,6 +16,12 @@ const OAUTH_CONFIGS: Record<string, { authUrl: string; tokenUrl: string; scopes:
     tokenUrl: "https://graph.facebook.com/v19.0/oauth/access_token",
     scopes: "pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish",
   },
+  instagram: {
+    // Instagram uses Facebook Login under the hood (Instagram Graph API via FB Pages)
+    authUrl: "https://www.facebook.com/v19.0/dialog/oauth",
+    tokenUrl: "https://graph.facebook.com/v19.0/oauth/access_token",
+    scopes: "pages_show_list,pages_read_engagement,instagram_basic,instagram_content_publish,business_management",
+  },
   linkedin: {
     authUrl: "https://www.linkedin.com/oauth/v2/authorization",
     tokenUrl: "https://www.linkedin.com/oauth/v2/accessToken",
@@ -32,6 +38,12 @@ const OAUTH_CONFIGS: Record<string, { authUrl: string; tokenUrl: string; scopes:
     scopes: "https://www.googleapis.com/auth/business.manage",
   },
 };
+
+// Platforms that share Facebook OAuth credentials (admin only configures Facebook once)
+const FB_BACKED_PLATFORMS = new Set(["facebook", "instagram"]);
+function credLookupName(platform: string): string {
+  return FB_BACKED_PLATFORMS.has(platform) ? "facebook" : platform;
+}
 
 // Settings stored in Vault-like pattern using a simple KV in a DB table
 // For now we use a dedicated table or env-based approach
@@ -173,17 +185,17 @@ Deno.serve(async (req) => {
       case "get_oauth_url": {
         const { platform, redirect_uri, business_id } = body;
 
-        // Get admin credentials for this platform
+        // Get admin credentials (Instagram shares Facebook credentials)
         const { data: config } = await supabaseAdmin
           .from("ai_provider_settings")
           .select("config_json, is_active")
           .eq("provider_type", "social_oauth")
-          .eq("provider_name", platform)
+          .eq("provider_name", credLookupName(platform))
           .maybeSingle();
 
         if (!config || !config.is_active) {
           return new Response(
-            JSON.stringify({ error: `${platform} integration is not configured by admin.` }),
+            JSON.stringify({ error: `${platform} integration is not configured by admin. ${platform === "instagram" ? "Instagram requires the Facebook integration to be configured." : ""}` }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
@@ -239,12 +251,12 @@ Deno.serve(async (req) => {
       case "exchange_token": {
         const { platform, code, redirect_uri, state: stateStr, business_id } = body;
 
-        // Get admin credentials
+        // Get admin credentials (Instagram shares Facebook credentials)
         const { data: config } = await supabaseAdmin
           .from("ai_provider_settings")
           .select("config_json")
           .eq("provider_type", "social_oauth")
-          .eq("provider_name", platform)
+          .eq("provider_name", credLookupName(platform))
           .maybeSingle();
 
         if (!config) {
@@ -320,6 +332,19 @@ Deno.serve(async (req) => {
             const me = await meRes.json();
             accountName = me.name || "Facebook User";
             accountId = me.id || "";
+          } else if (platform === "instagram") {
+            // Find IG business account linked to one of the user's FB pages
+            const pagesRes = await fetch(`https://graph.facebook.com/v19.0/me/accounts?fields=id,name,instagram_business_account{id,username}&access_token=${accessToken}`);
+            const pages = await pagesRes.json();
+            const pageWithIg = (pages.data || []).find((p: any) => p.instagram_business_account?.id);
+            if (pageWithIg?.instagram_business_account) {
+              accountName = pageWithIg.instagram_business_account.username || pageWithIg.name || "Instagram Account";
+              accountId = pageWithIg.instagram_business_account.id;
+            } else {
+              return new Response(JSON.stringify({
+                error: "No Instagram Business account is linked to your Facebook Pages. In Instagram, switch to a Business/Creator account and link it to a Facebook Page, then try again.",
+              }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            }
           } else if (platform === "linkedin") {
             const meRes = await fetch("https://api.linkedin.com/v2/userinfo", {
               headers: { Authorization: `Bearer ${accessToken}` },
@@ -409,6 +434,10 @@ Deno.serve(async (req) => {
           .eq("is_active", true);
 
         const enabledPlatforms = (settings || []).map((s: any) => s.provider_name);
+        // Instagram is enabled whenever Facebook is configured (shared credentials)
+        if (enabledPlatforms.includes("facebook") && !enabledPlatforms.includes("instagram")) {
+          enabledPlatforms.push("instagram");
+        }
         return new Response(JSON.stringify({ platforms: enabledPlatforms }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
