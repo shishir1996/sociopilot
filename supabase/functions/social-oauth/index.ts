@@ -332,6 +332,19 @@ Deno.serve(async (req) => {
             const me = await meRes.json();
             accountName = me.name || "Facebook User";
             accountId = me.id || "";
+          } else if (platform === "instagram") {
+            // Find IG business account linked to one of the user's FB pages
+            const pagesRes = await fetch(`https://graph.facebook.com/v19.0/me/accounts?fields=id,name,instagram_business_account{id,username}&access_token=${accessToken}`);
+            const pages = await pagesRes.json();
+            const pageWithIg = (pages.data || []).find((p: any) => p.instagram_business_account?.id);
+            if (pageWithIg?.instagram_business_account) {
+              accountName = pageWithIg.instagram_business_account.username || pageWithIg.name || "Instagram Account";
+              accountId = pageWithIg.instagram_business_account.id;
+            } else {
+              return new Response(JSON.stringify({
+                error: "No Instagram Business account is linked to your Facebook Pages. In Instagram, switch to a Business/Creator account and link it to a Facebook Page, then try again.",
+              }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            }
           } else if (platform === "linkedin") {
             const meRes = await fetch("https://api.linkedin.com/v2/userinfo", {
               headers: { Authorization: `Bearer ${accessToken}` },
