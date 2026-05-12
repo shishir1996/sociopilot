@@ -185,17 +185,17 @@ Deno.serve(async (req) => {
       case "get_oauth_url": {
         const { platform, redirect_uri, business_id } = body;
 
-        // Get admin credentials for this platform
+        // Get admin credentials (Instagram shares Facebook credentials)
         const { data: config } = await supabaseAdmin
           .from("ai_provider_settings")
           .select("config_json, is_active")
           .eq("provider_type", "social_oauth")
-          .eq("provider_name", platform)
+          .eq("provider_name", credLookupName(platform))
           .maybeSingle();
 
         if (!config || !config.is_active) {
           return new Response(
-            JSON.stringify({ error: `${platform} integration is not configured by admin.` }),
+            JSON.stringify({ error: `${platform} integration is not configured by admin. ${platform === "instagram" ? "Instagram requires the Facebook integration to be configured." : ""}` }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
@@ -251,12 +251,12 @@ Deno.serve(async (req) => {
       case "exchange_token": {
         const { platform, code, redirect_uri, state: stateStr, business_id } = body;
 
-        // Get admin credentials
+        // Get admin credentials (Instagram shares Facebook credentials)
         const { data: config } = await supabaseAdmin
           .from("ai_provider_settings")
           .select("config_json")
           .eq("provider_type", "social_oauth")
-          .eq("provider_name", platform)
+          .eq("provider_name", credLookupName(platform))
           .maybeSingle();
 
         if (!config) {
