@@ -16,6 +16,12 @@ const OAUTH_CONFIGS: Record<string, { authUrl: string; tokenUrl: string; scopes:
     tokenUrl: "https://graph.facebook.com/v19.0/oauth/access_token",
     scopes: "pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish",
   },
+  instagram: {
+    // Instagram uses Facebook Login under the hood (Instagram Graph API via FB Pages)
+    authUrl: "https://www.facebook.com/v19.0/dialog/oauth",
+    tokenUrl: "https://graph.facebook.com/v19.0/oauth/access_token",
+    scopes: "pages_show_list,pages_read_engagement,instagram_basic,instagram_content_publish,business_management",
+  },
   linkedin: {
     authUrl: "https://www.linkedin.com/oauth/v2/authorization",
     tokenUrl: "https://www.linkedin.com/oauth/v2/accessToken",
@@ -32,6 +38,12 @@ const OAUTH_CONFIGS: Record<string, { authUrl: string; tokenUrl: string; scopes:
     scopes: "https://www.googleapis.com/auth/business.manage",
   },
 };
+
+// Platforms that share Facebook OAuth credentials (admin only configures Facebook once)
+const FB_BACKED_PLATFORMS = new Set(["facebook", "instagram"]);
+function credLookupName(platform: string): string {
+  return FB_BACKED_PLATFORMS.has(platform) ? "facebook" : platform;
+}
 
 // Settings stored in Vault-like pattern using a simple KV in a DB table
 // For now we use a dedicated table or env-based approach
