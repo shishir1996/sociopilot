@@ -267,7 +267,7 @@ export default function SocialSettings() {
                       return;
                     }
                     if (available) {
-                      handleConnect(platform.value === "instagram" ? "facebook" : platform.value);
+                      handleConnect(platform.value);
                     }
                   }}
                   disabled={(!available && !lockedByPlan) || connecting === platform.value}
