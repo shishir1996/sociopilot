@@ -434,6 +434,10 @@ Deno.serve(async (req) => {
           .eq("is_active", true);
 
         const enabledPlatforms = (settings || []).map((s: any) => s.provider_name);
+        // Instagram is enabled whenever Facebook is configured (shared credentials)
+        if (enabledPlatforms.includes("facebook") && !enabledPlatforms.includes("instagram")) {
+          enabledPlatforms.push("instagram");
+        }
         return new Response(JSON.stringify({ platforms: enabledPlatforms }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
