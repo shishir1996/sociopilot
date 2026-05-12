@@ -61,6 +61,38 @@ function TextModelsPanel() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<any>(null);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  const testKey = async () => {
+    if (!editing?.api_key_secret_name) {
+      setTestResult({ ok: false, msg: "Enter an API key first" });
+      return;
+    }
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-validate-key`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session?.access_token}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ provider: editing.provider_name, api_key: editing.api_key_secret_name }),
+        }
+      );
+      const json = await res.json();
+      setTestResult({ ok: !!json.ok, msg: json.ok ? json.message : (json.error || "Unknown error") });
+    } catch (e: any) {
+      setTestResult({ ok: false, msg: e?.message || "Validation failed" });
+    } finally {
+      setTesting(false);
+    }
+  };
 
   const load = useCallback(async () => {
     try {
