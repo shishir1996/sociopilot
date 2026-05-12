@@ -334,8 +334,15 @@ The image should be visually striking, on-brand, and optimized for social media.
     });
   } catch (error: any) {
     console.error("ai-generate-image error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    const msg = String(error?.message || error);
+    let friendly = msg;
+    if (/401|unauthor/i.test(msg)) friendly = "AI provider rejected the API key (401). Ask the admin to verify the key in AI Control Center.";
+    else if (/403/i.test(msg)) friendly = "AI provider denied access (403). The key may be missing image-generation permissions.";
+    else if (/429/i.test(msg)) friendly = "AI provider rate limit reached. Try again shortly.";
+    else if (/402/i.test(msg)) friendly = "AI provider credits exhausted.";
+    else if (/404/i.test(msg)) friendly = "Configured image model not found. Ask the admin to update it.";
+    return new Response(JSON.stringify({ ok: false, error: friendly, diagnostics: msg }), {
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
