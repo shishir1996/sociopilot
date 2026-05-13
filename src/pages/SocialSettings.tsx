@@ -16,6 +16,12 @@ const PLATFORMS = [
   { value: "linkedin", label: "LinkedIn", icon: "💼", color: "bg-sky-500/10 text-sky-600 border-sky-200" },
   { value: "x_twitter", label: "X (Twitter)", icon: "🐦", color: "bg-gray-500/10 text-gray-600 border-gray-200" },
   { value: "google_business", label: "Google Business", icon: "📍", color: "bg-green-500/10 text-green-600 border-green-200" },
+  { value: "pinterest", label: "Pinterest", icon: "📌", color: "bg-red-500/10 text-red-600 border-red-200" },
+  { value: "tiktok", label: "TikTok", icon: "🎵", color: "bg-black/5 text-foreground border-border" },
+  { value: "threads", label: "Threads", icon: "🧵", color: "bg-zinc-500/10 text-zinc-700 border-zinc-200" },
+  { value: "reddit", label: "Reddit", icon: "👽", color: "bg-orange-500/10 text-orange-600 border-orange-200" },
+  { value: "tumblr", label: "Tumblr", icon: "📝", color: "bg-indigo-500/10 text-indigo-600 border-indigo-200" },
+  { value: "snapchat", label: "Snapchat", icon: "👻", color: "bg-yellow-400/20 text-yellow-700 border-yellow-200" },
 ];
 
 interface ConnectedAccount {
