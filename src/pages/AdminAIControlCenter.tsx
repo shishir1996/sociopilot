@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Settings, Cpu, Image, FileText, Shield, ToggleLeft, Activity,
-  Plus, Trash2, Save, DollarSign, Key, RefreshCw, Eye, EyeOff, Loader2, CheckCircle2, XCircle,
+  Plus, Trash2, Save, DollarSign, Key, RefreshCw, Eye, EyeOff, Loader2, CheckCircle2, XCircle, MapPin, Sparkles,
 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -620,6 +620,7 @@ function PlanLimitsPanel() {
         can_select_model: editing.can_select_model ?? false,
         premium_model_access: editing.premium_model_access ?? false,
         premium_image_styles: editing.premium_image_styles ?? false,
+        gmb_enabled: editing.gmb_enabled ?? false,
       };
       if (editing.id) {
         await adminApi({ action: "update", table: "ai_plan_limits", id: editing.id, data: payload });
@@ -672,6 +673,7 @@ function PlanLimitsPanel() {
             <div className="flex items-center gap-2"><Switch checked={editing.can_edit_prompts} onCheckedChange={v => setEditing({ ...editing, can_edit_prompts: v })} /><Label>Can Edit Prompts</Label></div>
             <div className="flex items-center gap-2"><Switch checked={editing.can_select_model} onCheckedChange={v => setEditing({ ...editing, can_select_model: v })} /><Label>Can Select Model</Label></div>
             <div className="flex items-center gap-2"><Switch checked={editing.premium_model_access} onCheckedChange={v => setEditing({ ...editing, premium_model_access: v })} /><Label>Premium Models</Label></div>
+            <div className="flex items-center gap-2"><Switch checked={editing.gmb_enabled ?? false} onCheckedChange={v => setEditing({ ...editing, gmb_enabled: v })} /><Label>Google My Business</Label></div>
           </div>
           <div className="flex gap-2">
             <Button size="sm" onClick={save} disabled={saving}>
