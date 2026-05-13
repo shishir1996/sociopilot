@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Shield, Loader2, Eye, EyeOff, Save, Facebook, Instagram, Linkedin } from "lucide-react";
+import { ArrowLeft, Shield, Loader2, Eye, EyeOff, Save, Facebook, Linkedin, Music2, MessageCircle, Image as ImageIcon, AtSign, Ghost, BookOpen } from "lucide-react";
 
 interface PlatformConfig {
   platform: string;
@@ -57,6 +57,66 @@ const PLATFORM_CONFIGS: PlatformConfig[] = [
     color: "text-green-600",
     fields: [
       { key: "client_id", label: "Client ID", placeholder: "Enter Google Client ID" },
+      { key: "client_secret", label: "Client Secret", placeholder: "Enter Client Secret" },
+    ],
+  },
+  {
+    platform: "pinterest",
+    label: "Pinterest",
+    icon: <ImageIcon className="h-5 w-5" />,
+    color: "text-red-600",
+    fields: [
+      { key: "client_id", label: "Client ID", placeholder: "Enter Pinterest App ID" },
+      { key: "client_secret", label: "Client Secret", placeholder: "Enter Pinterest App Secret" },
+    ],
+  },
+  {
+    platform: "tiktok",
+    label: "TikTok",
+    icon: <Music2 className="h-5 w-5" />,
+    color: "text-foreground",
+    fields: [
+      { key: "client_key", label: "Client Key", placeholder: "Enter TikTok Client Key" },
+      { key: "client_secret", label: "Client Secret", placeholder: "Enter TikTok Client Secret" },
+    ],
+  },
+  {
+    platform: "threads",
+    label: "Threads",
+    icon: <AtSign className="h-5 w-5" />,
+    color: "text-foreground",
+    fields: [
+      { key: "client_id", label: "Client ID", placeholder: "Enter Threads/Meta App ID" },
+      { key: "client_secret", label: "Client Secret", placeholder: "Enter App Secret" },
+    ],
+  },
+  {
+    platform: "reddit",
+    label: "Reddit",
+    icon: <MessageCircle className="h-5 w-5" />,
+    color: "text-orange-600",
+    fields: [
+      { key: "client_id", label: "Client ID", placeholder: "Enter Reddit Client ID" },
+      { key: "client_secret", label: "Client Secret", placeholder: "Enter Client Secret" },
+    ],
+  },
+  {
+    platform: "tumblr",
+    label: "Tumblr",
+    icon: <BookOpen className="h-5 w-5" />,
+    color: "text-indigo-600",
+    fields: [
+      { key: "consumer_key", label: "Consumer Key", placeholder: "Enter Tumblr Consumer Key" },
+      { key: "consumer_secret", label: "Consumer Secret", placeholder: "Enter Consumer Secret" },
+    ],
+  },
+  {
+    platform: "snapchat",
+    label: "Snapchat Business",
+    icon: <Ghost className="h-5 w-5" />,
+    color: "text-yellow-500",
+    fields: [
+      { key: "client_id", label: "Client ID", placeholder: "Enter Snapchat Client ID" },
       { key: "client_secret", label: "Client Secret", placeholder: "Enter Client Secret" },
     ],
   },
