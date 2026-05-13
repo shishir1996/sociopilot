@@ -20,6 +20,7 @@ import AdminAIControlCenter from "./pages/AdminAIControlCenter";
 import AdminSocialIntegrations from "./pages/AdminSocialIntegrations";
 import AIStudio from "./pages/AIStudio";
 import Pricing from "./pages/Pricing";
+import GoogleMyBusiness from "./pages/GoogleMyBusiness";
 import AboutUs from "./pages/legal/AboutUs";
 import TermsConditions from "./pages/legal/TermsConditions";
 import RefundPolicy from "./pages/legal/RefundPolicy";
@@ -46,6 +47,7 @@ const App = () => (
             <Route path="/schedule" element={<ScheduleSettings />} />
             <Route path="/ai-studio" element={<AIStudio />} />
             <Route path="/pricing" element={<Pricing />} />
+            <Route path="/google-business" element={<GoogleMyBusiness />} />
             <Route path="/about" element={<AboutUs />} />
             <Route path="/terms" element={<TermsConditions />} />
             <Route path="/refund-policy" element={<RefundPolicy />} />
