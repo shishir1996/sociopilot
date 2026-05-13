@@ -37,6 +37,36 @@ const OAUTH_CONFIGS: Record<string, { authUrl: string; tokenUrl: string; scopes:
     tokenUrl: "https://oauth2.googleapis.com/token",
     scopes: "https://www.googleapis.com/auth/business.manage",
   },
+  pinterest: {
+    authUrl: "https://www.pinterest.com/oauth/",
+    tokenUrl: "https://api.pinterest.com/v5/oauth/token",
+    scopes: "boards:read,pins:read,pins:write,user_accounts:read",
+  },
+  tiktok: {
+    authUrl: "https://www.tiktok.com/v2/auth/authorize/",
+    tokenUrl: "https://open.tiktokapis.com/v2/oauth/token/",
+    scopes: "user.info.basic,video.publish,video.upload",
+  },
+  threads: {
+    authUrl: "https://threads.net/oauth/authorize",
+    tokenUrl: "https://graph.threads.net/oauth/access_token",
+    scopes: "threads_basic,threads_content_publish",
+  },
+  reddit: {
+    authUrl: "https://www.reddit.com/api/v1/authorize",
+    tokenUrl: "https://www.reddit.com/api/v1/access_token",
+    scopes: "identity,submit,read",
+  },
+  tumblr: {
+    authUrl: "https://www.tumblr.com/oauth2/authorize",
+    tokenUrl: "https://api.tumblr.com/v2/oauth2/token",
+    scopes: "basic write offline_access",
+  },
+  snapchat: {
+    authUrl: "https://accounts.snapchat.com/login/oauth2/authorize",
+    tokenUrl: "https://accounts.snapchat.com/login/oauth2/access_token",
+    scopes: "snapchat-marketing-api",
+  },
 };
 
 // Platforms that share Facebook OAuth credentials (admin only configures Facebook once)
@@ -228,6 +258,26 @@ Deno.serve(async (req) => {
           }));
 
           authUrl = `${oauthConfig.authUrl}?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirect_uri)}&scope=${encodeURIComponent(oauthConfig.scopes)}&state=${twitterState}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
+        } else if (platform === "tiktok") {
+          // TikTok uses client_key instead of client_id
+          const params = new URLSearchParams({
+            client_key: clientId,
+            redirect_uri,
+            scope: oauthConfig.scopes,
+            response_type: "code",
+            state,
+          });
+          authUrl = `${oauthConfig.authUrl}?${params.toString()}`;
+        } else if (platform === "reddit") {
+          const params = new URLSearchParams({
+            client_id: clientId,
+            redirect_uri,
+            scope: oauthConfig.scopes,
+            response_type: "code",
+            state,
+            duration: "permanent",
+          });
+          authUrl = `${oauthConfig.authUrl}?${params.toString()}`;
         } else {
           const params = new URLSearchParams({
             client_id: clientId,
@@ -288,6 +338,29 @@ Deno.serve(async (req) => {
             redirect_uri,
             code_verifier: codeVerifier,
             client_id: clientId,
+          };
+          headers["Authorization"] = "Basic " + btoa(`${clientId}:${clientSecret}`);
+        } else if (platform === "tiktok") {
+          tokenBody = {
+            client_key: clientId,
+            client_secret: clientSecret,
+            code,
+            grant_type: "authorization_code",
+            redirect_uri,
+          };
+        } else if (platform === "reddit") {
+          tokenBody = {
+            grant_type: "authorization_code",
+            code,
+            redirect_uri,
+          };
+          headers["Authorization"] = "Basic " + btoa(`${clientId}:${clientSecret}`);
+          headers["User-Agent"] = "GrowvixApp/1.0";
+        } else if (platform === "pinterest" || platform === "tumblr") {
+          tokenBody = {
+            grant_type: "authorization_code",
+            code,
+            redirect_uri,
           };
           headers["Authorization"] = "Basic " + btoa(`${clientId}:${clientSecret}`);
         } else {
@@ -366,6 +439,46 @@ Deno.serve(async (req) => {
             const me = await meRes.json();
             accountName = me.name || "Google User";
             accountId = me.id || "";
+          } else if (platform === "pinterest") {
+            const meRes = await fetch("https://api.pinterest.com/v5/user_account", {
+              headers: { Authorization: `Bearer ${accessToken}` },
+            });
+            const me = await meRes.json();
+            accountName = me.username || "Pinterest User";
+            accountId = me.username || "";
+          } else if (platform === "tiktok") {
+            const meRes = await fetch("https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name", {
+              headers: { Authorization: `Bearer ${accessToken}` },
+            });
+            const me = await meRes.json();
+            accountName = me.data?.user?.display_name || "TikTok User";
+            accountId = me.data?.user?.open_id || "";
+          } else if (platform === "threads") {
+            const meRes = await fetch(`https://graph.threads.net/v1.0/me?fields=id,username&access_token=${accessToken}`);
+            const me = await meRes.json();
+            accountName = me.username || "Threads User";
+            accountId = me.id || "";
+          } else if (platform === "reddit") {
+            const meRes = await fetch("https://oauth.reddit.com/api/v1/me", {
+              headers: { Authorization: `Bearer ${accessToken}`, "User-Agent": "GrowvixApp/1.0" },
+            });
+            const me = await meRes.json();
+            accountName = me.name || "Reddit User";
+            accountId = me.id || "";
+          } else if (platform === "tumblr") {
+            const meRes = await fetch("https://api.tumblr.com/v2/user/info", {
+              headers: { Authorization: `Bearer ${accessToken}` },
+            });
+            const me = await meRes.json();
+            accountName = me.response?.user?.name || "Tumblr User";
+            accountId = me.response?.user?.name || "";
+          } else if (platform === "snapchat") {
+            const meRes = await fetch("https://adsapi.snapchat.com/v1/me", {
+              headers: { Authorization: `Bearer ${accessToken}` },
+            });
+            const me = await meRes.json();
+            accountName = me.me?.display_name || "Snapchat User";
+            accountId = me.me?.id || "";
           }
         } catch (err) {
           console.error("Error fetching account info:", err);
