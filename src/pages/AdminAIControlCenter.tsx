@@ -22,6 +22,7 @@ import {
 import { GeoPricingPanel } from "@/components/admin/GeoPricingPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { Slider } from "@/components/ui/slider";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // Helper to call the ai-admin-settings edge function
 async function adminApi(body: any) {
@@ -876,20 +877,24 @@ export default function AdminAIControlCenter() {
             <TabsTrigger value="text-models" className="flex items-center gap-1"><Cpu className="h-3.5 w-3.5" /> Text Models</TabsTrigger>
             <TabsTrigger value="image-models" className="flex items-center gap-1"><Image className="h-3.5 w-3.5" /> Image Models</TabsTrigger>
             <TabsTrigger value="api-keys" className="flex items-center gap-1"><Key className="h-3.5 w-3.5" /> API Keys</TabsTrigger>
+            <TabsTrigger value="model-discovery" className="flex items-center gap-1"><Sparkles className="h-3.5 w-3.5" /> Model Discovery</TabsTrigger>
             <TabsTrigger value="prompts" className="flex items-center gap-1"><FileText className="h-3.5 w-3.5" /> Prompts</TabsTrigger>
             <TabsTrigger value="plans" className="flex items-center gap-1"><Shield className="h-3.5 w-3.5" /> Plan Limits</TabsTrigger>
             <TabsTrigger value="pricing" className="flex items-center gap-1"><DollarSign className="h-3.5 w-3.5" /> Pricing</TabsTrigger>
             <TabsTrigger value="flags" className="flex items-center gap-1"><ToggleLeft className="h-3.5 w-3.5" /> Feature Flags</TabsTrigger>
             <TabsTrigger value="logs" className="flex items-center gap-1"><Activity className="h-3.5 w-3.5" /> Usage Logs</TabsTrigger>
+            <TabsTrigger value="gmb" className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> Google Business</TabsTrigger>
           </TabsList>
           <TabsContent value="text-models"><TextModelsPanel /></TabsContent>
           <TabsContent value="image-models"><ImageModelsPanel /></TabsContent>
           <TabsContent value="api-keys"><ApiKeysPanel /></TabsContent>
+          <TabsContent value="model-discovery"><ModelDiscoveryPanel /></TabsContent>
           <TabsContent value="prompts"><PromptTemplatesPanel /></TabsContent>
           <TabsContent value="plans"><PlanLimitsPanel /></TabsContent>
           <TabsContent value="pricing"><GeoPricingPanel /></TabsContent>
           <TabsContent value="flags"><FeatureFlagsPanel /></TabsContent>
           <TabsContent value="logs"><UsageLogsPanel /></TabsContent>
+          <TabsContent value="gmb"><AdminGMBPanel /></TabsContent>
         </Tabs>
       </main>
     </div>
