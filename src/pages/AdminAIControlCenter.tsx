@@ -850,6 +850,184 @@ function UsageLogsPanel() {
   );
 }
 
+// ===================== MODEL DISCOVERY =====================
+function ModelDiscoveryPanel() {
+  const { toast } = useToast();
+  const [providers, setProviders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const rows = await adminApi({ action: "list", table: "ai_provider_settings" });
+      setProviders(rows || []);
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally { setLoading(false); }
+  }, [toast]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const sync = async (provider: any) => {
+    setSyncingId(provider.id);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-list-models`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ provider_id: provider.id }),
+      });
+      const j = await res.json();
+      if (!j.ok) throw new Error(j.error || "Sync failed");
+      toast({ title: `Synced ${j.count} models` });
+      load();
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally { setSyncingId(null); }
+  };
+
+  const toggleModel = async (provider: any, kind: "text" | "image" | "video", modelId: string) => {
+    const field = `selected_${kind}_models` as const;
+    const current: string[] = provider[field] || [];
+    const next = current.includes(modelId) ? current.filter((m) => m !== modelId) : [...current, modelId];
+    try {
+      await adminApi({ action: "update", table: "ai_provider_settings", id: provider.id, data: { [field]: next } });
+      setProviders((prev) => prev.map((p) => p.id === provider.id ? { ...p, [field]: next } : p));
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    }
+  };
+
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+
+  return (
+    <div className="space-y-6">
+      <div className="text-sm text-muted-foreground">
+        Click <strong>Sync Models</strong> on each provider to fetch the live list of available models, then check the ones you want users to be able to select.
+      </div>
+      {providers.length === 0 && (
+        <Card><CardContent className="py-8 text-center text-muted-foreground">No providers configured. Add one in API Keys first.</CardContent></Card>
+      )}
+      {providers.map((p) => {
+        const models: any[] = Array.isArray(p.available_models) ? p.available_models : [];
+        const groups: Record<string, any[]> = { text: [], image: [], video: [] };
+        for (const m of models) {
+          const k = (m.kind || "text") as "text" | "image" | "video";
+          (groups[k] || groups.text).push(m);
+        }
+        return (
+          <Card key={p.id}>
+            <CardContent className="pt-4 space-y-4">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <div className="font-semibold">{p.provider_name} <span className="text-xs text-muted-foreground">({p.provider_type})</span></div>
+                  <div className="text-xs text-muted-foreground">
+                    {p.models_synced_at ? `Synced ${new Date(p.models_synced_at).toLocaleString()}` : "Never synced"} • {models.length} models available
+                  </div>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => sync(p)} disabled={syncingId === p.id}>
+                  {syncingId === p.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />} Sync Models
+                </Button>
+              </div>
+              {(["text", "image", "video"] as const).map((kind) => (
+                groups[kind].length > 0 && (
+                  <div key={kind}>
+                    <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">{kind} models ({groups[kind].length})</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1">
+                      {groups[kind].map((m) => {
+                        const selected: string[] = p[`selected_${kind}_models`] || [];
+                        const checked = selected.includes(m.id);
+                        return (
+                          <label key={m.id} className={`flex items-start gap-2 rounded-md border p-2 text-xs cursor-pointer hover:bg-muted/40 ${checked ? "border-primary/40 bg-primary/5" : "border-border"}`}>
+                            <Checkbox checked={checked} onCheckedChange={() => toggleModel(p, kind, m.id)} />
+                            <div className="min-w-0">
+                              <div className="font-medium truncate">{m.name || m.id}</div>
+                              <div className="text-muted-foreground truncate">{m.id}</div>
+                              {m.context_length && <div className="text-muted-foreground">ctx {m.context_length}</div>}
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )
+              ))}
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+// ===================== ADMIN GMB PANEL =====================
+function AdminGMBPanel() {
+  const [stats, setStats] = useState<any>({ connected: 0, avg_completeness: 0, optimizations_this_month: 0 });
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sortBy, setSortBy] = useState<"name" | "rating" | "completeness_score" | "last_optimized_at">("completeness_score");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [{ data: profiles }, { data: opts }] = await Promise.all([
+          supabase.from("gmb_profiles").select("*"),
+          supabase.from("gmb_optimizations").select("created_at").gte("created_at", new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()),
+        ]);
+        const p = profiles || [];
+        setUsers(p);
+        setStats({
+          connected: p.length,
+          avg_completeness: p.length ? Math.round(p.reduce((s: number, x: any) => s + (x.completeness_score || 0), 0) / p.length) : 0,
+          optimizations_this_month: (opts || []).length,
+        });
+      } catch {} finally { setLoading(false); }
+    })();
+  }, []);
+
+  const sorted = [...users].sort((a, b) => {
+    const av = a[sortBy] ?? 0, bv = b[sortBy] ?? 0;
+    if (typeof av === "string") return av.localeCompare(bv as string);
+    return (bv as number) - (av as number);
+  });
+
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <Card><CardContent className="pt-4"><div className="text-xs text-muted-foreground">Connected GMB users</div><div className="text-2xl font-bold">{stats.connected}</div></CardContent></Card>
+        <Card><CardContent className="pt-4"><div className="text-xs text-muted-foreground">Avg completeness</div><div className="text-2xl font-bold">{stats.avg_completeness}%</div></CardContent></Card>
+        <Card><CardContent className="pt-4"><div className="text-xs text-muted-foreground">Optimizations this month</div><div className="text-2xl font-bold">{stats.optimizations_this_month}</div></CardContent></Card>
+      </div>
+      <Table>
+        <TableHeader><TableRow>
+          <TableHead className="cursor-pointer" onClick={() => setSortBy("name")}>Business</TableHead>
+          <TableHead className="cursor-pointer" onClick={() => setSortBy("rating")}>Rating</TableHead>
+          <TableHead className="cursor-pointer" onClick={() => setSortBy("completeness_score")}>Completeness</TableHead>
+          <TableHead className="cursor-pointer" onClick={() => setSortBy("last_optimized_at")}>Last Optimized</TableHead>
+        </TableRow></TableHeader>
+        <TableBody>
+          {sorted.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No GMB profiles connected yet.</TableCell></TableRow>}
+          {sorted.map((u) => (
+            <TableRow key={u.id}>
+              <TableCell className="font-medium">{u.name || "Untitled"}</TableCell>
+              <TableCell>{u.rating || 0} ★ ({u.review_count || 0})</TableCell>
+              <TableCell>{u.completeness_score || 0}%</TableCell>
+              <TableCell className="text-xs text-muted-foreground">{u.last_optimized_at ? new Date(u.last_optimized_at).toLocaleDateString() : "—"}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
 // ===================== MAIN ADMIN PAGE =====================
 export default function AdminAIControlCenter() {
   const navigate = useNavigate();
