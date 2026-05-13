@@ -181,6 +181,7 @@ export type Database = {
           can_edit_prompts: boolean | null
           can_select_model: boolean | null
           created_at: string
+          gmb_enabled: boolean
           id: string
           image_generations_limit: number | null
           plan_name: string
@@ -197,6 +198,7 @@ export type Database = {
           can_edit_prompts?: boolean | null
           can_select_model?: boolean | null
           created_at?: string
+          gmb_enabled?: boolean
           id?: string
           image_generations_limit?: number | null
           plan_name: string
@@ -213,6 +215,7 @@ export type Database = {
           can_edit_prompts?: boolean | null
           can_select_model?: boolean | null
           created_at?: string
+          gmb_enabled?: boolean
           id?: string
           image_generations_limit?: number | null
           plan_name?: string
@@ -268,6 +271,7 @@ export type Database = {
       ai_provider_settings: {
         Row: {
           api_key_secret_name: string | null
+          available_models: Json
           config_json: Json | null
           created_at: string
           frequency_penalty: number | null
@@ -276,15 +280,20 @@ export type Database = {
           is_fallback: boolean | null
           max_tokens: number | null
           model_name: string
+          models_synced_at: string | null
           presence_penalty: number | null
           provider_name: string
           provider_type: string
+          selected_image_models: string[]
+          selected_text_models: string[]
+          selected_video_models: string[]
           temperature: number | null
           top_p: number | null
           updated_at: string
         }
         Insert: {
           api_key_secret_name?: string | null
+          available_models?: Json
           config_json?: Json | null
           created_at?: string
           frequency_penalty?: number | null
@@ -293,15 +302,20 @@ export type Database = {
           is_fallback?: boolean | null
           max_tokens?: number | null
           model_name: string
+          models_synced_at?: string | null
           presence_penalty?: number | null
           provider_name: string
           provider_type: string
+          selected_image_models?: string[]
+          selected_text_models?: string[]
+          selected_video_models?: string[]
           temperature?: number | null
           top_p?: number | null
           updated_at?: string
         }
         Update: {
           api_key_secret_name?: string | null
+          available_models?: Json
           config_json?: Json | null
           created_at?: string
           frequency_penalty?: number | null
@@ -310,9 +324,13 @@ export type Database = {
           is_fallback?: boolean | null
           max_tokens?: number | null
           model_name?: string
+          models_synced_at?: string | null
           presence_penalty?: number | null
           provider_name?: string
           provider_type?: string
+          selected_image_models?: string[]
+          selected_text_models?: string[]
+          selected_video_models?: string[]
           temperature?: number | null
           top_p?: number | null
           updated_at?: string
@@ -737,6 +755,156 @@ export type Database = {
           region?: string
           updated_at?: string
           yearly_price?: number | null
+        }
+        Relationships: []
+      }
+      gmb_optimizations: {
+        Row: {
+          after_score: number | null
+          ai_description: string | null
+          before_score: number | null
+          changes_applied: Json | null
+          created_at: string
+          gmb_profile_id: string
+          id: string
+          keywords: string[] | null
+          user_id: string
+        }
+        Insert: {
+          after_score?: number | null
+          ai_description?: string | null
+          before_score?: number | null
+          changes_applied?: Json | null
+          created_at?: string
+          gmb_profile_id: string
+          id?: string
+          keywords?: string[] | null
+          user_id: string
+        }
+        Update: {
+          after_score?: number | null
+          ai_description?: string | null
+          before_score?: number | null
+          changes_applied?: Json | null
+          created_at?: string
+          gmb_profile_id?: string
+          id?: string
+          keywords?: string[] | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      gmb_profiles: {
+        Row: {
+          address: string | null
+          ai_description: string | null
+          business_id: string
+          category: string | null
+          completeness_score: number | null
+          created_at: string
+          gmb_location_id: string | null
+          id: string
+          keywords: string[] | null
+          last_optimized_at: string | null
+          last_synced_at: string | null
+          name: string | null
+          phone: string | null
+          photo_count: number | null
+          published: boolean | null
+          rating: number | null
+          review_count: number | null
+          social_account_id: string | null
+          updated_at: string
+          user_id: string
+          verified: boolean | null
+          website: string | null
+        }
+        Insert: {
+          address?: string | null
+          ai_description?: string | null
+          business_id: string
+          category?: string | null
+          completeness_score?: number | null
+          created_at?: string
+          gmb_location_id?: string | null
+          id?: string
+          keywords?: string[] | null
+          last_optimized_at?: string | null
+          last_synced_at?: string | null
+          name?: string | null
+          phone?: string | null
+          photo_count?: number | null
+          published?: boolean | null
+          rating?: number | null
+          review_count?: number | null
+          social_account_id?: string | null
+          updated_at?: string
+          user_id: string
+          verified?: boolean | null
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          ai_description?: string | null
+          business_id?: string
+          category?: string | null
+          completeness_score?: number | null
+          created_at?: string
+          gmb_location_id?: string | null
+          id?: string
+          keywords?: string[] | null
+          last_optimized_at?: string | null
+          last_synced_at?: string | null
+          name?: string | null
+          phone?: string | null
+          photo_count?: number | null
+          published?: boolean | null
+          rating?: number | null
+          review_count?: number | null
+          social_account_id?: string | null
+          updated_at?: string
+          user_id?: string
+          verified?: boolean | null
+          website?: string | null
+        }
+        Relationships: []
+      }
+      gmb_reviews: {
+        Row: {
+          comment: string | null
+          created_at: string
+          gmb_profile_id: string
+          id: string
+          rating: number | null
+          reply: string | null
+          review_id: string | null
+          review_time: string | null
+          reviewer_name: string | null
+          user_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          gmb_profile_id: string
+          id?: string
+          rating?: number | null
+          reply?: string | null
+          review_id?: string | null
+          review_time?: string | null
+          reviewer_name?: string | null
+          user_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          gmb_profile_id?: string
+          id?: string
+          rating?: number | null
+          reply?: string | null
+          review_id?: string | null
+          review_time?: string | null
+          reviewer_name?: string | null
+          user_id?: string
         }
         Relationships: []
       }
