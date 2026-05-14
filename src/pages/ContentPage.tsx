@@ -135,10 +135,33 @@ export default function ContentPage() {
       // Enable auto-generate after first manual generation
       await supabase.from("businesses").update({ auto_generate_enabled: true }).eq("id", businessId);
 
-      toast({ title: "✨ Content Plan Generated!", description: "AI has created a new 7-day plan. Future weeks will auto-generate every Sunday." });
-      await fetchData();
+      const queued = data?.status === "queued";
+      toast({
+        title: queued ? "✨ Generation started" : "✨ Content Plan Generated!",
+        description: queued
+          ? "Your 7-day plan is being generated in the background. Posts will appear within 1–2 minutes."
+          : "AI has created a new 7-day plan. Future weeks will auto-generate every Sunday.",
+      });
+      // Poll for the new plan to appear (max ~3 minutes).
+      const startCount = plans.length;
+      let attempts = 0;
+      const poll = async () => {
+        attempts++;
+        await fetchData();
+        const { data: latest } = await supabase
+          .from("content_plans")
+          .select("id")
+          .eq("business_id", businessId) as any;
+        if ((latest?.length || 0) > startCount || attempts >= 18) return;
+        setTimeout(poll, 10000);
+      };
+      setTimeout(poll, 8000);
     } catch (error: any) {
-      toast({ title: "Generation Failed", description: error.message, variant: "destructive" });
+      toast({
+        title: "Generation Failed",
+        description: error.message || "Could not reach the generation service. Please try again.",
+        variant: "destructive",
+      });
     }
     setGenerating(false);
   };
