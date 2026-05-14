@@ -328,6 +328,79 @@ serve(async (req) => {
 
     const weekNumber = (count || 0) + 1;
 
+    // ---- Admin-controlled generation modes ------------------------------
+    // Read three feature flags managed in Admin → AI Control Center:
+    //   allow_text_generation   — must be enabled for any generation at all
+    //   allow_image_generation  — when off, force every post to text_only
+    //   allow_video_generation  — reserved for future video posts
+    const { data: flagRows } = await supabaseAdmin
+      .from("ai_feature_flags")
+      .select("feature_key, enabled")
+      .in("feature_key", ["allow_text_generation", "allow_image_generation", "allow_video_generation"]);
+    const flagMap: Record<string, boolean> = {};
+    (flagRows || []).forEach((f: any) => { flagMap[f.feature_key] = !!f.enabled; });
+    const allowText = flagMap["allow_text_generation"] !== false; // default true
+    const allowImage = flagMap["allow_image_generation"] !== false; // default true
+    const allowVideo = flagMap["allow_video_generation"] === true; // default false
+
+    if (!allowText) {
+      return fail(
+        "Content generation is currently disabled by the administrator.",
+        403,
+        "feature_disabled",
+      );
+    }
+
+    // Pre-create the content plan row so we can return immediately and let
+    // the heavy AI work run in the background. UI polls for items appearing
+    // under this plan_id.
+    const weekStartDate0 = new Date();
+    weekStartDate0.setDate(weekStartDate0.getDate() + (weekNumber - 1) * 7);
+    const weekStart0 = weekStartDate0.toISOString().split("T")[0];
+    const { data: pendingPlan, error: pendingErr } = await supabaseAdmin
+      .from("content_plans")
+      .insert({
+        business_id,
+        user_id: user.id,
+        week_start: weekStart0,
+        week_number: weekNumber,
+        strategy_summary: "Generating…",
+        status: "generating",
+      })
+      .select()
+      .single();
+    if (pendingErr || !pendingPlan) {
+      return fail(`Failed to create plan: ${pendingErr?.message || "unknown"}`, 500, "plan_pre_insert");
+    }
+
+    // Run the long-running AI text + image pipeline in the background and
+    // return immediately so we never hit the 150s edge-function wall clock.
+    EdgeRuntime.waitUntil(runFullGeneration({
+      pendingPlanId: pendingPlan.id,
+      business,
+      userId: user.id,
+      weekNumber,
+      previousTopicsHint: "", // populated below
+      allowImage,
+      allowVideo,
+      textProvider,
+      imageProvider,
+      supabaseUrl,
+      supabaseKey,
+      lovableApiKey: LOVABLE_API_KEY,
+    }));
+
+    return succeed({
+      success: true,
+      plan_id: pendingPlan.id,
+      week_number: weekNumber,
+      status: "generating",
+      message: "Generation started. Your content will appear in the dashboard within ~2 minutes.",
+    });
+
+    /* eslint-disable no-unreachable */
+    // Legacy synchronous path kept below for reference; never executes.
+
     // Fetch previous week topics to avoid repetition
     let previousTopicsSummary = "";
     const { data: recentItems } = await supabaseAdmin
