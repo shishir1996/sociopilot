@@ -750,6 +750,15 @@ function FeatureFlagsPanel() {
         </div>
         <Button size="sm" variant="outline" onClick={load}><RefreshCw className="h-4 w-4" /></Button>
       </div>
+      <Card className="border-primary/30 bg-primary/5">
+        <CardContent className="py-4">
+          <p className="font-semibold text-foreground text-sm mb-1">Content Generation Modes</p>
+          <p className="text-xs text-muted-foreground">
+            Toggle <strong>allow_text_generation</strong>, <strong>allow_image_generation</strong> and <strong>allow_video_generation</strong> below to control what every user can generate.
+            When image generation is OFF, all weekly posts are forced to text-only. Video generation is reserved for an upcoming release.
+          </p>
+        </CardContent>
+      </Card>
       {loading ? (
         <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : (
@@ -759,8 +768,13 @@ function FeatureFlagsPanel() {
             <Card key={f.id}>
               <CardContent className="py-3 flex items-center justify-between">
                 <div>
-                  <p className="font-medium text-foreground">{f.feature_key?.replace(/_/g, " ")}</p>
-                  <p className="text-xs text-muted-foreground">{f.feature_key}</p>
+                  <p className="font-medium text-foreground capitalize">{f.feature_key?.replace(/_/g, " ")}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {f.feature_key === "allow_text_generation" && "Master switch — when off, no users can generate any content."}
+                    {f.feature_key === "allow_image_generation" && "When off, every generated post is text-only (no AI images)."}
+                    {f.feature_key === "allow_video_generation" && "Reserved for upcoming video post format."}
+                    {!["allow_text_generation","allow_image_generation","allow_video_generation"].includes(f.feature_key) && f.feature_key}
+                  </p>
                 </div>
                 <Switch checked={f.enabled} onCheckedChange={() => toggle(f)} />
               </CardContent>
