@@ -437,7 +437,6 @@ For text_with_image and image_carousel: include detailed, brand-aligned image pr
           { role: "system", content: systemPrompt + "\n\nIMPORTANT: Return ONLY the raw JSON object described above. Do not wrap it in markdown code fences. Do not include any explanation before or after the JSON." },
           { role: "user", content: userPrompt },
         ],
-        response_format: { type: "json_object" },
         tools: [{
           type: "function",
           function: {
@@ -480,9 +479,11 @@ For text_with_image and image_carousel: include detailed, brand-aligned image pr
             },
           },
         }],
-        // NOTE: tool_choice is NOT forced. Many OpenRouter free models (e.g. gemma)
-        // do not support tool calling. We accept either tool_calls OR a JSON
-        // string in message.content and parse whichever is returned.
+        // Force the model to call our function when supported. For models that
+        // do not support function calling (some free OpenRouter models), the
+        // gateway will ignore tool_choice and return JSON in message.content,
+        // which we also handle below.
+        tool_choice: { type: "function", function: { name: "create_content_plan" } },
       };
 
     let aiResponse = await callTextProvider(textProvider, contentPlanRequest);
@@ -536,9 +537,10 @@ For text_with_image and image_carousel: include detailed, brand-aligned image pr
     if (!rawJson) {
       console.error("AI response had no parsable content:", JSON.stringify(aiData).slice(0, 800));
       return fail(
-        "AI returned an empty response. Try a more capable model in Admin → AI Control Center (e.g. google/gemini-2.5-flash via OpenRouter).",
+        `AI returned an empty response from ${textProvider.provider_name}/${textProvider.model_name}. Try switching the text model in Admin → AI Control Center (e.g. google/gemini-2.5-flash).`,
         502,
         "missing_tool_call",
+        { provider: textProvider.provider_name, model: textProvider.model_name, ai_finish_reason: aiData.choices?.[0]?.finish_reason },
       );
     }
 
@@ -554,8 +556,27 @@ For text_with_image and image_carousel: include detailed, brand-aligned image pr
       );
     }
 
+    // Some models nest the plan under an outer key (e.g. { plan: {...} } or
+    // { content_plan: {...} } or { result: {...} }). Unwrap if needed.
+    if (!Array.isArray(plan?.days)) {
+      const candidates = ["plan", "content_plan", "result", "data", "output"];
+      for (const k of candidates) {
+        if (plan?.[k] && Array.isArray(plan[k]?.days)) { plan = plan[k]; break; }
+      }
+    }
+    // Some models return the days array at the root (no wrapper object).
+    if (Array.isArray(plan)) {
+      plan = { strategy_summary: `Week ${weekNumber} content plan`, days: plan };
+    }
+
     if (!plan.days || !Array.isArray(plan.days) || plan.days.length === 0) {
-      return fail("AI returned an empty content plan. Please try again.", 502, "empty_content_plan");
+      console.error("AI plan missing days. Raw shape:", JSON.stringify(plan).slice(0, 800));
+      return fail(
+        `AI returned a plan without any days (provider: ${textProvider.provider_name}, model: ${textProvider.model_name}). Try a different model in Admin → AI Control Center.`,
+        502,
+        "empty_content_plan",
+        { provider: textProvider.provider_name, model: textProvider.model_name, plan_keys: Object.keys(plan || {}) },
+      );
     }
 
     // Normalize and validate post formats
