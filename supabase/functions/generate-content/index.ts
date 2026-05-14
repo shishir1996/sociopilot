@@ -351,27 +351,40 @@ serve(async (req) => {
       );
     }
 
-    // Pre-create the content plan row so we can return immediately and let
-    // the heavy AI work run in the background. UI polls for items appearing
-    // under this plan_id. This avoids the 150s edge-function wall clock.
-    const weekStartDate0 = new Date();
-    weekStartDate0.setDate(weekStartDate0.getDate() + (weekNumber - 1) * 7);
-    const weekStart0 = weekStartDate0.toISOString().split("T")[0];
-    const { data: pendingPlan, error: pendingErr } = await supabaseAdmin
-      .from("content_plans")
-      .insert({
-        business_id,
-        user_id: user.id,
-        week_start: weekStart0,
-        week_number: weekNumber,
-        strategy_summary: "Generating…",
-        status: "generating",
-      })
-      .select()
-      .single();
-    if (pendingErr || !pendingPlan) {
-      return fail(`Failed to create plan: ${pendingErr?.message || "unknown"}`, 500, "plan_pre_insert");
-    }
+    // The full text+image pipeline can take 60-180s. To avoid the edge
+    // function 150s wall clock (which surfaces as "Failed to send a request
+    // to the Edge Function") we kick the heavy work into a background task
+    // and acknowledge the request immediately. The UI polls the
+    // content_plans table to detect when the new plan appears.
+    const backgroundJob = (async () => {
+      try {
+        await runFullGeneration({
+          supabaseAdmin,
+          supabaseUrl,
+          supabaseKey,
+          userId: user.id,
+          business,
+          businessId: business_id,
+          weekNumber,
+          allowImage,
+          allowVideo,
+          textProvider,
+          imageProvider,
+          lovableApiKey: LOVABLE_API_KEY,
+        });
+      } catch (bgErr) {
+        console.error("Background generation failed:", bgErr);
+      }
+    })();
+    // @ts-ignore -- EdgeRuntime is available in Supabase edge runtime
+    if (typeof EdgeRuntime !== "undefined") EdgeRuntime.waitUntil(backgroundJob);
+
+    return succeed({
+      success: true,
+      status: "queued",
+      week_number: weekNumber,
+      message: "Generation started. New posts will appear in your dashboard within 1–2 minutes — feel free to refresh.",
+    });
 
     // Fetch previous week topics to avoid repetition
     let previousTopicsSummary = "";
