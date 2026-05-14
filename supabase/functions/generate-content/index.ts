@@ -353,7 +353,7 @@ serve(async (req) => {
 
     // Pre-create the content plan row so we can return immediately and let
     // the heavy AI work run in the background. UI polls for items appearing
-    // under this plan_id.
+    // under this plan_id. This avoids the 150s edge-function wall clock.
     const weekStartDate0 = new Date();
     weekStartDate0.setDate(weekStartDate0.getDate() + (weekNumber - 1) * 7);
     const weekStart0 = weekStartDate0.toISOString().split("T")[0];
@@ -372,34 +372,6 @@ serve(async (req) => {
     if (pendingErr || !pendingPlan) {
       return fail(`Failed to create plan: ${pendingErr?.message || "unknown"}`, 500, "plan_pre_insert");
     }
-
-    // Run the long-running AI text + image pipeline in the background and
-    // return immediately so we never hit the 150s edge-function wall clock.
-    EdgeRuntime.waitUntil(runFullGeneration({
-      pendingPlanId: pendingPlan.id,
-      business,
-      userId: user.id,
-      weekNumber,
-      previousTopicsHint: "", // populated below
-      allowImage,
-      allowVideo,
-      textProvider,
-      imageProvider,
-      supabaseUrl,
-      supabaseKey,
-      lovableApiKey: LOVABLE_API_KEY,
-    }));
-
-    return succeed({
-      success: true,
-      plan_id: pendingPlan.id,
-      week_number: weekNumber,
-      status: "generating",
-      message: "Generation started. Your content will appear in the dashboard within ~2 minutes.",
-    });
-
-    /* eslint-disable no-unreachable */
-    // Legacy synchronous path kept below for reference; never executes.
 
     // Fetch previous week topics to avoid repetition
     let previousTopicsSummary = "";
