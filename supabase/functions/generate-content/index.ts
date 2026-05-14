@@ -192,6 +192,263 @@ async function generateImagesInBackground(
   console.log("Background image generation complete for plan", planId);
 }
 
+// ----- Full content generation pipeline (runs in background) -----------
+// Encapsulates the AI text-plan call, plan/items insert, and kicks off
+// image generation. Designed to be invoked from EdgeRuntime.waitUntil so
+// the HTTP request can return immediately and avoid the 150s wall clock.
+interface RunFullGenerationArgs {
+  supabaseAdmin: any;
+  supabaseUrl: string;
+  supabaseKey: string;
+  userId: string;
+  business: any;
+  businessId: string;
+  weekNumber: number;
+  allowImage: boolean;
+  allowVideo: boolean;
+  textProvider: any;
+  imageProvider: any;
+  lovableApiKey: string;
+  brandContext: string;
+  colorContext: string;
+  sloganContext: string;
+  creativeDirectionContext: string;
+}
+
+async function runFullGeneration(args: RunFullGenerationArgs) {
+  const {
+    supabaseAdmin, supabaseUrl, supabaseKey, userId, business, businessId,
+    weekNumber, allowImage, textProvider, imageProvider, lovableApiKey,
+    brandContext, colorContext, sloganContext, creativeDirectionContext,
+  } = args;
+
+  // Fetch previous week topics to avoid repetition
+  let previousTopicsSummary = "";
+  const { data: recentItems } = await supabaseAdmin
+    .from("content_items")
+    .select("topic")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(21);
+  if (recentItems && recentItems.length > 0) {
+    const topicList = recentItems.map((i: any) => `"${i.topic}"`).join(", ");
+    previousTopicsSummary = `\n\nPREVIOUSLY USED TOPICS (DO NOT REPEAT THESE — create completely new angles):\n${topicList}`;
+  }
+
+  // When admin disables image generation, force every post to be text_only.
+  const formatGuidance = allowImage
+    ? `For EACH post, decide post_format from: "text_only" | "text_with_image" | "image_carousel".
+- A good weekly mix is: 2-3 text_with_image, 1-2 image_carousel, 2-3 text_only
+- text_only posts: image_prompt and visual_style MUST be empty strings
+- text_with_image and image_carousel: include a detailed image_prompt`
+    : `IMPORTANT: image generation is currently DISABLED by the administrator.
+EVERY post MUST use post_format = "text_only", content_type = "Text Post",
+image_prompt = "" and visual_style = "". Do NOT suggest carousels or images.`;
+
+  const systemPrompt = `You are a senior AI Content Strategist specialized in ${business.industry || "business"} marketing.
+You create hyper-personalized, niche-specific social media content plans.
+
+BUSINESS PROFILE:
+- Name: ${business.name}
+- Industry/Niche: ${business.industry || "General"}
+- Products/Services: ${business.products_services || "Not specified"}
+- Location: ${business.location || "Not specified"}
+- Target Audience: ${business.target_audience || "General audience"}
+- Business Goals: ${(business.goals || []).join(", ") || "Brand awareness"}
+- Brand Tone: ${business.brand_tone || "Professional"}
+- Content Style: ${business.content_style || "Balanced"}
+- Main Offers: ${business.main_offers || "Not specified"}
+- Competitors: ${business.competitors || "Not specified"}
+- Posting Goals: ${(business.posting_goals || ["engagement"]).join(", ")}${colorContext}${sloganContext}${brandContext}${creativeDirectionContext}
+
+=== FORMAT DECISION RULES (CRITICAL — FOLLOW EXACTLY) ===
+${formatGuidance}
+- NEVER use "Reel", "Video", "Story" as content_type — only use: "Text Post", "Image Post", "Carousel"
+
+=== CONTENT RULES ===
+1. Every post MUST be specifically about "${business.name}" — NO generic filler.
+2. Captions must mention the business name, products, or services naturally.
+3. Hooks must be scroll-stopping and address real pain points of "${business.target_audience || "the target audience"}".
+4. CTAs must drive specific actions: calls, DMs, website visits, bookings.
+5. Hashtags must include brand-specific, location-specific, and niche-specific tags.
+6. Each day must target a DIFFERENT content goal.
+
+Generate exactly 7 days with diverse, non-repetitive content.${previousTopicsSummary}`;
+
+  const userPrompt = `Generate Week ${weekNumber} content plan for "${business.name}".
+Platforms: ${(business.platforms || ["Instagram", "Facebook"]).join(", ")}
+This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 === 2 ? "engagement" : weekNumber % 4 === 3 ? "trust building" : "sales conversion"}.`;
+
+  const contentPlanRequest: any = {
+    model: textProvider.model_name || "openrouter/auto",
+    messages: [
+      { role: "system", content: systemPrompt + "\n\nReturn ONLY the raw JSON object via the create_content_plan tool." },
+      { role: "user", content: userPrompt },
+    ],
+    tools: [{
+      type: "function",
+      function: {
+        name: "create_content_plan",
+        description: "Create a 7-day content plan",
+        parameters: {
+          type: "object",
+          properties: {
+            strategy_summary: { type: "string" },
+            days: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  day_number: { type: "number" },
+                  post_format: { type: "string", enum: ["text_only", "text_with_image", "image_carousel"] },
+                  content_theme: { type: "string" },
+                  content_goal: { type: "string" },
+                  primary_platform: { type: "string" },
+                  secondary_platforms: { type: "array", items: { type: "string" } },
+                  content_type: { type: "string", enum: ["Text Post", "Image Post", "Carousel"] },
+                  topic: { type: "string" },
+                  hook: { type: "string" },
+                  pain_point: { type: "string" },
+                  core_message: { type: "string" },
+                  cta: { type: "string" },
+                  posting_time: { type: "string" },
+                  why_it_matters: { type: "string" },
+                  caption: { type: "string" },
+                  hashtags: { type: "array", items: { type: "string" } },
+                  image_prompt: { type: "string" },
+                  visual_style: { type: "string" },
+                  repurposing_suggestion: { type: "string" },
+                },
+                required: ["day_number", "post_format", "content_theme", "primary_platform", "content_type", "topic", "hook", "caption", "cta"],
+              },
+            },
+          },
+          required: ["strategy_summary", "days"],
+        },
+      },
+    }],
+    tool_choice: { type: "function", function: { name: "create_content_plan" } },
+  };
+
+  let aiResponse = await callTextProvider(textProvider, contentPlanRequest);
+  if (!aiResponse.ok && aiResponse.status === 404 && textProvider.provider_name === "openrouter" && contentPlanRequest.model !== "openrouter/auto") {
+    console.warn(`Configured OpenRouter model returned 404. Retrying with openrouter/auto.`);
+    aiResponse = await callTextProvider(
+      { ...textProvider, model_name: "openrouter/auto" },
+      { ...contentPlanRequest, model: "openrouter/auto" },
+    );
+  }
+  if (!aiResponse.ok) {
+    const errText = await aiResponse.text();
+    console.error("AI gateway error:", aiResponse.status, errText.slice(0, 500));
+    return;
+  }
+
+  const aiData = await aiResponse.json();
+  const choice = aiData.choices?.[0]?.message;
+  const toolCall = choice?.tool_calls?.[0];
+  let rawJson: string | undefined;
+  if (toolCall?.function?.arguments) {
+    rawJson = toolCall.function.arguments;
+  } else if (typeof choice?.content === "string" && choice.content.trim().length > 0) {
+    rawJson = choice.content.trim();
+    const fenceMatch = rawJson.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fenceMatch) rawJson = fenceMatch[1].trim();
+    const firstBrace = rawJson.indexOf("{");
+    const lastBrace = rawJson.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace > firstBrace) rawJson = rawJson.slice(firstBrace, lastBrace + 1);
+  }
+  if (!rawJson) {
+    console.error("AI response had no parsable content");
+    return;
+  }
+
+  let plan: any;
+  try { plan = JSON.parse(rawJson); }
+  catch { console.error("Failed to parse AI response"); return; }
+
+  if (!Array.isArray(plan?.days)) {
+    for (const k of ["plan", "content_plan", "result", "data", "output"]) {
+      if (plan?.[k] && Array.isArray(plan[k]?.days)) { plan = plan[k]; break; }
+    }
+  }
+  if (Array.isArray(plan)) plan = { strategy_summary: `Week ${weekNumber} content plan`, days: plan };
+  if (!plan?.days?.length) { console.error("AI plan missing days"); return; }
+
+  // Normalize
+  const validFormats = ["text_only", "text_with_image", "image_carousel"];
+  for (const day of plan.days) {
+    if (!allowImage) { day.post_format = "text_only"; }
+    if (!validFormats.includes(day.post_format)) {
+      day.post_format = day.image_prompt ? "text_with_image" : "text_only";
+    }
+    if (day.post_format === "text_only") { day.image_prompt = ""; day.visual_style = ""; }
+    day.content_type = day.post_format === "text_only" ? "Text Post" : day.post_format === "image_carousel" ? "Carousel" : "Image Post";
+  }
+
+  const weekStartDate = new Date();
+  weekStartDate.setDate(weekStartDate.getDate() + (weekNumber - 1) * 7);
+  const weekStart = weekStartDate.toISOString().split("T")[0];
+
+  const { data: newPlan, error: planError } = await supabaseAdmin
+    .from("content_plans")
+    .insert({
+      business_id: businessId,
+      user_id: userId,
+      week_start: weekStart,
+      week_number: weekNumber,
+      strategy_summary: plan.strategy_summary || `Week ${weekNumber} plan`,
+      status: "draft",
+    })
+    .select()
+    .single();
+  if (planError || !newPlan) { console.error("Plan insert error:", planError); return; }
+
+  const items = plan.days.map((day: any) => ({
+    plan_id: newPlan.id,
+    user_id: userId,
+    day_number: day.day_number,
+    content_theme: day.content_theme,
+    content_goal: day.content_goal || "",
+    primary_platform: day.primary_platform || "",
+    secondary_platforms: day.secondary_platforms || [],
+    content_type: day.content_type,
+    topic: day.topic,
+    hook: day.hook || "",
+    pain_point: day.pain_point || "",
+    core_message: day.core_message || "",
+    cta: day.cta || "",
+    posting_time: day.posting_time || "",
+    why_it_matters: day.why_it_matters || "",
+    caption: day.caption || "",
+    hashtags: day.hashtags || [],
+    image_prompt: day.post_format !== "text_only" ? (day.image_prompt || "") : "",
+    visual_style: day.post_format !== "text_only" ? (day.visual_style || "") : "",
+    repurposing_suggestion: day.repurposing_suggestion || "",
+    status: "draft",
+  }));
+
+  const { data: insertedItems, error: itemsError } = await supabaseAdmin
+    .from("content_items")
+    .insert(items)
+    .select("id, image_prompt, day_number, content_type");
+  if (itemsError) { console.error("Items insert error:", itemsError); return; }
+
+  if (allowImage) {
+    const itemsNeedingImages = (insertedItems || []).filter((it: any) => it.image_prompt?.length > 0);
+    if (itemsNeedingImages.length > 0) {
+      const itemsWithFormat = itemsNeedingImages.map((item: any) => {
+        const dayData = plan.days.find((d: any) => d.day_number === item.day_number);
+        return { ...item, post_format: dayData?.post_format || "text_with_image" };
+      });
+      // Run inline (we're already in background) so images finish too.
+      await generateImagesInBackground(itemsWithFormat, newPlan.id, supabaseUrl, supabaseKey, imageProvider, lovableApiKey);
+    }
+  }
+
+  console.log(`Background generation complete for plan ${newPlan.id}`);
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
