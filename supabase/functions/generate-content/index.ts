@@ -203,6 +203,7 @@ interface RunFullGenerationArgs {
   userId: string;
   business: any;
   businessId: string;
+  generationRequestId?: string | null;
   weekNumber: number;
   allowImage: boolean;
   allowVideo: boolean;
@@ -217,7 +218,7 @@ interface RunFullGenerationArgs {
 
 async function runFullGeneration(args: RunFullGenerationArgs) {
   const {
-    supabaseAdmin, supabaseUrl, supabaseKey, userId, business, businessId,
+    supabaseAdmin, supabaseUrl, supabaseKey, userId, business, businessId, generationRequestId,
     weekNumber, allowImage, textProvider, imageProvider, lovableApiKey,
     brandContext, colorContext, sloganContext, creativeDirectionContext,
   } = args;
@@ -330,6 +331,17 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
     tool_choice: { type: "function", function: { name: "create_content_plan" } },
   };
 
+  const plainJsonRequest: any = {
+    model: textProvider.model_name || "openrouter/auto",
+    messages: [
+      { role: "system", content: `${systemPrompt}\n\nReturn STRICT JSON only with this shape: {"strategy_summary":"...","days":[...]}. Do not use markdown.` },
+      { role: "user", content: userPrompt },
+    ],
+    response_format: { type: "json_object" },
+    temperature: Number(textProvider.temperature ?? 0.7),
+    max_tokens: Number(textProvider.max_tokens ?? 4096),
+  };
+
   let aiResponse = await callTextProvider(textProvider, contentPlanRequest);
   if (!aiResponse.ok && aiResponse.status === 404 && textProvider.provider_name === "openrouter" && contentPlanRequest.model !== "openrouter/auto") {
     console.warn(`Configured OpenRouter model returned 404. Retrying with openrouter/auto.`);
@@ -341,7 +353,7 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
   if (!aiResponse.ok) {
     const errText = await aiResponse.text();
     console.error("AI gateway error:", aiResponse.status, errText.slice(0, 500));
-    return;
+    throw new Error(`AI provider failed (${aiResponse.status}). Check the active model/API key in Admin → AI Control Center.`);
   }
 
   const aiData = await aiResponse.json();
@@ -359,13 +371,29 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
     if (firstBrace !== -1 && lastBrace > firstBrace) rawJson = rawJson.slice(firstBrace, lastBrace + 1);
   }
   if (!rawJson) {
+    console.warn("Tool-call response was empty; retrying with plain JSON mode.");
+    const fallbackResponse = await callTextProvider(textProvider, plainJsonRequest);
+    if (!fallbackResponse.ok) {
+      const errText = await fallbackResponse.text();
+      console.error("Plain JSON AI fallback error:", fallbackResponse.status, errText.slice(0, 500));
+      throw new Error(`AI provider failed (${fallbackResponse.status}). Check the active model/API key in Admin → AI Control Center.`);
+    }
+    const fallbackData = await fallbackResponse.json();
+    rawJson = fallbackData.choices?.[0]?.message?.content?.trim();
+    const fenceMatch = rawJson?.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fenceMatch) rawJson = fenceMatch[1].trim();
+    const firstBrace = rawJson?.indexOf("{") ?? -1;
+    const lastBrace = rawJson?.lastIndexOf("}") ?? -1;
+    if (rawJson && firstBrace !== -1 && lastBrace > firstBrace) rawJson = rawJson.slice(firstBrace, lastBrace + 1);
+  }
+  if (!rawJson) {
     console.error("AI response had no parsable content");
-    return;
+    throw new Error("AI returned an empty content plan. Select a stronger text model in Admin → AI Control Center.");
   }
 
   let plan: any;
   try { plan = JSON.parse(rawJson); }
-  catch { console.error("Failed to parse AI response"); return; }
+  catch { console.error("Failed to parse AI response"); throw new Error("AI returned invalid JSON. Select a stronger text model in Admin → AI Control Center."); }
 
   if (!Array.isArray(plan?.days)) {
     for (const k of ["plan", "content_plan", "result", "data", "output"]) {
@@ -373,7 +401,7 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
     }
   }
   if (Array.isArray(plan)) plan = { strategy_summary: `Week ${weekNumber} content plan`, days: plan };
-  if (!plan?.days?.length) { console.error("AI plan missing days"); return; }
+  if (!plan?.days?.length) { console.error("AI plan missing days"); throw new Error("AI returned 0 content days. Select a stronger text model in Admin → AI Control Center."); }
 
   // Normalize
   const validFormats = ["text_only", "text_with_image", "image_carousel"];
@@ -402,7 +430,7 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
     })
     .select()
     .single();
-  if (planError || !newPlan) { console.error("Plan insert error:", planError); return; }
+  if (planError || !newPlan) { console.error("Plan insert error:", planError); throw new Error("Content plan could not be saved."); }
 
   const items = plan.days.map((day: any) => ({
     plan_id: newPlan.id,
@@ -428,11 +456,26 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
     status: "draft",
   }));
 
-  const { data: insertedItems, error: itemsError } = await supabaseAdmin
+    const { data: insertedItems, error: itemsError } = await supabaseAdmin
     .from("content_items")
     .insert(items)
-    .select("id, image_prompt, day_number, content_type");
-  if (itemsError) { console.error("Items insert error:", itemsError); return; }
+      .select("id, image_prompt, day_number, content_type");
+    if (itemsError) { console.error("Items insert error:", itemsError); throw new Error("Content items could not be saved."); }
+
+    const insertedCount = insertedItems?.length || 0;
+    if (generationRequestId) {
+      await supabaseAdmin.from("weekly_generation_requests")
+        .update({ status: "completed", content_plan_id: newPlan.id })
+        .eq("id", generationRequestId)
+        .eq("user_id", userId);
+    } else {
+      await supabaseAdmin.from("weekly_generation_requests")
+        .update({ status: "completed", content_plan_id: newPlan.id })
+        .eq("business_id", businessId)
+        .eq("user_id", userId)
+        .eq("status", "generating")
+        .is("content_plan_id", null);
+    }
 
   if (allowImage) {
     const itemsNeedingImages = (insertedItems || []).filter((it: any) => it.image_prompt?.length > 0);
@@ -446,7 +489,15 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
     }
   }
 
-  console.log(`Background generation complete for plan ${newPlan.id}`);
+  await supabaseAdmin.from("notifications").insert({
+    user_id: userId,
+    title: "Content generated",
+    message: `${insertedCount} content items were created for Week ${weekNumber}.`,
+    type: "success",
+    action_url: "/content",
+  });
+
+  console.log(`Background generation complete for plan ${newPlan.id} with ${insertedCount} items`);
 }
 
 serve(async (req) => {
@@ -506,7 +557,8 @@ serve(async (req) => {
     const { data: providerRows } = await supabaseAdmin
       .from("ai_provider_settings")
       .select("*")
-      .eq("is_active", true);
+      .eq("is_active", true)
+      .in("provider_type", ["text", "image", "video"]);
     const textProvider =
       (providerRows || []).find((p: any) => p.provider_type === "text") ||
       { provider_name: "lovable", model_name: "google/gemini-2.5-flash" };
@@ -539,7 +591,7 @@ serve(async (req) => {
       return fail("Upload failed", 500, "regenerate_image_upload_failed");
     }
 
-    const { business_id } = body;
+    const { business_id, generation_request_id } = body;
     if (!business_id) {
       return fail("business_id is required", 400, "validation", { field: "business_id" });
     }
@@ -622,6 +674,7 @@ serve(async (req) => {
           userId: user.id,
           business,
           businessId: business_id,
+          generationRequestId: generation_request_id || null,
           weekNumber,
           allowImage,
           allowVideo,
@@ -635,6 +688,12 @@ serve(async (req) => {
         });
       } catch (bgErr) {
         console.error("Background generation failed:", bgErr);
+        if (generation_request_id) {
+          await supabaseAdmin.from("weekly_generation_requests")
+            .update({ status: "failed" })
+            .eq("id", generation_request_id)
+            .eq("user_id", user.id);
+        }
       }
     })();
     // @ts-ignore -- EdgeRuntime is available in Supabase edge runtime

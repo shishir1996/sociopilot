@@ -721,7 +721,14 @@ function FeatureFlagsPanel() {
     try {
       setLoading(true);
       const rows = await adminApi({ action: "list", table: "ai_feature_flags" });
-      setFlags(rows || []);
+      const required = [
+        { feature_key: "allow_text_generation", enabled: true, plan_restriction: [] },
+        { feature_key: "allow_image_generation", enabled: true, plan_restriction: [] },
+        { feature_key: "allow_video_generation", enabled: false, plan_restriction: [] },
+      ];
+      const missing = required.filter(flag => !(rows || []).some((row: any) => row.feature_key === flag.feature_key));
+      for (const flag of missing) await adminApi({ action: "create", table: "ai_feature_flags", data: flag });
+      setFlags(missing.length ? await adminApi({ action: "list", table: "ai_feature_flags" }) : (rows || []));
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     } finally {
@@ -741,6 +748,27 @@ function FeatureFlagsPanel() {
     }
   };
 
+  const setGenerationMode = async (mode: "text" | "image" | "video") => {
+    const nextState: Record<string, boolean> = {
+      allow_text_generation: true,
+      allow_image_generation: mode === "image" || mode === "video",
+      allow_video_generation: mode === "video",
+    };
+    try {
+      await Promise.all(flags
+        .filter((flag: any) => flag.feature_key in nextState)
+        .map((flag: any) => adminApi({ action: "update", table: "ai_feature_flags", id: flag.id, data: { enabled: nextState[flag.feature_key] } })));
+      toast({ title: "Generation mode updated ✓" });
+      load();
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const enabledMap = Object.fromEntries(flags.map((flag: any) => [flag.feature_key, !!flag.enabled]));
+  const activeMode = enabledMap.allow_video_generation ? "video" : enabledMap.allow_image_generation ? "image" : "text";
+  const generationFlags = flags.filter((flag: any) => ["allow_text_generation", "allow_image_generation", "allow_video_generation"].includes(flag.feature_key));
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -751,20 +779,24 @@ function FeatureFlagsPanel() {
         <Button size="sm" variant="outline" onClick={load}><RefreshCw className="h-4 w-4" /></Button>
       </div>
       <Card className="border-primary/30 bg-primary/5">
-        <CardContent className="py-4">
+        <CardContent className="py-4 space-y-3">
           <p className="font-semibold text-foreground text-sm mb-1">Content Generation Modes</p>
           <p className="text-xs text-muted-foreground">
-            Toggle <strong>allow_text_generation</strong>, <strong>allow_image_generation</strong> and <strong>allow_video_generation</strong> below to control what every user can generate.
-            When image generation is OFF, all weekly posts are forced to text-only. Video generation is reserved for an upcoming release.
+            Choose exactly what every user can generate. Text is always required; image and video are optional admin-controlled add-ons.
           </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <Button size="sm" variant={activeMode === "text" ? "default" : "outline"} onClick={() => setGenerationMode("text")}>Text only</Button>
+            <Button size="sm" variant={activeMode === "image" ? "default" : "outline"} onClick={() => setGenerationMode("image")}>Text + Image</Button>
+            <Button size="sm" variant={activeMode === "video" ? "default" : "outline"} onClick={() => setGenerationMode("video")}>Text + Image + Video</Button>
+          </div>
         </CardContent>
       </Card>
       {loading ? (
         <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : (
         <div className="space-y-3">
-          {flags.length === 0 && <p className="text-center text-muted-foreground py-8">No feature flags configured.</p>}
-          {flags.map(f => (
+          {generationFlags.length === 0 && <p className="text-center text-muted-foreground py-8">No feature flags configured.</p>}
+          {generationFlags.map(f => (
             <Card key={f.id}>
               <CardContent className="py-3 flex items-center justify-between">
                 <div>

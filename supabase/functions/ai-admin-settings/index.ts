@@ -46,7 +46,11 @@ serve(async (req) => {
 
     switch (action) {
       case "list": {
-        const { data: rows, error } = await supabaseAdmin.from(table).select("*").order("created_at", { ascending: false });
+        const listQuery = supabaseAdmin.from(table).select("*");
+        const orderedQuery = table === "ai_feature_flags"
+          ? listQuery.order("feature_key", { ascending: true })
+          : listQuery.order("created_at", { ascending: false });
+        const { data: rows, error } = await orderedQuery;
         if (error) throw error;
         result = rows;
         break;
@@ -64,7 +68,8 @@ serve(async (req) => {
         break;
       }
       case "update": {
-        const { data: row, error } = await supabaseAdmin.from(table).update(data).eq("id", id).select().single();
+        const payload = table === "ai_feature_flags" ? { ...data, updated_at: new Date().toISOString() } : data;
+        const { data: row, error } = await supabaseAdmin.from(table).update(payload).eq("id", id).select().single();
         if (error) throw error;
         result = row;
         break;

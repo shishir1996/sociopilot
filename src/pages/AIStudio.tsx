@@ -94,6 +94,7 @@ export default function AIStudio() {
       .from("weekly_generation_requests")
       .select("*", { count: "exact", head: true })
       .eq("user_id", user.id)
+      .eq("status", "completed")
       .gte("created_at", weekStart.toISOString());
     setWeeklyGenCount(genCount || 0);
     const monthStart = new Date();
@@ -132,6 +133,49 @@ export default function AIStudio() {
   };
 
   const totalSelectedPosts = Object.values(daySelection).reduce((sum, platforms) => sum + platforms.length, 0);
+
+  const fetchGeneratedItemsForPlan = async (planId: string) => {
+    const { data: items } = await supabase
+      .from("content_items")
+      .select("*")
+      .eq("plan_id", planId)
+      .order("day_number", { ascending: true });
+    setGeneratedItems(items || []);
+    return items || [];
+  };
+
+  const waitForGeneratedPlan = async (requestId: string, startedAt: string) => {
+    for (let attempt = 0; attempt < 36; attempt++) {
+      const { data: request } = await supabase
+        .from("weekly_generation_requests")
+        .select("status, content_plan_id")
+        .eq("id", requestId)
+        .single();
+
+      if (request?.status === "completed" && request.content_plan_id) {
+        return fetchGeneratedItemsForPlan(request.content_plan_id);
+      }
+      if (request?.status === "failed") throw new Error("Generation failed in the background. Please check the active AI model/API key in Admin → AI Control Center.");
+
+      const { data: latestPlan } = await supabase
+        .from("content_plans")
+        .select("id")
+        .eq("business_id", business.id)
+        .eq("user_id", user!.id)
+        .gte("created_at", startedAt)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (latestPlan?.id) {
+        const items = await fetchGeneratedItemsForPlan(latestPlan.id);
+        if (items.length > 0) return items;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+    return [];
+  };
 
   const canGenerate = () => {
     if (totalSelectedPosts === 0) return false;
@@ -181,37 +225,41 @@ export default function AIStudio() {
 
     setStep("generating");
     setGenerating(true);
+    let activeRequestId: string | null = null;
     try {
-      await supabase.from("weekly_generation_requests").insert({
+      const generationStartedAt = new Date().toISOString();
+      const { data: generationRequest, error: requestError } = await supabase.from("weekly_generation_requests").insert({
         user_id: user!.id,
         business_id: business.id,
         plan_type: planType,
         selected_days: daySelection,
         selected_platforms: Object.values(daySelection).flat(),
         status: "generating",
-      });
+      }).select("id").single();
+      if (requestError || !generationRequest) throw requestError || new Error("Could not start generation request");
+      activeRequestId = generationRequest.id;
+
       const { data, error } = await supabase.functions.invoke("generate-content", {
         body: {
           business_id: business.id,
+          generation_request_id: generationRequest.id,
           selected_days: daySelection,
           business_context: { name: businessName, industry, target_audience: targetAudience, content_goal: contentGoal, tone },
         },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      if (data?.plan_id) {
-        const { data: items } = await supabase
-          .from("content_items")
-          .select("*")
-          .eq("plan_id", data.plan_id)
-          .order("day_number", { ascending: true });
-        setGeneratedItems(items || []);
-      }
+      toast({ title: "✨ Generation started", description: "Your weekly content is being created. Results will appear here automatically." });
+      const items = data?.plan_id
+        ? await fetchGeneratedItemsForPlan(data.plan_id)
+        : await waitForGeneratedPlan(generationRequest.id, generationStartedAt);
+      if (items.length === 0) throw new Error("Generation is still processing. Please open Content Manager in a minute to see the posts.");
       await supabase.from("businesses").update({ auto_generate_enabled: true }).eq("id", business.id);
       setStep("results");
       if (isTrial) setShowUpgrade("trial_generated");
-      toast({ title: "✨ Weekly Content Generated!", description: `${totalSelectedPosts} posts created for your week.` });
+      toast({ title: "✨ Weekly Content Generated!", description: `${items.length} posts created for your week.` });
     } catch (err: any) {
+      if (activeRequestId) await supabase.from("weekly_generation_requests").update({ status: "failed" }).eq("id", activeRequestId);
       toast({ title: "Generation Failed", description: err.message, variant: "destructive" });
       setStep("calendar");
     }
@@ -457,7 +505,7 @@ export default function AIStudio() {
             <div>
               <h2 className="text-xl font-bold text-foreground mb-2">AI is crafting your content...</h2>
               <p className="text-sm text-muted-foreground">
-                Generating {totalSelectedPosts} platform-optimized posts with captions, hashtags, images, and CTAs.
+                Generating platform-optimized posts with captions, hashtags, images, and CTAs. This can take 1–3 minutes.
               </p>
             </div>
             <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />
