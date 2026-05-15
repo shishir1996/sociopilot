@@ -203,6 +203,7 @@ interface RunFullGenerationArgs {
   userId: string;
   business: any;
   businessId: string;
+  generationRequestId?: string | null;
   weekNumber: number;
   allowImage: boolean;
   allowVideo: boolean;
@@ -217,7 +218,7 @@ interface RunFullGenerationArgs {
 
 async function runFullGeneration(args: RunFullGenerationArgs) {
   const {
-    supabaseAdmin, supabaseUrl, supabaseKey, userId, business, businessId,
+    supabaseAdmin, supabaseUrl, supabaseKey, userId, business, businessId, generationRequestId,
     weekNumber, allowImage, textProvider, imageProvider, lovableApiKey,
     brandContext, colorContext, sloganContext, creativeDirectionContext,
   } = args;
@@ -341,7 +342,7 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
   if (!aiResponse.ok) {
     const errText = await aiResponse.text();
     console.error("AI gateway error:", aiResponse.status, errText.slice(0, 500));
-    return;
+    throw new Error(`AI provider failed (${aiResponse.status}). Check the active model/API key in Admin → AI Control Center.`);
   }
 
   const aiData = await aiResponse.json();
@@ -360,12 +361,12 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
   }
   if (!rawJson) {
     console.error("AI response had no parsable content");
-    return;
+    throw new Error("AI returned an empty content plan. Select a stronger text model in Admin → AI Control Center.");
   }
 
   let plan: any;
   try { plan = JSON.parse(rawJson); }
-  catch { console.error("Failed to parse AI response"); return; }
+  catch { console.error("Failed to parse AI response"); throw new Error("AI returned invalid JSON. Select a stronger text model in Admin → AI Control Center."); }
 
   if (!Array.isArray(plan?.days)) {
     for (const k of ["plan", "content_plan", "result", "data", "output"]) {
@@ -373,7 +374,7 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
     }
   }
   if (Array.isArray(plan)) plan = { strategy_summary: `Week ${weekNumber} content plan`, days: plan };
-  if (!plan?.days?.length) { console.error("AI plan missing days"); return; }
+  if (!plan?.days?.length) { console.error("AI plan missing days"); throw new Error("AI returned 0 content days. Select a stronger text model in Admin → AI Control Center."); }
 
   // Normalize
   const validFormats = ["text_only", "text_with_image", "image_carousel"];
