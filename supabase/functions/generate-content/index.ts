@@ -522,7 +522,8 @@ serve(async (req) => {
     const { data: providerRows } = await supabaseAdmin
       .from("ai_provider_settings")
       .select("*")
-      .eq("is_active", true);
+      .eq("is_active", true)
+      .in("provider_type", ["text", "image", "video"]);
     const textProvider =
       (providerRows || []).find((p: any) => p.provider_type === "text") ||
       { provider_name: "lovable", model_name: "google/gemini-2.5-flash" };
