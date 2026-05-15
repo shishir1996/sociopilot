@@ -143,7 +143,7 @@ export default function AIStudio() {
     return items || [];
   };
 
-  const waitForGeneratedPlan = async (requestId: string) => {
+  const waitForGeneratedPlan = async (requestId: string, startedAt: string) => {
     for (let attempt = 0; attempt < 36; attempt++) {
       const { data: request } = await supabase
         .from("weekly_generation_requests")
@@ -154,12 +154,14 @@ export default function AIStudio() {
       if (request?.status === "completed" && request.content_plan_id) {
         return fetchGeneratedItemsForPlan(request.content_plan_id);
       }
+      if (request?.status === "failed") throw new Error("Generation failed in the background. Please check the active AI model/API key in Admin → AI Control Center.");
 
       const { data: latestPlan } = await supabase
         .from("content_plans")
         .select("id")
         .eq("business_id", business.id)
         .eq("user_id", user!.id)
+        .gte("created_at", startedAt)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -223,6 +225,7 @@ export default function AIStudio() {
     setStep("generating");
     setGenerating(true);
     try {
+      const generationStartedAt = new Date().toISOString();
       const { data: generationRequest, error: requestError } = await supabase.from("weekly_generation_requests").insert({
         user_id: user!.id,
         business_id: business.id,
@@ -246,7 +249,7 @@ export default function AIStudio() {
       toast({ title: "✨ Generation started", description: "Your weekly content is being created. Results will appear here automatically." });
       const items = data?.plan_id
         ? await fetchGeneratedItemsForPlan(data.plan_id)
-        : await waitForGeneratedPlan(generationRequest.id);
+        : await waitForGeneratedPlan(generationRequest.id, generationStartedAt);
       if (items.length === 0) throw new Error("Generation is still processing. Please open Content Manager in a minute to see the posts.");
       await supabase.from("businesses").update({ auto_generate_enabled: true }).eq("id", business.id);
       setStep("results");
