@@ -331,6 +331,17 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
     tool_choice: { type: "function", function: { name: "create_content_plan" } },
   };
 
+  const plainJsonRequest: any = {
+    model: textProvider.model_name || "openrouter/auto",
+    messages: [
+      { role: "system", content: `${systemPrompt}\n\nReturn STRICT JSON only with this shape: {"strategy_summary":"...","days":[...]}. Do not use markdown.` },
+      { role: "user", content: userPrompt },
+    ],
+    response_format: { type: "json_object" },
+    temperature: Number(textProvider.temperature ?? 0.7),
+    max_tokens: Number(textProvider.max_tokens ?? 4096),
+  };
+
   let aiResponse = await callTextProvider(textProvider, contentPlanRequest);
   if (!aiResponse.ok && aiResponse.status === 404 && textProvider.provider_name === "openrouter" && contentPlanRequest.model !== "openrouter/auto") {
     console.warn(`Configured OpenRouter model returned 404. Retrying with openrouter/auto.`);
