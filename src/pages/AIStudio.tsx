@@ -223,14 +223,16 @@ export default function AIStudio() {
     setStep("generating");
     setGenerating(true);
     try {
-      await supabase.from("weekly_generation_requests").insert({
+      const { data: generationRequest, error: requestError } = await supabase.from("weekly_generation_requests").insert({
         user_id: user!.id,
         business_id: business.id,
         plan_type: planType,
         selected_days: daySelection,
         selected_platforms: Object.values(daySelection).flat(),
         status: "generating",
-      });
+      }).select("id").single();
+      if (requestError || !generationRequest) throw requestError || new Error("Could not start generation request");
+
       const { data, error } = await supabase.functions.invoke("generate-content", {
         body: {
           business_id: business.id,
@@ -240,18 +242,15 @@ export default function AIStudio() {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      if (data?.plan_id) {
-        const { data: items } = await supabase
-          .from("content_items")
-          .select("*")
-          .eq("plan_id", data.plan_id)
-          .order("day_number", { ascending: true });
-        setGeneratedItems(items || []);
-      }
+      toast({ title: "✨ Generation started", description: "Your weekly content is being created. Results will appear here automatically." });
+      const items = data?.plan_id
+        ? await fetchGeneratedItemsForPlan(data.plan_id)
+        : await waitForGeneratedPlan(generationRequest.id);
+      if (items.length === 0) throw new Error("Generation is still processing. Please open Content Manager in a minute to see the posts.");
       await supabase.from("businesses").update({ auto_generate_enabled: true }).eq("id", business.id);
       setStep("results");
       if (isTrial) setShowUpgrade("trial_generated");
-      toast({ title: "✨ Weekly Content Generated!", description: `${totalSelectedPosts} posts created for your week.` });
+      toast({ title: "✨ Weekly Content Generated!", description: `${items.length} posts created for your week.` });
     } catch (err: any) {
       toast({ title: "Generation Failed", description: err.message, variant: "destructive" });
       setStep("calendar");
