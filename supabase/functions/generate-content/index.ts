@@ -403,7 +403,7 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
     })
     .select()
     .single();
-  if (planError || !newPlan) { console.error("Plan insert error:", planError); return; }
+  if (planError || !newPlan) { console.error("Plan insert error:", planError); throw new Error("Content plan could not be saved."); }
 
   const items = plan.days.map((day: any) => ({
     plan_id: newPlan.id,
@@ -433,7 +433,7 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
     .from("content_items")
     .insert(items)
       .select("id, image_prompt, day_number, content_type");
-  if (itemsError) { console.error("Items insert error:", itemsError); return; }
+    if (itemsError) { console.error("Items insert error:", itemsError); throw new Error("Content items could not be saved."); }
 
     const insertedCount = insertedItems?.length || 0;
     if (generationRequestId) {
@@ -661,6 +661,12 @@ serve(async (req) => {
         });
       } catch (bgErr) {
         console.error("Background generation failed:", bgErr);
+        if (generation_request_id) {
+          await supabaseAdmin.from("weekly_generation_requests")
+            .update({ status: "failed" })
+            .eq("id", generation_request_id)
+            .eq("user_id", user.id);
+        }
       }
     })();
     // @ts-ignore -- EdgeRuntime is available in Supabase edge runtime
