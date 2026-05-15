@@ -436,12 +436,19 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
   if (itemsError) { console.error("Items insert error:", itemsError); return; }
 
     const insertedCount = insertedItems?.length || 0;
-    await supabaseAdmin.from("weekly_generation_requests")
-      .update({ status: "completed", content_plan_id: newPlan.id })
-      .eq("business_id", businessId)
-      .eq("user_id", userId)
-      .eq("status", "generating")
-      .is("content_plan_id", null);
+    if (generationRequestId) {
+      await supabaseAdmin.from("weekly_generation_requests")
+        .update({ status: "completed", content_plan_id: newPlan.id })
+        .eq("id", generationRequestId)
+        .eq("user_id", userId);
+    } else {
+      await supabaseAdmin.from("weekly_generation_requests")
+        .update({ status: "completed", content_plan_id: newPlan.id })
+        .eq("business_id", businessId)
+        .eq("user_id", userId)
+        .eq("status", "generating")
+        .is("content_plan_id", null);
+    }
 
   if (allowImage) {
     const itemsNeedingImages = (insertedItems || []).filter((it: any) => it.image_prompt?.length > 0);
