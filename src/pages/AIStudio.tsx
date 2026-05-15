@@ -236,6 +236,7 @@ export default function AIStudio() {
       const { data, error } = await supabase.functions.invoke("generate-content", {
         body: {
           business_id: business.id,
+          generation_request_id: generationRequest.id,
           selected_days: daySelection,
           business_context: { name: businessName, industry, target_audience: targetAudience, content_goal: contentGoal, tone },
         },
