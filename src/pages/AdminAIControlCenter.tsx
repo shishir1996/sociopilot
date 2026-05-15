@@ -721,7 +721,14 @@ function FeatureFlagsPanel() {
     try {
       setLoading(true);
       const rows = await adminApi({ action: "list", table: "ai_feature_flags" });
-      setFlags(rows || []);
+      const required = [
+        { feature_key: "allow_text_generation", enabled: true, plan_restriction: [] },
+        { feature_key: "allow_image_generation", enabled: true, plan_restriction: [] },
+        { feature_key: "allow_video_generation", enabled: false, plan_restriction: [] },
+      ];
+      const missing = required.filter(flag => !(rows || []).some((row: any) => row.feature_key === flag.feature_key));
+      for (const flag of missing) await adminApi({ action: "create", table: "ai_feature_flags", data: flag });
+      setFlags(missing.length ? await adminApi({ action: "list", table: "ai_feature_flags" }) : (rows || []));
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     } finally {
@@ -740,6 +747,27 @@ function FeatureFlagsPanel() {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     }
   };
+
+  const setGenerationMode = async (mode: "text" | "image" | "video") => {
+    const nextState: Record<string, boolean> = {
+      allow_text_generation: true,
+      allow_image_generation: mode === "image" || mode === "video",
+      allow_video_generation: mode === "video",
+    };
+    try {
+      await Promise.all(flags
+        .filter((flag: any) => flag.feature_key in nextState)
+        .map((flag: any) => adminApi({ action: "update", table: "ai_feature_flags", id: flag.id, data: { enabled: nextState[flag.feature_key] } })));
+      toast({ title: "Generation mode updated ✓" });
+      load();
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const enabledMap = Object.fromEntries(flags.map((flag: any) => [flag.feature_key, !!flag.enabled]));
+  const activeMode = enabledMap.allow_video_generation ? "video" : enabledMap.allow_image_generation ? "image" : "text";
+  const generationFlags = flags.filter((flag: any) => ["allow_text_generation", "allow_image_generation", "allow_video_generation"].includes(flag.feature_key));
 
   return (
     <div className="space-y-4">
