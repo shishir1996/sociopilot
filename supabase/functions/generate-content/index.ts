@@ -371,6 +371,22 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
     if (firstBrace !== -1 && lastBrace > firstBrace) rawJson = rawJson.slice(firstBrace, lastBrace + 1);
   }
   if (!rawJson) {
+    console.warn("Tool-call response was empty; retrying with plain JSON mode.");
+    const fallbackResponse = await callTextProvider(textProvider, plainJsonRequest);
+    if (!fallbackResponse.ok) {
+      const errText = await fallbackResponse.text();
+      console.error("Plain JSON AI fallback error:", fallbackResponse.status, errText.slice(0, 500));
+      throw new Error(`AI provider failed (${fallbackResponse.status}). Check the active model/API key in Admin → AI Control Center.`);
+    }
+    const fallbackData = await fallbackResponse.json();
+    rawJson = fallbackData.choices?.[0]?.message?.content?.trim();
+    const fenceMatch = rawJson?.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fenceMatch) rawJson = fenceMatch[1].trim();
+    const firstBrace = rawJson?.indexOf("{") ?? -1;
+    const lastBrace = rawJson?.lastIndexOf("}") ?? -1;
+    if (rawJson && firstBrace !== -1 && lastBrace > firstBrace) rawJson = rawJson.slice(firstBrace, lastBrace + 1);
+  }
+  if (!rawJson) {
     console.error("AI response had no parsable content");
     throw new Error("AI returned an empty content plan. Select a stronger text model in Admin → AI Control Center.");
   }
