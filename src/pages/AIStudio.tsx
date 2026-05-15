@@ -133,6 +133,47 @@ export default function AIStudio() {
 
   const totalSelectedPosts = Object.values(daySelection).reduce((sum, platforms) => sum + platforms.length, 0);
 
+  const fetchGeneratedItemsForPlan = async (planId: string) => {
+    const { data: items } = await supabase
+      .from("content_items")
+      .select("*")
+      .eq("plan_id", planId)
+      .order("day_number", { ascending: true });
+    setGeneratedItems(items || []);
+    return items || [];
+  };
+
+  const waitForGeneratedPlan = async (requestId: string) => {
+    for (let attempt = 0; attempt < 36; attempt++) {
+      const { data: request } = await supabase
+        .from("weekly_generation_requests")
+        .select("status, content_plan_id")
+        .eq("id", requestId)
+        .single();
+
+      if (request?.status === "completed" && request.content_plan_id) {
+        return fetchGeneratedItemsForPlan(request.content_plan_id);
+      }
+
+      const { data: latestPlan } = await supabase
+        .from("content_plans")
+        .select("id")
+        .eq("business_id", business.id)
+        .eq("user_id", user!.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (latestPlan?.id) {
+        const items = await fetchGeneratedItemsForPlan(latestPlan.id);
+        if (items.length > 0) return items;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+    return [];
+  };
+
   const canGenerate = () => {
     if (totalSelectedPosts === 0) return false;
     if (isTrial && weeklyGenCount >= 1) return false;
