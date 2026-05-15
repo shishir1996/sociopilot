@@ -428,11 +428,19 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
     status: "draft",
   }));
 
-  const { data: insertedItems, error: itemsError } = await supabaseAdmin
+    const { data: insertedItems, error: itemsError } = await supabaseAdmin
     .from("content_items")
     .insert(items)
-    .select("id, image_prompt, day_number, content_type");
+      .select("id, image_prompt, day_number, content_type");
   if (itemsError) { console.error("Items insert error:", itemsError); return; }
+
+    const insertedCount = insertedItems?.length || 0;
+    await supabaseAdmin.from("weekly_generation_requests")
+      .update({ status: "completed", content_plan_id: newPlan.id })
+      .eq("business_id", businessId)
+      .eq("user_id", userId)
+      .eq("status", "generating")
+      .is("content_plan_id", null);
 
   if (allowImage) {
     const itemsNeedingImages = (insertedItems || []).filter((it: any) => it.image_prompt?.length > 0);
@@ -446,7 +454,15 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
     }
   }
 
-  console.log(`Background generation complete for plan ${newPlan.id}`);
+  await supabaseAdmin.from("notifications").insert({
+    user_id: userId,
+    title: "Content generated",
+    message: `${insertedCount} content items were created for Week ${weekNumber}.`,
+    type: "success",
+    action_url: "/content",
+  });
+
+  console.log(`Background generation complete for plan ${newPlan.id} with ${insertedCount} items`);
 }
 
 serve(async (req) => {
