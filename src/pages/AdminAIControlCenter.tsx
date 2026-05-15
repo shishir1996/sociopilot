@@ -779,20 +779,24 @@ function FeatureFlagsPanel() {
         <Button size="sm" variant="outline" onClick={load}><RefreshCw className="h-4 w-4" /></Button>
       </div>
       <Card className="border-primary/30 bg-primary/5">
-        <CardContent className="py-4">
+        <CardContent className="py-4 space-y-3">
           <p className="font-semibold text-foreground text-sm mb-1">Content Generation Modes</p>
           <p className="text-xs text-muted-foreground">
-            Toggle <strong>allow_text_generation</strong>, <strong>allow_image_generation</strong> and <strong>allow_video_generation</strong> below to control what every user can generate.
-            When image generation is OFF, all weekly posts are forced to text-only. Video generation is reserved for an upcoming release.
+            Choose exactly what every user can generate. Text is always required; image and video are optional admin-controlled add-ons.
           </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <Button size="sm" variant={activeMode === "text" ? "default" : "outline"} onClick={() => setGenerationMode("text")}>Text only</Button>
+            <Button size="sm" variant={activeMode === "image" ? "default" : "outline"} onClick={() => setGenerationMode("image")}>Text + Image</Button>
+            <Button size="sm" variant={activeMode === "video" ? "default" : "outline"} onClick={() => setGenerationMode("video")}>Text + Image + Video</Button>
+          </div>
         </CardContent>
       </Card>
       {loading ? (
         <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : (
         <div className="space-y-3">
-          {flags.length === 0 && <p className="text-center text-muted-foreground py-8">No feature flags configured.</p>}
-          {flags.map(f => (
+          {generationFlags.length === 0 && <p className="text-center text-muted-foreground py-8">No feature flags configured.</p>}
+          {generationFlags.map(f => (
             <Card key={f.id}>
               <CardContent className="py-3 flex items-center justify-between">
                 <div>
