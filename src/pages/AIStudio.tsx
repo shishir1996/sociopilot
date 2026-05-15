@@ -497,7 +497,7 @@ export default function AIStudio() {
             <div>
               <h2 className="text-xl font-bold text-foreground mb-2">AI is crafting your content...</h2>
               <p className="text-sm text-muted-foreground">
-                Generating {totalSelectedPosts} platform-optimized posts with captions, hashtags, images, and CTAs.
+                Generating platform-optimized posts with captions, hashtags, images, and CTAs. This can take 1–3 minutes.
               </p>
             </div>
             <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />
