@@ -94,6 +94,7 @@ export default function AIStudio() {
       .from("weekly_generation_requests")
       .select("*", { count: "exact", head: true })
       .eq("user_id", user.id)
+      .eq("status", "completed")
       .gte("created_at", weekStart.toISOString());
     setWeeklyGenCount(genCount || 0);
     const monthStart = new Date();
@@ -224,6 +225,7 @@ export default function AIStudio() {
 
     setStep("generating");
     setGenerating(true);
+    let activeRequestId: string | null = null;
     try {
       const generationStartedAt = new Date().toISOString();
       const { data: generationRequest, error: requestError } = await supabase.from("weekly_generation_requests").insert({
@@ -235,6 +237,7 @@ export default function AIStudio() {
         status: "generating",
       }).select("id").single();
       if (requestError || !generationRequest) throw requestError || new Error("Could not start generation request");
+      activeRequestId = generationRequest.id;
 
       const { data, error } = await supabase.functions.invoke("generate-content", {
         body: {
@@ -256,6 +259,7 @@ export default function AIStudio() {
       if (isTrial) setShowUpgrade("trial_generated");
       toast({ title: "✨ Weekly Content Generated!", description: `${items.length} posts created for your week.` });
     } catch (err: any) {
+      if (activeRequestId) await supabase.from("weekly_generation_requests").update({ status: "failed" }).eq("id", activeRequestId);
       toast({ title: "Generation Failed", description: err.message, variant: "destructive" });
       setStep("calendar");
     }
