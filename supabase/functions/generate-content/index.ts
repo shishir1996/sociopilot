@@ -564,7 +564,7 @@ serve(async (req) => {
       return fail("Upload failed", 500, "regenerate_image_upload_failed");
     }
 
-    const { business_id } = body;
+    const { business_id, generation_request_id } = body;
     if (!business_id) {
       return fail("business_id is required", 400, "validation", { field: "business_id" });
     }
@@ -647,6 +647,7 @@ serve(async (req) => {
           userId: user.id,
           business,
           businessId: business_id,
+          generationRequestId: generation_request_id || null,
           weekNumber,
           allowImage,
           allowVideo,
