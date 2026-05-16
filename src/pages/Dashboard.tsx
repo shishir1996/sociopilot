@@ -25,11 +25,10 @@ interface Business {
 
 const sidebarNav = [
   { icon: LayoutDashboard, label: "Dashboard", active: true },
-  { icon: Sparkles, label: "AI Studio", route: "/ai-studio" },
-  { icon: BarChart3, label: "Content", route: "/content" },
   { icon: Calendar, label: "Schedule", route: "/schedule" },
-  { icon: Inbox, label: "Inbox" },
-  { icon: Globe, label: "GMB" },
+  { icon: BarChart3, label: "Content", route: "/content" },
+  { icon: Sparkles, label: "AI Studio", route: "/ai-studio" },
+  { icon: Globe, label: "GMB", route: "/google-business", isGmb: true },
 ];
 
 export default function Dashboard() {
