@@ -223,6 +223,106 @@ async function runFullGeneration(args: RunFullGenerationArgs) {
     brandContext, colorContext, sloganContext, creativeDirectionContext,
   } = args;
 
+  // ---- Build today-first, timezone-aware schedule slots ----------------
+  // Returns up to 7 upcoming slots (one per day_number) using the user's
+  // posting_schedules and the business timezone. day_number 1 = the earliest
+  // upcoming slot (which may be today if `now <= scheduled_time - 30 min`).
+  const tz = business.timezone || "UTC";
+  const { data: scheduleRows } = await supabaseAdmin
+    .from("posting_schedules")
+    .select("day_of_week, posting_time, platforms, enabled")
+    .eq("business_id", businessId)
+    .eq("user_id", userId)
+    .eq("enabled", true);
+  const enabledSchedules = (scheduleRows || []).filter((s: any) =>
+    Array.isArray(s.platforms) && s.platforms.length > 0
+  );
+
+  // Subscription tier: trial/basic → restrict to first publishing_platform.
+  const { data: subRow } = await supabaseAdmin
+    .from("subscriptions").select("plan_name, status, is_trial")
+    .eq("user_id", userId).maybeSingle();
+  const planName = (subRow?.plan_name || "free_trial").toLowerCase();
+  const isPro = planName === "pro";
+  const lockedPlatform: string | null = !isPro
+    ? (Array.isArray(business.publishing_platforms) && business.publishing_platforms[0]) || null
+    : null;
+
+  // Helper: "now" in business timezone as a comparable Date
+  const nowUtc = new Date();
+  const tzNowParts = new Intl.DateTimeFormatToParts
+    ? new Intl.DateTimeFormat("en-US", {
+        timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+      }).formatToParts(nowUtc)
+    : [];
+  const tzPart = (t: string) => Number(tzNowParts.find((p: any) => p.type === t)?.value || "0");
+  const tzYear = tzPart("year");
+  const tzMonth = tzPart("month");
+  const tzDay = tzPart("day");
+  const tzHour = tzPart("hour");
+  const tzMinute = tzPart("minute");
+  const tzTodayLocal = new Date(Date.UTC(tzYear, tzMonth - 1, tzDay)); // local midnight as UTC anchor
+  const tzNowMinutes = tzHour * 60 + tzMinute;
+  const todayDow = tzTodayLocal.getUTCDay();
+
+  type Slot = { dayNumber: number; date: Date; platforms: string[]; postingTime: string };
+  const slots: Slot[] = [];
+  for (let i = 0; i < 14 && slots.length < 7; i++) {
+    const dow = (todayDow + i) % 7;
+    const sched = enabledSchedules.find((s: any) => s.day_of_week === dow);
+    if (!sched) continue;
+    const [hh, mm] = String(sched.posting_time || "10:00").split(":").map(Number);
+    if (i === 0) {
+      // 30-min window rule
+      const schedMinutes = (hh || 10) * 60 + (mm || 0);
+      if (tzNowMinutes > schedMinutes - 30) continue;
+    }
+    // Compute UTC instant for this local time. Build local-as-UTC then offset
+    // by tz at that moment to convert to real UTC.
+    const dayAnchor = new Date(tzTodayLocal.getTime() + i * 24 * 60 * 60 * 1000);
+    const localAsUtc = new Date(Date.UTC(
+      dayAnchor.getUTCFullYear(), dayAnchor.getUTCMonth(), dayAnchor.getUTCDate(),
+      hh || 10, mm || 0, 0,
+    ));
+    // Get the offset between tz and UTC at this instant
+    const tzString = localAsUtc.toLocaleString("en-US", { timeZone: tz });
+    const utcString = localAsUtc.toLocaleString("en-US", { timeZone: "UTC" });
+    const offsetMs = new Date(utcString).getTime() - new Date(tzString).getTime();
+    const realUtc = new Date(localAsUtc.getTime() + offsetMs);
+
+    let platforms: string[] = Array.isArray(sched.platforms) ? [...sched.platforms] : [];
+    if (lockedPlatform) platforms = [lockedPlatform];
+    if (platforms.length === 0) continue;
+    slots.push({
+      dayNumber: slots.length + 1,
+      date: realUtc,
+      platforms,
+      postingTime: `${String(hh || 10).padStart(2, "0")}:${String(mm || 0).padStart(2, "0")}`,
+    });
+  }
+
+  // Per-day platform assignment string for the AI prompt.
+  const scheduleBrief = slots.length > 0
+    ? slots.map(s => {
+        const d = s.date.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: tz });
+        return `Day ${s.dayNumber}: ${d} ${s.postingTime} → primary platform: ${s.platforms[0]}${s.platforms.length > 1 ? `, secondary: ${s.platforms.slice(1).join(", ")}` : ""}`;
+      }).join("\n")
+    : "No schedule configured — generate 7 generic days.";
+
+  const platformStyleGuide = `
+=== PLATFORM-SPECIFIC WRITING RULES (CRITICAL) ===
+Generate each day's caption/hook/tone specifically for that day's primary platform:
+- LinkedIn: professional, long-form (150-300 words), authority/thought leadership, no emoji-spam.
+- X (Twitter)/X: concise (<280 chars), punchy hook, 1-2 hashtags max, viral tone.
+- Instagram: emotional caption, vivid imagery, hashtag-rich (8-15), visual CTA.
+- Facebook: conversational, community-focused, shareable, medium length.
+- Threads: casual, conversational, threaded micro-story tone.
+- YouTube: short community-post tone or video hook script.
+- Google Business / GMB: local SEO, offers, hours, calls-to-visit.
+Do NOT reuse the same caption across days even if platforms differ — each day must be tailored.
+`;
+
   // Fetch previous week topics to avoid repetition
   let previousTopicsSummary = "";
   const { data: recentItems } = await supabaseAdmin
@@ -274,10 +374,19 @@ ${formatGuidance}
 5. Hashtags must include brand-specific, location-specific, and niche-specific tags.
 6. Each day must target a DIFFERENT content goal.
 
-Generate exactly 7 days with diverse, non-repetitive content.${previousTopicsSummary}`;
+Generate exactly 7 days with diverse, non-repetitive content.${previousTopicsSummary}
 
+${platformStyleGuide}
+
+=== SCHEDULE & PLATFORM ASSIGNMENT (MUST FOLLOW) ===
+${scheduleBrief}
+Match each day's primary_platform to the assignment above exactly. Write the caption/hook in that platform's native style.`;
+
+  const platformsForUser = slots.length > 0
+    ? [...new Set(slots.flatMap(s => s.platforms))]
+    : (business.publishing_platforms?.length ? business.publishing_platforms : (business.platforms || ["Instagram", "Facebook"]));
   const userPrompt = `Generate Week ${weekNumber} content plan for "${business.name}".
-Platforms: ${(business.platforms || ["Instagram", "Facebook"]).join(", ")}
+Active platforms this week: ${platformsForUser.join(", ")}
 This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 === 2 ? "engagement" : weekNumber % 4 === 3 ? "trust building" : "sales conversion"}.`;
 
   const contentPlanRequest: any = {
