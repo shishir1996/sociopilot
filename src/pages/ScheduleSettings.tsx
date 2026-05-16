@@ -192,9 +192,9 @@ export default function ScheduleSettings() {
       {showUpgrade && (
         <UpgradeModal
           open={showUpgrade}
-          onOpenChange={setShowUpgrade}
-          reason="Upgrade to Pro to publish across multiple platforms."
-          feature="multi-platform scheduling"
+          onClose={() => setShowUpgrade(false)}
+          onUpgrade={() => navigate("/pricing")}
+          trigger="multi_platform"
         />
       )}
       <header className="border-b border-border bg-card h-14 flex items-center justify-between px-4 sm:px-6">
