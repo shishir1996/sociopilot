@@ -27,6 +27,7 @@ interface ContentItem {
   core_message: string;
   cta: string;
   posting_time: string;
+  scheduled_at: string | null;
   why_it_matters: string;
   status: string;
   caption: string;
@@ -307,6 +308,7 @@ export default function ContentPage() {
                 coreMessage={item.core_message}
                 cta={item.cta}
                 postingTime={item.posting_time}
+                scheduledAt={item.scheduled_at}
                 whyItMatters={item.why_it_matters}
                 status={item.status}
                 caption={item.caption}
