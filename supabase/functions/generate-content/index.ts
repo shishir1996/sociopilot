@@ -463,6 +463,43 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
     if (itemsError) { console.error("Items insert error:", itemsError); throw new Error("Content items could not be saved."); }
 
     const insertedCount = insertedItems?.length || 0;
+
+    // ---- Schedule items using the user's posting_schedules -----------------
+    // Generate for the next 7 days starting today. day_number 1 == today.
+    try {
+      const { data: schedules } = await supabaseAdmin
+        .from("posting_schedules")
+        .select("day_of_week, posting_time, platforms, enabled")
+        .eq("business_id", businessId)
+        .eq("user_id", userId)
+        .eq("enabled", true);
+
+      if (schedules && schedules.length > 0 && insertedItems && insertedItems.length > 0) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        for (const it of insertedItems) {
+          const offset = Math.max(0, (it.day_number || 1) - 1);
+          const target = new Date(today);
+          target.setDate(today.getDate() + offset);
+          const dow = target.getDay(); // 0=Sun..6=Sat
+          const sched = schedules.find((s: any) => s.day_of_week === dow);
+          if (!sched) continue;
+          const [hh, mm] = String(sched.posting_time || "10:00").split(":").map(Number);
+          target.setHours(hh || 10, mm || 0, 0, 0);
+          const platforms: string[] = Array.isArray(sched.platforms) ? sched.platforms : [];
+          await supabaseAdmin.from("content_items").update({
+            scheduled_at: target.toISOString(),
+            status: "scheduled",
+            primary_platform: platforms[0] || undefined,
+            secondary_platforms: platforms.slice(1),
+          }).eq("id", it.id);
+        }
+      }
+    } catch (e) {
+      console.error("Auto-schedule failed:", e);
+    }
+
     if (generationRequestId) {
       await supabaseAdmin.from("weekly_generation_requests")
         .update({ status: "completed", content_plan_id: newPlan.id })
