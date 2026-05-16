@@ -124,33 +124,30 @@ async function scheduleContentItems(supabase: any, businessId: string, planId: s
 
   if (!items || items.length === 0) return;
 
-  // Map day_number (1-7) to next week's dates
-  const now = new Date();
-  const nextMonday = new Date(now);
-  nextMonday.setDate(now.getDate() + (8 - now.getDay()) % 7 || 7);
-  nextMonday.setHours(0, 0, 0, 0);
-
-  for (const item of items) {
-    // day_number 1 = Monday, 7 = Sunday
-    const dayIndex = item.day_number - 1; // 0-6 (Mon-Sun)
-    const targetDate = new Date(nextMonday);
-    targetDate.setDate(nextMonday.getDate() + dayIndex);
-
-    // Find matching schedule (convert: Mon=1 in our system, but day_of_week 0=Sun,1=Mon...)
-    const dayOfWeek = dayIndex === 6 ? 0 : dayIndex + 1; // Convert to 0=Sun format
-    const schedule = schedules.find((s: any) => s.day_of_week === dayOfWeek);
-
-    if (schedule) {
-      const [hours, minutes] = schedule.posting_time.split(":").map(Number);
-      targetDate.setHours(hours, minutes, 0, 0);
-
-      // Update the content item with scheduled time and platforms from schedule
-      await supabase.from("content_items").update({
-        scheduled_at: targetDate.toISOString(),
-        status: "scheduled",
-        primary_platform: schedule.platforms[0] || "",
-        secondary_platforms: schedule.platforms.slice(1) || [],
-      }).eq("id", item.id);
-    }
+  // Map day_number → next occurrence starting today (today-first).
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayDow = today.getDay();
+  // Build ordered upcoming slots (next 7 days that have a schedule)
+  const slots: Array<{ date: Date; platforms: string[] }> = [];
+  for (let i = 0; i < 14 && slots.length < 7; i++) {
+    const dow = (todayDow + i) % 7;
+    const sched = schedules.find((s: any) => s.day_of_week === dow);
+    if (!sched) continue;
+    const [hh, mm] = String(sched.posting_time || "10:00").split(":").map(Number);
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    d.setHours(hh || 10, mm || 0, 0, 0);
+    slots.push({ date: d, platforms: sched.platforms || [] });
+  }
+  for (let idx = 0; idx < items.length && idx < slots.length; idx++) {
+    const item = items[idx];
+    const slot = slots[idx];
+    await supabase.from("content_items").update({
+      scheduled_at: slot.date.toISOString(),
+      status: "scheduled",
+      primary_platform: slot.platforms[0] || "",
+      secondary_platforms: slot.platforms.slice(1) || [],
+    }).eq("id", item.id);
   }
 }
