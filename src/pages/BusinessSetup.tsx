@@ -11,7 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, ArrowRight, Building2, Target, Palette, Share2,
-  Loader2, Check, Sparkles, Facebook, Instagram, Linkedin, Lock,
+  Loader2, Check, Sparkles, Facebook, Instagram, Linkedin, Lock, Send,
 } from "lucide-react";
 
 const INDUSTRIES = [
@@ -43,6 +43,9 @@ export default function BusinessSetup() {
   const [loading, setLoading] = useState(false);
   const [enabledPlatforms, setEnabledPlatforms] = useState<string[]>([]);
   const [connectedCount, setConnectedCount] = useState(0);
+  const [connectedList, setConnectedList] = useState<string[]>([]);
+  const [pubPlatforms, setPubPlatforms] = useState<string[]>([]);
+  const [planIsPro, setPlanIsPro] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
@@ -80,13 +83,17 @@ export default function BusinessSetup() {
       const { data: biz } = await supabase
         .from("businesses").select("id").eq("user_id", user.id).maybeSingle();
       if (biz) {
-        const { count } = await supabase
+        const { data: accts, count } = await supabase
           .from("social_accounts")
-          .select("id", { count: "exact", head: true })
+          .select("platform", { count: "exact" })
           .eq("user_id", user.id)
-          .eq("business_id", biz.id);
+          .eq("business_id", biz.id) as any;
         setConnectedCount(count || 0);
+        setConnectedList((accts || []).map((a: any) => a.platform));
       }
+      const { data: sub } = await supabase
+        .from("subscriptions").select("plan_name").eq("user_id", user.id).maybeSingle() as any;
+      setPlanIsPro((sub?.plan_name || "").toLowerCase() === "pro");
     }
   };
 
@@ -122,6 +129,7 @@ export default function BusinessSetup() {
           main_offers: form.main_offers,
           location: form.location,
           timezone: form.timezone,
+          publishing_platforms: pubPlatforms,
         } as any).eq("id", existing.id);
         if (error) throw error;
       } else {
@@ -136,6 +144,7 @@ export default function BusinessSetup() {
           main_offers: form.main_offers,
           location: form.location,
           timezone: form.timezone,
+          publishing_platforms: pubPlatforms,
         } as any);
         if (error) throw error;
       }
@@ -194,7 +203,7 @@ export default function BusinessSetup() {
     }
   };
 
-  const TOTAL_STEPS = 4;
+  const TOTAL_STEPS = 5;
   const progress = ((step + 1) / TOTAL_STEPS) * 100;
 
   const stepLabels = [
@@ -202,10 +211,12 @@ export default function BusinessSetup() {
     { icon: Target, label: "Goals & Tone" },
     { icon: Palette, label: "Product Info" },
     { icon: Share2, label: "Connect" },
+    { icon: Send, label: "Publishing" },
   ];
 
   const canProceed = () => {
     if (step === 0) return form.name.trim() !== "";
+    if (step === 4) return pubPlatforms.length > 0;
     return true;
   };
 
