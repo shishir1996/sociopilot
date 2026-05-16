@@ -422,6 +422,62 @@ export default function BusinessSetup() {
               </div>
             )}
 
+            {/* Step 4: Publishing Platform Selection */}
+            {step === 4 && (
+              <div className="space-y-4">
+                <div className="text-center">
+                  <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                    <Send className="h-7 w-7 text-primary" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-foreground">Publishing Platform Selection</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {planIsPro
+                      ? "Choose one or more platforms for automated publishing."
+                      : "Choose ONE platform for automated publishing. Upgrade to Pro to publish to multiple."}
+                  </p>
+                </div>
+
+                {connectedList.length === 0 ? (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-foreground">
+                    Connect at least one platform in the previous step first.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-2">
+                    {connectedList.map((p) => {
+                      const selected = pubPlatforms.includes(p);
+                      return (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => {
+                            if (planIsPro) {
+                              setPubPlatforms((prev) =>
+                                prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]
+                              );
+                            } else {
+                              setPubPlatforms([p]);
+                            }
+                          }}
+                          className={`flex items-center justify-between px-4 py-3 rounded-xl border text-sm transition-all ${
+                            selected ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/40"
+                          }`}
+                        >
+                          <span className="capitalize font-medium">{p}</span>
+                          {selected && <Check className="h-4 w-4" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {!planIsPro && (
+                  <p className="text-xs text-center text-muted-foreground">
+                    On Free/Basic, the same platform is auto-assigned to every scheduled day.
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Navigation */}
             <div className="flex justify-between mt-8 pt-4 border-t border-border">
               <Button
@@ -439,6 +495,7 @@ export default function BusinessSetup() {
                     const next = step + 1;
                     setStep(next);
                     if (next === 3) loadEnabledPlatforms();
+                    if (next === 4) loadEnabledPlatforms();
                   }}
                   disabled={!canProceed()}
                   className="gap-2"
@@ -447,14 +504,11 @@ export default function BusinessSetup() {
                 </Button>
               ) : (
                 <div className="flex gap-2">
-                  <Button variant="outline" onClick={handleSubmit} disabled={loading}>
-                    Skip & Finish
-                  </Button>
                   <Button
                     onClick={handleSubmit}
-                    disabled={loading || connectedCount === 0}
+                    disabled={loading || pubPlatforms.length === 0}
                     className="gap-2"
-                    title={connectedCount === 0 ? "Connect at least one platform to finish, or use Skip & Finish" : undefined}
+                    title={pubPlatforms.length === 0 ? "Pick at least one publishing platform" : undefined}
                   >
                     {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                     {loading ? "Creating..." : "Finish Setup"}
