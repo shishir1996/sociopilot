@@ -8,6 +8,8 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Clock, Save, Loader2, CalendarClock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { usePlanLimits } from "@/hooks/usePlanLimits";
+import { UpgradeModal } from "@/components/upgrade/UpgradeModal";
 
 const DAYS = [
   { value: 0, label: "Sunday" },
@@ -19,7 +21,7 @@ const DAYS = [
   { value: 6, label: "Saturday" },
 ];
 
-const PLATFORMS = ["Facebook", "Instagram", "LinkedIn", "X (Twitter)", "Google Business"];
+const PLATFORMS = ["Facebook", "Instagram", "LinkedIn", "X (Twitter)", "Threads", "YouTube", "Google Business"];
 
 interface ScheduleRow {
   id?: string;
@@ -33,8 +35,13 @@ export default function ScheduleSettings() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isPro } = usePlanLimits();
   const [businessId, setBusinessId] = useState<string | null>(null);
   const [connectedPlatforms, setConnectedPlatforms] = useState<string[]>([]);
+  const [publishingPlatform, setPublishingPlatform] = useState<string>("");
+  const [autoPublish, setAutoPublish] = useState(true);
+  const [approvalRequired, setApprovalRequired] = useState(false);
+  const [showUpgrade, setShowUpgrade] = useState(false);
   const [schedules, setSchedules] = useState<ScheduleRow[]>(
     DAYS.map((d) => ({ day_of_week: d.value, posting_time: "10:00", platforms: [], enabled: true }))
   );
@@ -66,6 +73,18 @@ export default function ScheduleSettings() {
       .eq("business_id", bizId) as any;
     setConnectedPlatforms((accounts || []).map((a: any) => a.platform));
 
+    // Load business publishing settings
+    const { data: bizRow } = await supabase
+      .from("businesses")
+      .select("publishing_platforms, auto_publish_enabled, approval_required")
+      .eq("id", bizId)
+      .maybeSingle() as any;
+    if (bizRow) {
+      setPublishingPlatform((bizRow.publishing_platforms || [])[0] || "");
+      setAutoPublish(bizRow.auto_publish_enabled !== false);
+      setApprovalRequired(!!bizRow.approval_required);
+    }
+
     // Fetch existing schedules
     const { data: existing } = await supabase
       .from("posting_schedules")
@@ -92,6 +111,26 @@ export default function ScheduleSettings() {
   };
 
   const togglePlatform = (dayIndex: number, platform: string) => {
+    // Free/Basic users are locked to a single publishing platform across all days
+    if (!isPro) {
+      const target = publishingPlatform || platform;
+      if (publishingPlatform && platform !== publishingPlatform) {
+        setShowUpgrade(true);
+        return;
+      }
+      // First selection on any day sets the locked platform for everyone
+      setPublishingPlatform(target);
+      setSchedules((prev) =>
+        prev.map((s) => {
+          if (s.day_of_week === DAYS[dayIndex].value) {
+            const has = s.platforms.includes(target);
+            return { ...s, platforms: has ? [] : [target] };
+          }
+          return s;
+        })
+      );
+      return;
+    }
     setSchedules((prev) =>
       prev.map((s, i) => {
         if (i !== dayIndex) return s;
@@ -106,13 +145,23 @@ export default function ScheduleSettings() {
     setSaving(true);
 
     try {
+      // Persist business-level publishing settings
+      const platformsArr = !isPro && publishingPlatform ? [publishingPlatform] : [];
+      await supabase.from("businesses").update({
+        publishing_platforms: platformsArr.length ? platformsArr : (schedules.flatMap(s => s.platforms).filter((v, i, a) => a.indexOf(v) === i)),
+        auto_publish_enabled: autoPublish,
+        approval_required: approvalRequired,
+      } as any).eq("id", businessId);
+
       for (const schedule of schedules) {
         const row = {
           business_id: businessId,
           user_id: user.id,
           day_of_week: schedule.day_of_week,
           posting_time: schedule.posting_time + ":00",
-          platforms: schedule.platforms,
+          platforms: !isPro && publishingPlatform && schedule.platforms.length > 0
+            ? [publishingPlatform]
+            : schedule.platforms,
           enabled: schedule.enabled,
         };
 
@@ -140,6 +189,14 @@ export default function ScheduleSettings() {
 
   return (
     <div className="min-h-screen bg-background">
+      {showUpgrade && (
+        <UpgradeModal
+          open={showUpgrade}
+          onClose={() => setShowUpgrade(false)}
+          onUpgrade={() => navigate("/pricing")}
+          trigger="multi_platform"
+        />
+      )}
       <header className="border-b border-border bg-card h-14 flex items-center justify-between px-4 sm:px-6">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="text-muted-foreground">
@@ -161,6 +218,35 @@ export default function ScheduleSettings() {
         <p className="text-sm text-muted-foreground">
           Set your posting time and choose which platforms to post on each day. Only connected platforms are available.
         </p>
+
+        {/* Publishing settings card */}
+        <Card>
+          <CardHeader className="py-3 px-4">
+            <CardTitle className="text-sm font-semibold">Publishing Settings</CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-3 space-y-3 text-sm">
+            {!isPro && (
+              <div className="rounded-md bg-warning/5 border border-warning/20 p-3 text-xs">
+                <strong>Free / Basic plan:</strong> you can automate publishing on <strong>one</strong> platform.
+                {publishingPlatform ? <> Currently locked to <strong>{publishingPlatform}</strong>.</> : <> Pick a platform on any day below — it will apply to all days.</>}
+              </div>
+            )}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">Auto-publish generated content</p>
+                <p className="text-xs text-muted-foreground">When ON, new posts go straight to the scheduled queue.</p>
+              </div>
+              <Switch checked={autoPublish} onCheckedChange={setAutoPublish} />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">Require my approval before scheduling</p>
+                <p className="text-xs text-muted-foreground">New posts wait in an approval queue.</p>
+              </div>
+              <Switch checked={approvalRequired} onCheckedChange={setApprovalRequired} />
+            </div>
+          </CardContent>
+        </Card>
 
         {connectedPlatforms.length === 0 && (
           <Card className="border-warning/30 bg-warning/5">

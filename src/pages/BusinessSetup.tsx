@@ -11,7 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, ArrowRight, Building2, Target, Palette, Share2,
-  Loader2, Check, Sparkles, Facebook, Instagram, Linkedin, Lock,
+  Loader2, Check, Sparkles, Facebook, Instagram, Linkedin, Lock, Send,
 } from "lucide-react";
 
 const INDUSTRIES = [
@@ -43,6 +43,9 @@ export default function BusinessSetup() {
   const [loading, setLoading] = useState(false);
   const [enabledPlatforms, setEnabledPlatforms] = useState<string[]>([]);
   const [connectedCount, setConnectedCount] = useState(0);
+  const [connectedList, setConnectedList] = useState<string[]>([]);
+  const [pubPlatforms, setPubPlatforms] = useState<string[]>([]);
+  const [planIsPro, setPlanIsPro] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
@@ -80,13 +83,17 @@ export default function BusinessSetup() {
       const { data: biz } = await supabase
         .from("businesses").select("id").eq("user_id", user.id).maybeSingle();
       if (biz) {
-        const { count } = await supabase
+        const { data: accts, count } = await supabase
           .from("social_accounts")
-          .select("id", { count: "exact", head: true })
+          .select("platform", { count: "exact" })
           .eq("user_id", user.id)
-          .eq("business_id", biz.id);
+          .eq("business_id", biz.id) as any;
         setConnectedCount(count || 0);
+        setConnectedList((accts || []).map((a: any) => a.platform));
       }
+      const { data: sub } = await supabase
+        .from("subscriptions").select("plan_name").eq("user_id", user.id).maybeSingle() as any;
+      setPlanIsPro((sub?.plan_name || "").toLowerCase() === "pro");
     }
   };
 
@@ -122,6 +129,7 @@ export default function BusinessSetup() {
           main_offers: form.main_offers,
           location: form.location,
           timezone: form.timezone,
+          publishing_platforms: pubPlatforms,
         } as any).eq("id", existing.id);
         if (error) throw error;
       } else {
@@ -136,6 +144,7 @@ export default function BusinessSetup() {
           main_offers: form.main_offers,
           location: form.location,
           timezone: form.timezone,
+          publishing_platforms: pubPlatforms,
         } as any);
         if (error) throw error;
       }
@@ -194,7 +203,7 @@ export default function BusinessSetup() {
     }
   };
 
-  const TOTAL_STEPS = 4;
+  const TOTAL_STEPS = 5;
   const progress = ((step + 1) / TOTAL_STEPS) * 100;
 
   const stepLabels = [
@@ -202,10 +211,12 @@ export default function BusinessSetup() {
     { icon: Target, label: "Goals & Tone" },
     { icon: Palette, label: "Product Info" },
     { icon: Share2, label: "Connect" },
+    { icon: Send, label: "Publishing" },
   ];
 
   const canProceed = () => {
     if (step === 0) return form.name.trim() !== "";
+    if (step === 4) return pubPlatforms.length > 0;
     return true;
   };
 
@@ -411,6 +422,62 @@ export default function BusinessSetup() {
               </div>
             )}
 
+            {/* Step 4: Publishing Platform Selection */}
+            {step === 4 && (
+              <div className="space-y-4">
+                <div className="text-center">
+                  <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                    <Send className="h-7 w-7 text-primary" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-foreground">Publishing Platform Selection</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {planIsPro
+                      ? "Choose one or more platforms for automated publishing."
+                      : "Choose ONE platform for automated publishing. Upgrade to Pro to publish to multiple."}
+                  </p>
+                </div>
+
+                {connectedList.length === 0 ? (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-foreground">
+                    Connect at least one platform in the previous step first.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-2">
+                    {connectedList.map((p) => {
+                      const selected = pubPlatforms.includes(p);
+                      return (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => {
+                            if (planIsPro) {
+                              setPubPlatforms((prev) =>
+                                prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]
+                              );
+                            } else {
+                              setPubPlatforms([p]);
+                            }
+                          }}
+                          className={`flex items-center justify-between px-4 py-3 rounded-xl border text-sm transition-all ${
+                            selected ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/40"
+                          }`}
+                        >
+                          <span className="capitalize font-medium">{p}</span>
+                          {selected && <Check className="h-4 w-4" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {!planIsPro && (
+                  <p className="text-xs text-center text-muted-foreground">
+                    On Free/Basic, the same platform is auto-assigned to every scheduled day.
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Navigation */}
             <div className="flex justify-between mt-8 pt-4 border-t border-border">
               <Button
@@ -428,6 +495,7 @@ export default function BusinessSetup() {
                     const next = step + 1;
                     setStep(next);
                     if (next === 3) loadEnabledPlatforms();
+                    if (next === 4) loadEnabledPlatforms();
                   }}
                   disabled={!canProceed()}
                   className="gap-2"
@@ -436,14 +504,11 @@ export default function BusinessSetup() {
                 </Button>
               ) : (
                 <div className="flex gap-2">
-                  <Button variant="outline" onClick={handleSubmit} disabled={loading}>
-                    Skip & Finish
-                  </Button>
                   <Button
                     onClick={handleSubmit}
-                    disabled={loading || connectedCount === 0}
+                    disabled={loading || pubPlatforms.length === 0}
                     className="gap-2"
-                    title={connectedCount === 0 ? "Connect at least one platform to finish, or use Skip & Finish" : undefined}
+                    title={pubPlatforms.length === 0 ? "Pick at least one publishing platform" : undefined}
                   >
                     {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                     {loading ? "Creating..." : "Finish Setup"}

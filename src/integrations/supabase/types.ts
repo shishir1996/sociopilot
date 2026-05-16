@@ -498,7 +498,9 @@ export type Database = {
       }
       businesses: {
         Row: {
+          approval_required: boolean
           auto_generate_enabled: boolean
+          auto_publish_enabled: boolean
           brand_colors: string[] | null
           brand_tone: string | null
           competitors: string | null
@@ -515,6 +517,7 @@ export type Database = {
           platforms: string[] | null
           posting_goals: string[] | null
           products_services: string | null
+          publishing_platforms: string[]
           slogan: string | null
           target_audience: string | null
           timezone: string
@@ -522,7 +525,9 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          approval_required?: boolean
           auto_generate_enabled?: boolean
+          auto_publish_enabled?: boolean
           brand_colors?: string[] | null
           brand_tone?: string | null
           competitors?: string | null
@@ -539,6 +544,7 @@ export type Database = {
           platforms?: string[] | null
           posting_goals?: string[] | null
           products_services?: string | null
+          publishing_platforms?: string[]
           slogan?: string | null
           target_audience?: string | null
           timezone?: string
@@ -546,7 +552,9 @@ export type Database = {
           user_id: string
         }
         Update: {
+          approval_required?: boolean
           auto_generate_enabled?: boolean
+          auto_publish_enabled?: boolean
           brand_colors?: string[] | null
           brand_tone?: string | null
           competitors?: string | null
@@ -563,6 +571,7 @@ export type Database = {
           platforms?: string[] | null
           posting_goals?: string[] | null
           products_services?: string | null
+          publishing_platforms?: string[]
           slogan?: string | null
           target_audience?: string | null
           timezone?: string

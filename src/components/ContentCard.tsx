@@ -30,6 +30,7 @@ interface ContentCardProps {
   coreMessage: string;
   cta: string;
   postingTime: string;
+  scheduledAt?: string | null;
   whyItMatters: string;
   status: string;
   caption?: string;
@@ -44,7 +45,7 @@ interface ContentCardProps {
 
 export function ContentCard({
   id, dayNumber, theme, goal, primaryPlatform, secondaryPlatforms,
-  contentType, topic, hook, painPoint, coreMessage, cta, postingTime,
+  contentType, topic, hook, painPoint, coreMessage, cta, postingTime, scheduledAt,
   whyItMatters, status, caption, hashtags, imagePrompt, imageUrl,
   visualStyle, repurposingSuggestion, onStatusChange, onDelete,
 }: ContentCardProps) {
@@ -63,8 +64,27 @@ export function ContentCard({
     approved: "default",
     scheduled: "outline",
     posted: "default",
+    published: "default",
+    failed: "destructive",
+    awaiting_approval: "secondary",
     partially_posted: "destructive",
   };
+
+  const statusLabel: Record<string, string> = {
+    awaiting_approval: "Awaiting Approval",
+    scheduled: "Scheduled",
+    draft: "Draft",
+    posted: "Published",
+    published: "Published",
+    failed: "Failed",
+  };
+
+  const scheduledDateLabel = scheduledAt
+    ? new Date(scheduledAt).toLocaleDateString(undefined, { weekday: "long", day: "2-digit", month: "short", year: "numeric" })
+    : null;
+  const scheduledTimeLabel = scheduledAt
+    ? new Date(scheduledAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
+    : postingTime || null;
 
   const handleCopyCaption = async () => {
     const fullText = caption
@@ -149,7 +169,7 @@ export function ContentCard({
           </div>
           <div className="flex items-center gap-1">
             <Badge variant={statusColors[status] as any || "secondary"} className="text-xs">
-              {status}
+              {statusLabel[status] || status}
             </Badge>
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -179,6 +199,14 @@ export function ContentCard({
           ))}
           <ContentTypeBadge type={contentType} />
         </div>
+
+        {(scheduledDateLabel || scheduledTimeLabel) && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 rounded-md px-2 py-1.5">
+            <CalendarClock className="h-3.5 w-3.5 text-primary" />
+            {scheduledDateLabel && <span className="font-medium text-foreground">{scheduledDateLabel}</span>}
+            {scheduledTimeLabel && <span>· {scheduledTimeLabel}</span>}
+          </div>
+        )}
 
         <div>
           <p className="text-sm font-semibold text-foreground">{topic}</p>
