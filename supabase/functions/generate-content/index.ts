@@ -573,35 +573,23 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
 
     const insertedCount = insertedItems?.length || 0;
 
-    // ---- Schedule items using the user's posting_schedules -----------------
-    // Generate for the next 7 days starting today. day_number 1 == today.
+    // ---- Auto-schedule items to pre-computed slots (today-first, tz-aware)
     try {
-      const { data: schedules } = await supabaseAdmin
-        .from("posting_schedules")
-        .select("day_of_week, posting_time, platforms, enabled")
-        .eq("business_id", businessId)
-        .eq("user_id", userId)
-        .eq("enabled", true);
-
-      if (schedules && schedules.length > 0 && insertedItems && insertedItems.length > 0) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
+      if (slots.length > 0 && insertedItems && insertedItems.length > 0) {
+        const approvalRequired = !!business.approval_required;
+        const autoPublishOn = business.auto_publish_enabled !== false;
+        const targetStatus = approvalRequired
+          ? "awaiting_approval"
+          : (autoPublishOn ? "scheduled" : "draft");
         for (const it of insertedItems) {
-          const offset = Math.max(0, (it.day_number || 1) - 1);
-          const target = new Date(today);
-          target.setDate(today.getDate() + offset);
-          const dow = target.getDay(); // 0=Sun..6=Sat
-          const sched = schedules.find((s: any) => s.day_of_week === dow);
-          if (!sched) continue;
-          const [hh, mm] = String(sched.posting_time || "10:00").split(":").map(Number);
-          target.setHours(hh || 10, mm || 0, 0, 0);
-          const platforms: string[] = Array.isArray(sched.platforms) ? sched.platforms : [];
+          const slot = slots.find(s => s.dayNumber === (it.day_number || 0));
+          if (!slot) continue;
           await supabaseAdmin.from("content_items").update({
-            scheduled_at: target.toISOString(),
-            status: "scheduled",
-            primary_platform: platforms[0] || undefined,
-            secondary_platforms: platforms.slice(1),
+            scheduled_at: slot.date.toISOString(),
+            status: targetStatus,
+            posting_time: slot.postingTime,
+            primary_platform: slot.platforms[0],
+            secondary_platforms: slot.platforms.slice(1),
           }).eq("id", it.id);
         }
       }
