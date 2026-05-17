@@ -155,7 +155,7 @@ export default function AIStudio() {
       if (request?.status === "completed" && request.content_plan_id) {
         return fetchGeneratedItemsForPlan(request.content_plan_id);
       }
-      if (request?.status === "failed") throw new Error("Generation failed in the background. Please check the active AI model/API key in Admin → AI Control Center.");
+      if (request?.status === "failed") throw new Error("Something went wrong while generating your content. Please try again in a minute.");
 
       const { data: latestPlan } = await supabase
         .from("content_plans")
