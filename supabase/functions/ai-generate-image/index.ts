@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildProviderChain } from "../_shared/ai-router.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -169,6 +170,46 @@ function getApiKey(provider: any): string {
     return Deno.env.get("LOVABLE_API_KEY") || "";
   }
   return "";
+}
+
+async function recordProviderHealth(supabaseAdmin: any, provider: any, ok: boolean, responseTimeMs?: number, errorMessage?: string) {
+  if (!provider?.id) return;
+  await supabaseAdmin.from("provider_health_logs").insert({
+    provider_id: provider.id,
+    provider_name: provider.provider_name || "unknown",
+    provider_type: provider.provider_type || "image",
+    status: ok ? "success" : "failure",
+    response_time_ms: responseTimeMs || null,
+    error_message: errorMessage ? String(errorMessage).slice(0, 500) : null,
+  }).then(() => null, () => null);
+  await supabaseAdmin.from("ai_provider_settings").update(ok ? {
+    health_status: "healthy",
+    last_success_at: new Date().toISOString(),
+    failure_count: 0,
+  } : {
+    health_status: "degraded",
+    last_failure_at: new Date().toISOString(),
+    failure_count: Number(provider.failure_count || 0) + 1,
+  }).eq("id", provider.id).then(() => null, () => null);
+}
+
+async function generateWithProviderChain(supabaseAdmin: any, providers: any[], prompt: string, opts: any) {
+  let lastErr: any = null;
+  for (const provider of providers) {
+    const startedAt = Date.now();
+    try {
+      const adapter = getImageAdapter(provider.provider_name);
+      const apiKey = getApiKey(provider);
+      const result = await adapter.generate(apiKey, provider.model_name, prompt, opts);
+      if (!result.base64 && !result.url) throw new Error("empty_image_result");
+      await recordProviderHealth(supabaseAdmin, provider, true, Date.now() - startedAt);
+      return { result, provider };
+    } catch (err: any) {
+      lastErr = err;
+      await recordProviderHealth(supabaseAdmin, provider, false, Date.now() - startedAt, err?.message || err);
+    }
+  }
+  throw lastErr || new Error("__image_unavailable__");
 }
 
 serve(async (req) => {
