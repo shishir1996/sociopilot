@@ -29,6 +29,38 @@ function providerEndpoint(name: string): string {
   return "https://ai.gateway.lovable.dev/v1/chat/completions";
 }
 
+function safeTimeZone(timeZone?: string): string {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: timeZone || "UTC" }).format(new Date());
+    return timeZone || "UTC";
+  } catch (_) {
+    return "UTC";
+  }
+}
+
+async function recordProviderHealth(supabaseAdmin: any, provider: any, ok: boolean, responseTimeMs?: number, errorMessage?: string) {
+  if (!provider?.id) return;
+  const providerName = provider.provider_name || "unknown";
+  const providerType = provider.provider_type || "text";
+  await supabaseAdmin.from("provider_health_logs").insert({
+    provider_id: provider.id,
+    provider_name: providerName,
+    provider_type: providerType,
+    status: ok ? "success" : "failure",
+    response_time_ms: responseTimeMs || null,
+    error_message: errorMessage ? String(errorMessage).slice(0, 500) : null,
+  }).then(() => null, () => null);
+  await supabaseAdmin.from("ai_provider_settings").update(ok ? {
+    health_status: "healthy",
+    last_success_at: new Date().toISOString(),
+    failure_count: 0,
+  } : {
+    health_status: "degraded",
+    last_failure_at: new Date().toISOString(),
+    failure_count: (Number(provider.failure_count || 0) + 1),
+  }).eq("id", provider.id).then(() => null, () => null);
+}
+
 async function callTextProvider(provider: any, body: any) {
   const url = providerEndpoint(provider?.provider_name || "lovable");
   const apiKey = resolveApiKey(provider);
@@ -53,17 +85,22 @@ async function callTextProvider(provider: any, body: any) {
 // Try a request across multiple providers in order. Retries each provider once
 // on transient failure (network/timeout/5xx/429), then moves on to the next.
 // Returns the first OK response, or throws a generic error if all fail.
-async function callTextWithFailover(providers: any[], body: any): Promise<{ res: Response; provider: any }> {
+async function callTextWithFailover(supabaseAdmin: any, providers: any[], body: any): Promise<{ res: Response; provider: any }> {
   let lastErr: any = null;
   for (const provider of providers) {
     for (let attempt = 0; attempt < 2; attempt++) {
+      const attemptStartedAt = Date.now();
       try {
         const reqBody = { ...body, model: provider.model_name || body.model };
         const res = await callTextProvider(provider, reqBody);
-        if (res.ok) return { res, provider };
+        if (res.ok) {
+          await recordProviderHealth(supabaseAdmin, provider, true, Date.now() - attemptStartedAt);
+          return { res, provider };
+        }
         // Retry on 408/429/5xx; otherwise move to next provider.
+        const txt = await res.clone().text().catch(() => "");
+        await recordProviderHealth(supabaseAdmin, provider, false, Date.now() - attemptStartedAt, `HTTP ${res.status}: ${txt}`);
         if (![408, 429, 500, 502, 503, 504].includes(res.status)) {
-          const txt = await res.text().catch(() => "");
           console.error(`Provider ${provider.provider_name} failed (${res.status}): ${txt.slice(0, 300)}`);
           lastErr = new Error(`status_${res.status}`);
           break;
@@ -72,6 +109,7 @@ async function callTextWithFailover(providers: any[], body: any): Promise<{ res:
         await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
       } catch (e: any) {
         console.error(`Provider ${provider.provider_name} threw:`, e?.message || e);
+        await recordProviderHealth(supabaseAdmin, provider, false, Date.now() - attemptStartedAt, e?.message || e);
         lastErr = e;
         await new Promise(r => setTimeout(r, 1000));
       }
