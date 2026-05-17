@@ -260,7 +260,12 @@ export default function AIStudio() {
       toast({ title: "✨ Weekly Content Generated!", description: `${items.length} posts created for your week.` });
     } catch (err: any) {
       if (activeRequestId) await supabase.from("weekly_generation_requests").update({ status: "failed" }).eq("id", activeRequestId);
-      toast({ title: "Generation Failed", description: err.message, variant: "destructive" });
+      const raw = String(err?.message || "");
+      // Never expose internal sentinels or provider/API details.
+      const friendly = raw.startsWith("__") || /provider|api key|model|openrouter|gemini|openai|groq/i.test(raw)
+        ? "Something went wrong while generating your content. Please try again in a minute."
+        : raw || "Something went wrong while generating your content. Please try again in a minute.";
+      toast({ title: "Generation Failed", description: friendly, variant: "destructive" });
       setStep("calendar");
     }
     setGenerating(false);
