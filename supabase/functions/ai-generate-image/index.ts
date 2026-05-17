@@ -269,14 +269,17 @@ serve(async (req) => {
       }
     }
 
-    // Get active + fallback image providers
+    // Get active image provider chain by admin priority + health.
     const { data: providerRows } = await supabaseAdmin
       .from("ai_provider_settings").select("*")
-      .eq("provider_type", "image").order("is_active", { ascending: false });
+      .eq("provider_type", "image")
+      .eq("is_active", true)
+      .neq("health_status", "down")
+      .order("priority", { ascending: true })
+      .order("is_fallback", { ascending: true });
 
-    const activeProvider = (providerRows || []).find((p: any) => p.is_active);
-    const fallbackProvider = (providerRows || []).find((p: any) => p.is_fallback && p.id !== activeProvider?.id);
-    const provider = activeProvider || { provider_name: "lovable", model_name: "google/gemini-3.1-flash-image-preview" };
+    const builtInFallback = { provider_name: "lovable", provider_type: "image", model_name: "google/gemini-3.1-flash-image-preview", priority: 999 };
+    const providerChain = buildProviderChain(providerRows || [], "image", builtInFallback);
 
     // Get prompt template
     const { data: promptTemplate } = await supabaseAdmin
@@ -310,24 +313,8 @@ The image should be visually striking, on-brand, and optimized for social media.
     for (let i = 0; i < count; i++) {
       if (i > 0) await new Promise(r => setTimeout(r, 2000));
 
-      let result: { base64?: string; url?: string } = {};
-      let usedProvider = provider;
-      const adapter = getImageAdapter(provider.provider_name);
-      const apiKey = getApiKey(provider);
-
-      try {
-        result = await adapter.generate(apiKey, provider.model_name, imagePrompt, { size: sizeMap[aspect_ratio], aspect_ratio });
-      } catch (err: any) {
-        if (fallbackProvider) {
-          console.log("Image fallback to:", fallbackProvider.provider_name);
-          const fbAdapter = getImageAdapter(fallbackProvider.provider_name);
-          const fbKey = getApiKey(fallbackProvider);
-          usedProvider = fallbackProvider;
-          result = await fbAdapter.generate(fbKey, fallbackProvider.model_name, imagePrompt, { size: sizeMap[aspect_ratio], aspect_ratio });
-        } else {
-          throw err;
-        }
-      }
+      const routed = await generateWithProviderChain(supabaseAdmin, providerChain, imagePrompt, { size: sizeMap[aspect_ratio], aspect_ratio });
+      const result: { base64?: string; url?: string } = routed.result;
 
       // Upload to storage
       if (result.base64) {
