@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Settings, Cpu, Image, FileText, Shield, ToggleLeft, Activity,
-  Plus, Trash2, Save, DollarSign, Key, RefreshCw, Eye, EyeOff, Loader2, CheckCircle2, XCircle, MapPin, Sparkles,
+  Plus, Trash2, Save, DollarSign, Key, RefreshCw, Eye, EyeOff, Loader2, CheckCircle2, XCircle, MapPin, Sparkles, ArrowUp, ArrowDown,
 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -48,12 +48,30 @@ async function adminApi(body: any) {
 }
 
 const TEXT_PROVIDERS = [
-  { label: "OpenRouter (only supported provider)", value: "openrouter" },
+  { label: "OpenRouter", value: "openrouter" },
+  { label: "Lovable AI", value: "lovable" },
+  { label: "OpenAI", value: "openai" },
+  { label: "Gemini", value: "gemini" },
+  { label: "Groq", value: "groq" },
+  { label: "Together AI", value: "together" },
+  { label: "DeepSeek", value: "deepseek" },
 ];
 
 const IMAGE_PROVIDERS = [
-  { label: "OpenRouter (only supported provider)", value: "openrouter" },
+  { label: "OpenRouter", value: "openrouter" },
+  { label: "Lovable AI", value: "lovable" },
+  { label: "OpenAI Image", value: "openai_image" },
+  { label: "Stability", value: "stability" },
+  { label: "Replicate", value: "replicate" },
+  { label: "Fal AI", value: "fal" },
 ];
+
+function healthBadge(status?: string) {
+  if (status === "healthy") return <Badge variant="secondary">Healthy</Badge>;
+  if (status === "degraded") return <Badge variant="outline">Degraded</Badge>;
+  if (status === "down") return <Badge variant="destructive">Down</Badge>;
+  return <Badge variant="outline">Unknown</Badge>;
+}
 
 // ===================== TEXT MODELS =====================
 function TextModelsPanel() {
