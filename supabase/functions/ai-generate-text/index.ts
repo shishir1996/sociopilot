@@ -237,13 +237,14 @@ serve(async (req) => {
       }
     }
 
-    // Get active text provider + fallback
+    // Get active text provider chain by admin priority + health.
     const { data: providers } = await supabaseAdmin
       .from("ai_provider_settings").select("*")
-      .eq("provider_type", "text").order("is_active", { ascending: false }).order("is_fallback", { ascending: false });
-
-    const activeProvider = (providers || []).find((p: any) => p.is_active);
-    const fallbackProvider = (providers || []).find((p: any) => p.is_fallback && p.id !== activeProvider?.id);
+      .eq("provider_type", "text")
+      .eq("is_active", true)
+      .neq("health_status", "down")
+      .order("priority", { ascending: true })
+      .order("is_fallback", { ascending: true });
 
     // Get prompt template
     const { data: promptTemplate } = await supabaseAdmin
@@ -257,8 +258,9 @@ serve(async (req) => {
       brandPreset = data;
     }
 
-    const provider = activeProvider || { provider_name: "lovable", model_name: "google/gemini-3-flash-preview", temperature: 0.7, max_tokens: 2048 };
-    const modelName = provider.model_name || "google/gemini-3-flash-preview";
+    const builtInFallback = { provider_name: "lovable", provider_type: "text", model_name: "google/gemini-3-flash-preview", temperature: 0.7, max_tokens: 2048, priority: 999 };
+    const providerChain = buildProviderChain(providers || [], "text", builtInFallback);
+    const provider = providerChain[0] || builtInFallback;
     const temperature = provider.temperature || 0.7;
     const maxTokens = provider.max_tokens || 2048;
     const numVariations = variations_count || 3;
@@ -318,58 +320,9 @@ Return a JSON object with this exact structure:
     ];
     const callOpts: any = { temperature, max_tokens: maxTokens };
 
-    let aiData: any;
-    let usedProvider = provider;
-
-    // Try active provider first, then fallback
-    const adapter = getAdapter(provider.provider_name);
-    const apiKey = getApiKey(provider);
-
-    try {
-      aiData = await adapter.call(apiKey, modelName, messages, callOpts);
-    } catch (primaryErr: any) {
-      console.error("Primary provider failed:", primaryErr.message);
-      const shouldRetryOpenRouterAuto =
-        provider.provider_name === "openrouter" &&
-        primaryErr.message?.includes("404") &&
-        modelName !== "openrouter/auto";
-
-      if (shouldRetryOpenRouterAuto) {
-        try {
-          console.log("Configured OpenRouter model unavailable, retrying with openrouter/auto");
-          aiData = await adapter.call(apiKey, "openrouter/auto", messages, callOpts);
-          usedProvider = { ...provider, model_name: "openrouter/auto" };
-        } catch (autoRetryErr: any) {
-          console.error("OpenRouter auto retry failed:", autoRetryErr.message);
-          primaryErr = autoRetryErr;
-        }
-      }
-
-      if (aiData) {
-        // noop: the OpenRouter auto retry succeeded.
-      } else if (primaryErr.status === 429 || primaryErr.status === 402) {
-        // Check if we have a fallback
-        if (fallbackProvider) {
-          console.log("Trying fallback provider:", fallbackProvider.provider_name);
-          const fbAdapter = getAdapter(fallbackProvider.provider_name);
-          const fbKey = getApiKey(fallbackProvider);
-          usedProvider = fallbackProvider;
-          aiData = await fbAdapter.call(fbKey, fallbackProvider.model_name, messages, callOpts);
-        } else {
-          return new Response(JSON.stringify({ error: primaryErr.message }), {
-            status: primaryErr.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-      } else if (fallbackProvider) {
-        console.log("Trying fallback provider:", fallbackProvider.provider_name);
-        const fbAdapter = getAdapter(fallbackProvider.provider_name);
-        const fbKey = getApiKey(fallbackProvider);
-        usedProvider = fallbackProvider;
-        aiData = await fbAdapter.call(fbKey, fallbackProvider.model_name, messages, callOpts);
-      } else {
-        throw primaryErr;
-      }
-    }
+    const routed = await callTextProviderChain(supabaseAdmin, providerChain, messages, callOpts);
+    const aiData = routed.data;
+    const usedProvider = routed.provider;
 
     const rawContent = aiData.choices?.[0]?.message?.content || "";
     let variations: any[] = [];
