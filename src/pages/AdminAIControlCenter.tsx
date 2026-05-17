@@ -203,9 +203,10 @@ function TextModelsPanel() {
                 <SelectContent>{TEXT_PROVIDERS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div><Label>OpenRouter Model Slug</Label><Input value={editing.model_name} onChange={e => setEditing({ ...editing, model_name: e.target.value })} placeholder="e.g. openrouter/auto" /></div>
-              <div><Label>OpenRouter API Key</Label><Input type="password" value={editing.api_key_secret_name || ""} onChange={e => setEditing({ ...editing, api_key_secret_name: e.target.value })} placeholder="sk-or-..." /></div>
+              <div><Label>Model Slug</Label><Input value={editing.model_name} onChange={e => setEditing({ ...editing, model_name: e.target.value })} placeholder="e.g. openrouter/auto" /></div>
+              <div><Label>API Key / Secret Name</Label><Input type="password" value={editing.api_key_secret_name || ""} onChange={e => setEditing({ ...editing, api_key_secret_name: e.target.value })} placeholder="Secret name or key" /></div>
               <div><Label>Max Tokens</Label><Input type="number" value={editing.max_tokens} onChange={e => setEditing({ ...editing, max_tokens: parseInt(e.target.value) || 2048 })} /></div>
+              <div><Label>Priority</Label><Input type="number" value={editing.priority ?? 10} onChange={e => setEditing({ ...editing, priority: parseInt(e.target.value) || 10 })} /></div>
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div>
@@ -223,7 +224,8 @@ function TextModelsPanel() {
             </div>
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-2"><Switch checked={editing.is_active} onCheckedChange={v => setEditing({ ...editing, is_active: v })} /><Label>Active</Label></div>
-              <div className="flex items-center gap-2"><Switch checked={editing.is_fallback} onCheckedChange={v => setEditing({ ...editing, is_fallback: v })} /><Label>Fallback</Label></div>
+              <div className="flex items-center gap-2"><Switch checked={editing.is_fallback} onCheckedChange={v => setEditing({ ...editing, is_fallback: v, priority: v ? Math.max(editing.priority ?? 50, 50) : editing.priority })} /><Label>Fallback</Label></div>
+              <div className="flex items-center gap-2"><Label>Health</Label>{healthBadge(editing.health_status)}</div>
             </div>
             <div className="flex gap-2">
               <Button size="sm" onClick={save} disabled={saving}>
@@ -248,19 +250,20 @@ function TextModelsPanel() {
         <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : (
         <Table>
-          <TableHeader><TableRow>
-            <TableHead>Provider</TableHead><TableHead>Model</TableHead><TableHead>Temp</TableHead><TableHead>API Key</TableHead><TableHead>Status</TableHead><TableHead></TableHead>
+            <TableHeader><TableRow>
+            <TableHead>Priority</TableHead><TableHead>Provider</TableHead><TableHead>Model</TableHead><TableHead>Temp</TableHead><TableHead>Health</TableHead><TableHead>Status</TableHead><TableHead></TableHead>
           </TableRow></TableHeader>
           <TableBody>
             {providers.length === 0 && (
-              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No text providers configured. Add one above.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No text providers configured. Built-in AI fallback will still run.</TableCell></TableRow>
             )}
             {providers.map(p => (
               <TableRow key={p.id}>
+                <TableCell className="font-medium">{p.priority ?? 100}</TableCell>
                 <TableCell className="font-medium">{TEXT_PROVIDERS.find(x => x.value === p.provider_name)?.label || p.provider_name}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">{p.model_name}</TableCell>
                 <TableCell>{p.temperature}</TableCell>
-                <TableCell className="text-xs text-muted-foreground">{p.api_key_secret_name || "Lovable AI (built-in)"}</TableCell>
+                <TableCell>{healthBadge(p.health_status)}</TableCell>
                 <TableCell>
                   {p.is_active ? <Badge className="bg-green-500/10 text-green-600 border-green-500/20">Active</Badge> : <Badge variant="secondary">Inactive</Badge>}
                   {p.is_fallback && <Badge variant="outline" className="ml-1">Fallback</Badge>}
