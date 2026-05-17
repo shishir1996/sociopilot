@@ -143,6 +143,8 @@ function TextModelsPanel() {
         presence_penalty: editing.presence_penalty ?? 0,
         is_active: editing.is_active ?? false,
         is_fallback: editing.is_fallback ?? false,
+        priority: editing.priority ?? (editing.is_fallback ? 50 : 10),
+        health_status: editing.health_status || "unknown",
         config_json: editing.config_json || {},
       };
       if (editing.id) {
@@ -179,18 +181,15 @@ function TextModelsPanel() {
           <Button size="sm" onClick={() => setEditing({
             provider_name: "openrouter", model_name: "openrouter/auto", temperature: 0.7,
             max_tokens: 2048, top_p: 1.0, frequency_penalty: 0, presence_penalty: 0,
-            is_active: false, is_fallback: false, api_key_secret_name: "",
+            is_active: false, is_fallback: false, api_key_secret_name: "", priority: 10, health_status: "unknown",
           })}>
             <Plus className="h-4 w-4 mr-1" /> Add Provider
           </Button>
         </div>
       </div>
 
-        <div className="text-xs text-muted-foreground bg-muted/40 border border-border rounded-md p-3">
-        Only <strong>OpenRouter</strong> is supported for content generation (text, image, video).
-        Paste your OpenRouter API key directly into the <em>OpenRouter API Key</em> field below
-        (it must start with <code>sk-or-...</code>) and use a valid model slug like
-          <code> openrouter/auto</code> or <code>google/gemini-2.5-flash</code>.
+      <div className="text-xs text-muted-foreground bg-muted/40 border border-border rounded-md p-3">
+        Providers run by priority. Lower numbers run first; degraded providers remain fallbackable, while down providers are skipped.
       </div>
 
       {editing && (
