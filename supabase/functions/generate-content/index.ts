@@ -305,7 +305,7 @@ async function runFullGeneration(args: RunFullGenerationArgs) {
   // Returns up to 7 upcoming slots (one per day_number) using the user's
   // posting_schedules and the business timezone. day_number 1 = the earliest
   // upcoming slot (which may be today if `now <= scheduled_time - 30 min`).
-  const tz = business.timezone || "UTC";
+  const tz = safeTimeZone(business.timezone || "UTC");
   const { data: scheduleRows } = await supabaseAdmin
     .from("posting_schedules")
     .select("day_of_week, posting_time, platforms, enabled")
@@ -328,12 +328,10 @@ async function runFullGeneration(args: RunFullGenerationArgs) {
 
   // Helper: "now" in business timezone as a comparable Date
   const nowUtc = new Date();
-  const tzNowParts = new Intl.DateTimeFormatToParts
-    ? new Intl.DateTimeFormat("en-US", {
-        timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
-        hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
-      }).formatToParts(nowUtc)
-    : [];
+  const tzNowParts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+  }).formatToParts(nowUtc);
   const tzPart = (t: string) => Number(tzNowParts.find((p: any) => p.type === t)?.value || "0");
   const tzYear = tzPart("year");
   const tzMonth = tzPart("month");
@@ -531,7 +529,7 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
 
   let aiResponse: Response;
   try {
-    const out = await callTextWithFailover(textProvidersChain, contentPlanRequest);
+    const out = await callTextWithFailover(supabaseAdmin, textProvidersChain, contentPlanRequest);
     aiResponse = out.res;
   } catch (e) {
     console.error("All text providers failed (tool-call mode):", e);
@@ -556,7 +554,7 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
     console.warn("Tool-call response was empty; retrying with plain JSON mode across providers.");
     let fallbackResponse: Response;
     try {
-      const out = await callTextWithFailover(textProvidersChain, plainJsonRequest);
+      const out = await callTextWithFailover(supabaseAdmin, textProvidersChain, plainJsonRequest);
       fallbackResponse = out.res;
     } catch (e) {
       console.error("All text providers failed (plain JSON mode):", e);
