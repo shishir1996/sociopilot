@@ -75,12 +75,15 @@ async function callTextProvider(provider: any, body: any) {
   const ac = new AbortController();
   const to = setTimeout(() => ac.abort(), 45000);
   try {
+    const headers = provider?.provider_name === "lovable"
+      ? { "Lovable-API-Key": apiKey, "X-Lovable-AIG-SDK": "vercel-ai-sdk", "Content-Type": "application/json" }
+      : { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" };
     return await fetch(url, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
       signal: ac.signal,
-  });
+    });
   } finally {
     clearTimeout(to);
   }
@@ -161,10 +164,9 @@ async function generateImage(
 
       const response = await fetch(url, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
+        headers: useLovable
+          ? { "Lovable-API-Key": apiKey, "X-Lovable-AIG-SDK": "vercel-ai-sdk", "Content-Type": "application/json" }
+          : { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           model,
           messages: [{ role: "user", content: prompt }],
