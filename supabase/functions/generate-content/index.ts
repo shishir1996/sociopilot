@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildProviderChain } from "../_shared/ai-router.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,6 +26,9 @@ function providerEndpoint(name: string): string {
   if (name === "openrouter") return "https://openrouter.ai/api/v1/chat/completions";
   if (name === "openai") return "https://api.openai.com/v1/chat/completions";
   if (name === "groq") return "https://api.groq.com/openai/v1/chat/completions";
+  if (name === "together") return "https://api.together.xyz/v1/chat/completions";
+  if (name === "deepseek") return "https://api.deepseek.com/chat/completions";
+  if (name === "gemini") return "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
   // default -> Lovable AI gateway
   return "https://ai.gateway.lovable.dev/v1/chat/completions";
 }
