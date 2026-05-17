@@ -33,13 +33,51 @@ async function callTextProvider(provider: any, body: any) {
   const url = providerEndpoint(provider?.provider_name || "lovable");
   const apiKey = resolveApiKey(provider);
   if (!apiKey) {
-    throw new Error(`Missing API key for provider "${provider?.provider_name}". Configure it in Admin → AI Control Center.`);
+    throw new Error(`__provider_missing_key__:${provider?.provider_name || "unknown"}`);
   }
-  return fetch(url, {
+  // 45s timeout per provider attempt.
+  const ac = new AbortController();
+  const to = setTimeout(() => ac.abort(), 45000);
+  try {
+    return await fetch(url, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify(body),
+      signal: ac.signal,
   });
+  } finally {
+    clearTimeout(to);
+  }
+}
+
+// Try a request across multiple providers in order. Retries each provider once
+// on transient failure (network/timeout/5xx/429), then moves on to the next.
+// Returns the first OK response, or throws a generic error if all fail.
+async function callTextWithFailover(providers: any[], body: any): Promise<{ res: Response; provider: any }> {
+  let lastErr: any = null;
+  for (const provider of providers) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const reqBody = { ...body, model: provider.model_name || body.model };
+        const res = await callTextProvider(provider, reqBody);
+        if (res.ok) return { res, provider };
+        // Retry on 408/429/5xx; otherwise move to next provider.
+        if (![408, 429, 500, 502, 503, 504].includes(res.status)) {
+          const txt = await res.text().catch(() => "");
+          console.error(`Provider ${provider.provider_name} failed (${res.status}): ${txt.slice(0, 300)}`);
+          lastErr = new Error(`status_${res.status}`);
+          break;
+        }
+        console.warn(`Provider ${provider.provider_name} transient ${res.status}, attempt ${attempt + 1}/2`);
+        await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
+      } catch (e: any) {
+        console.error(`Provider ${provider.provider_name} threw:`, e?.message || e);
+        lastErr = e;
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    }
+  }
+  throw lastErr || new Error("all_providers_failed");
 }
 
 async function ensureBucketExists(supabaseAdmin: any) {
