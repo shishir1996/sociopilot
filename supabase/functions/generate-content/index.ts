@@ -730,9 +730,16 @@ serve(async (req) => {
       .select("*")
       .eq("is_active", true)
       .in("provider_type", ["text", "image", "video"]);
-    const textProvider =
-      (providerRows || []).find((p: any) => p.provider_type === "text") ||
-      { provider_name: "lovable", model_name: "google/gemini-2.5-flash" };
+    // Build ordered text provider chain: primary (is_fallback=false) first,
+    // then fallbacks. Always append the Lovable AI gateway as a final safety net.
+    const textRows = (providerRows || []).filter((p: any) => p.provider_type === "text");
+    const primaryText = textRows.find((p: any) => !p.is_fallback) || textRows[0];
+    const fallbackTexts = textRows.filter((p: any) => p !== primaryText);
+    const lovableFallback = { provider_name: "lovable", model_name: "google/gemini-2.5-flash" };
+    const textProvider = primaryText || lovableFallback;
+    const textProviderFallbacks = [...fallbackTexts, lovableFallback].filter(
+      (p: any) => p.provider_name !== textProvider.provider_name,
+    );
     const imageProvider =
       (providerRows || []).find((p: any) => p.provider_type === "image") || null;
 
@@ -850,6 +857,7 @@ serve(async (req) => {
           allowImage,
           allowVideo,
           textProvider,
+          textProviderFallbacks,
           imageProvider,
           lovableApiKey: LOVABLE_API_KEY,
           brandContext,
@@ -865,6 +873,16 @@ serve(async (req) => {
             .eq("id", generation_request_id)
             .eq("user_id", user.id);
         }
+        // Always notify the user with a generic, non-technical message.
+        try {
+          await supabaseAdmin.from("notifications").insert({
+            user_id: user.id,
+            title: "Generation could not complete",
+            message: "Something went wrong while generating your content. Please try again in a minute.",
+            type: "error",
+            action_url: "/ai-studio",
+          });
+        } catch (_) { /* noop */ }
       }
     })();
     // @ts-ignore -- EdgeRuntime is available in Supabase edge runtime
