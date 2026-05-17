@@ -246,6 +246,7 @@ interface RunFullGenerationArgs {
   allowImage: boolean;
   allowVideo: boolean;
   textProvider: any;
+  textProviderFallbacks?: any[];
   imageProvider: any;
   lovableApiKey: string;
   brandContext: string;
@@ -257,9 +258,10 @@ interface RunFullGenerationArgs {
 async function runFullGeneration(args: RunFullGenerationArgs) {
   const {
     supabaseAdmin, supabaseUrl, supabaseKey, userId, business, businessId, generationRequestId,
-    weekNumber, allowImage, textProvider, imageProvider, lovableApiKey,
+    weekNumber, allowImage, textProvider, textProviderFallbacks, imageProvider, lovableApiKey,
     brandContext, colorContext, sloganContext, creativeDirectionContext,
   } = args;
+  const textProvidersChain: any[] = [textProvider, ...(textProviderFallbacks || [])].filter(Boolean);
 
   // ---- Build today-first, timezone-aware schedule slots ----------------
   // Returns up to 7 upcoming slots (one per day_number) using the user's
@@ -489,18 +491,13 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
     max_tokens: Number(textProvider.max_tokens ?? 4096),
   };
 
-  let aiResponse = await callTextProvider(textProvider, contentPlanRequest);
-  if (!aiResponse.ok && aiResponse.status === 404 && textProvider.provider_name === "openrouter" && contentPlanRequest.model !== "openrouter/auto") {
-    console.warn(`Configured OpenRouter model returned 404. Retrying with openrouter/auto.`);
-    aiResponse = await callTextProvider(
-      { ...textProvider, model_name: "openrouter/auto" },
-      { ...contentPlanRequest, model: "openrouter/auto" },
-    );
-  }
-  if (!aiResponse.ok) {
-    const errText = await aiResponse.text();
-    console.error("AI gateway error:", aiResponse.status, errText.slice(0, 500));
-    throw new Error(`AI provider failed (${aiResponse.status}). Check the active model/API key in Admin → AI Control Center.`);
+  let aiResponse: Response;
+  try {
+    const out = await callTextWithFailover(textProvidersChain, contentPlanRequest);
+    aiResponse = out.res;
+  } catch (e) {
+    console.error("All text providers failed (tool-call mode):", e);
+    throw new Error("__ai_unavailable__");
   }
 
   const aiData = await aiResponse.json();
@@ -518,12 +515,14 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
     if (firstBrace !== -1 && lastBrace > firstBrace) rawJson = rawJson.slice(firstBrace, lastBrace + 1);
   }
   if (!rawJson) {
-    console.warn("Tool-call response was empty; retrying with plain JSON mode.");
-    const fallbackResponse = await callTextProvider(textProvider, plainJsonRequest);
-    if (!fallbackResponse.ok) {
-      const errText = await fallbackResponse.text();
-      console.error("Plain JSON AI fallback error:", fallbackResponse.status, errText.slice(0, 500));
-      throw new Error(`AI provider failed (${fallbackResponse.status}). Check the active model/API key in Admin → AI Control Center.`);
+    console.warn("Tool-call response was empty; retrying with plain JSON mode across providers.");
+    let fallbackResponse: Response;
+    try {
+      const out = await callTextWithFailover(textProvidersChain, plainJsonRequest);
+      fallbackResponse = out.res;
+    } catch (e) {
+      console.error("All text providers failed (plain JSON mode):", e);
+      throw new Error("__ai_unavailable__");
     }
     const fallbackData = await fallbackResponse.json();
     rawJson = fallbackData.choices?.[0]?.message?.content?.trim();
@@ -535,12 +534,12 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
   }
   if (!rawJson) {
     console.error("AI response had no parsable content");
-    throw new Error("AI returned an empty content plan. Select a stronger text model in Admin → AI Control Center.");
+    throw new Error("__ai_empty__");
   }
 
   let plan: any;
   try { plan = JSON.parse(rawJson); }
-  catch { console.error("Failed to parse AI response"); throw new Error("AI returned invalid JSON. Select a stronger text model in Admin → AI Control Center."); }
+  catch { console.error("Failed to parse AI response"); throw new Error("__ai_invalid__"); }
 
   if (!Array.isArray(plan?.days)) {
     for (const k of ["plan", "content_plan", "result", "data", "output"]) {
@@ -548,7 +547,7 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
     }
   }
   if (Array.isArray(plan)) plan = { strategy_summary: `Week ${weekNumber} content plan`, days: plan };
-  if (!plan?.days?.length) { console.error("AI plan missing days"); throw new Error("AI returned 0 content days. Select a stronger text model in Admin → AI Control Center."); }
+  if (!plan?.days?.length) { console.error("AI plan missing days"); throw new Error("__ai_empty__"); }
 
   // Normalize
   const validFormats = ["text_only", "text_with_image", "image_carousel"];
