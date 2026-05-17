@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildProviderChain } from "../_shared/ai-router.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,8 +26,43 @@ function providerEndpoint(name: string): string {
   if (name === "openrouter") return "https://openrouter.ai/api/v1/chat/completions";
   if (name === "openai") return "https://api.openai.com/v1/chat/completions";
   if (name === "groq") return "https://api.groq.com/openai/v1/chat/completions";
+  if (name === "together") return "https://api.together.xyz/v1/chat/completions";
+  if (name === "deepseek") return "https://api.deepseek.com/chat/completions";
+  if (name === "gemini") return "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
   // default -> Lovable AI gateway
   return "https://ai.gateway.lovable.dev/v1/chat/completions";
+}
+
+function safeTimeZone(timeZone?: string): string {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: timeZone || "UTC" }).format(new Date());
+    return timeZone || "UTC";
+  } catch (_) {
+    return "UTC";
+  }
+}
+
+async function recordProviderHealth(supabaseAdmin: any, provider: any, ok: boolean, responseTimeMs?: number, errorMessage?: string) {
+  if (!provider?.id) return;
+  const providerName = provider.provider_name || "unknown";
+  const providerType = provider.provider_type || "text";
+  await supabaseAdmin.from("provider_health_logs").insert({
+    provider_id: provider.id,
+    provider_name: providerName,
+    provider_type: providerType,
+    status: ok ? "success" : "failure",
+    response_time_ms: responseTimeMs || null,
+    error_message: errorMessage ? String(errorMessage).slice(0, 500) : null,
+  }).then(() => null, () => null);
+  await supabaseAdmin.from("ai_provider_settings").update(ok ? {
+    health_status: "healthy",
+    last_success_at: new Date().toISOString(),
+    failure_count: 0,
+  } : {
+    health_status: "degraded",
+    last_failure_at: new Date().toISOString(),
+    failure_count: (Number(provider.failure_count || 0) + 1),
+  }).eq("id", provider.id).then(() => null, () => null);
 }
 
 async function callTextProvider(provider: any, body: any) {
@@ -39,12 +75,15 @@ async function callTextProvider(provider: any, body: any) {
   const ac = new AbortController();
   const to = setTimeout(() => ac.abort(), 45000);
   try {
+    const headers = provider?.provider_name === "lovable"
+      ? { "Lovable-API-Key": apiKey, "X-Lovable-AIG-SDK": "vercel-ai-sdk", "Content-Type": "application/json" }
+      : { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" };
     return await fetch(url, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
       signal: ac.signal,
-  });
+    });
   } finally {
     clearTimeout(to);
   }
@@ -53,17 +92,22 @@ async function callTextProvider(provider: any, body: any) {
 // Try a request across multiple providers in order. Retries each provider once
 // on transient failure (network/timeout/5xx/429), then moves on to the next.
 // Returns the first OK response, or throws a generic error if all fail.
-async function callTextWithFailover(providers: any[], body: any): Promise<{ res: Response; provider: any }> {
+async function callTextWithFailover(supabaseAdmin: any, providers: any[], body: any): Promise<{ res: Response; provider: any }> {
   let lastErr: any = null;
   for (const provider of providers) {
     for (let attempt = 0; attempt < 2; attempt++) {
+      const attemptStartedAt = Date.now();
       try {
         const reqBody = { ...body, model: provider.model_name || body.model };
         const res = await callTextProvider(provider, reqBody);
-        if (res.ok) return { res, provider };
+        if (res.ok) {
+          await recordProviderHealth(supabaseAdmin, provider, true, Date.now() - attemptStartedAt);
+          return { res, provider };
+        }
         // Retry on 408/429/5xx; otherwise move to next provider.
+        const txt = await res.clone().text().catch(() => "");
+        await recordProviderHealth(supabaseAdmin, provider, false, Date.now() - attemptStartedAt, `HTTP ${res.status}: ${txt}`);
         if (![408, 429, 500, 502, 503, 504].includes(res.status)) {
-          const txt = await res.text().catch(() => "");
           console.error(`Provider ${provider.provider_name} failed (${res.status}): ${txt.slice(0, 300)}`);
           lastErr = new Error(`status_${res.status}`);
           break;
@@ -72,6 +116,7 @@ async function callTextWithFailover(providers: any[], body: any): Promise<{ res:
         await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
       } catch (e: any) {
         console.error(`Provider ${provider.provider_name} threw:`, e?.message || e);
+        await recordProviderHealth(supabaseAdmin, provider, false, Date.now() - attemptStartedAt, e?.message || e);
         lastErr = e;
         await new Promise(r => setTimeout(r, 1000));
       }
@@ -119,10 +164,9 @@ async function generateImage(
 
       const response = await fetch(url, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
+        headers: useLovable
+          ? { "Lovable-API-Key": apiKey, "X-Lovable-AIG-SDK": "vercel-ai-sdk", "Content-Type": "application/json" }
+          : { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           model,
           messages: [{ role: "user", content: prompt }],
@@ -267,7 +311,7 @@ async function runFullGeneration(args: RunFullGenerationArgs) {
   // Returns up to 7 upcoming slots (one per day_number) using the user's
   // posting_schedules and the business timezone. day_number 1 = the earliest
   // upcoming slot (which may be today if `now <= scheduled_time - 30 min`).
-  const tz = business.timezone || "UTC";
+  const tz = safeTimeZone(business.timezone || "UTC");
   const { data: scheduleRows } = await supabaseAdmin
     .from("posting_schedules")
     .select("day_of_week, posting_time, platforms, enabled")
@@ -290,12 +334,10 @@ async function runFullGeneration(args: RunFullGenerationArgs) {
 
   // Helper: "now" in business timezone as a comparable Date
   const nowUtc = new Date();
-  const tzNowParts = new Intl.DateTimeFormatToParts
-    ? new Intl.DateTimeFormat("en-US", {
-        timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
-        hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
-      }).formatToParts(nowUtc)
-    : [];
+  const tzNowParts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+  }).formatToParts(nowUtc);
   const tzPart = (t: string) => Number(tzNowParts.find((p: any) => p.type === t)?.value || "0");
   const tzYear = tzPart("year");
   const tzMonth = tzPart("month");
@@ -493,7 +535,7 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
 
   let aiResponse: Response;
   try {
-    const out = await callTextWithFailover(textProvidersChain, contentPlanRequest);
+    const out = await callTextWithFailover(supabaseAdmin, textProvidersChain, contentPlanRequest);
     aiResponse = out.res;
   } catch (e) {
     console.error("All text providers failed (tool-call mode):", e);
@@ -518,7 +560,7 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
     console.warn("Tool-call response was empty; retrying with plain JSON mode across providers.");
     let fallbackResponse: Response;
     try {
-      const out = await callTextWithFailover(textProvidersChain, plainJsonRequest);
+      const out = await callTextWithFailover(supabaseAdmin, textProvidersChain, plainJsonRequest);
       fallbackResponse = out.res;
     } catch (e) {
       console.error("All text providers failed (plain JSON mode):", e);
@@ -729,15 +771,16 @@ serve(async (req) => {
       .from("ai_provider_settings")
       .select("*")
       .eq("is_active", true)
-      .in("provider_type", ["text", "image", "video"]);
-    // Build ordered text provider chain: primary (is_fallback=false) first,
-    // then fallbacks. Always append the Lovable AI gateway as a final safety net.
-    const textRows = (providerRows || []).filter((p: any) => p.provider_type === "text");
-    const primaryText = textRows.find((p: any) => !p.is_fallback) || textRows[0];
-    const fallbackTexts = textRows.filter((p: any) => p !== primaryText);
-    const lovableFallback = { provider_name: "lovable", model_name: "google/gemini-2.5-flash" };
-    const textProvider = primaryText || lovableFallback;
-    const textProviderFallbacks = [...fallbackTexts, lovableFallback].filter(
+      .in("provider_type", ["text", "image", "video"])
+      .neq("health_status", "down")
+      .order("priority", { ascending: true })
+      .order("is_fallback", { ascending: true });
+    // Build ordered text provider chain by admin priority + health. Always append
+    // the Lovable AI gateway as a final safety net.
+    const lovableFallback = { provider_name: "lovable", provider_type: "text", model_name: "google/gemini-3-flash-preview", priority: 999 };
+    const textChain = buildProviderChain(providerRows || [], "text", lovableFallback);
+    const textProvider = textChain[0] || lovableFallback;
+    const textProviderFallbacks = textChain.slice(1).filter(
       (p: any) => p.provider_name !== textProvider.provider_name,
     );
     const imageProvider =

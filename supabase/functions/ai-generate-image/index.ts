@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildProviderChain } from "../_shared/ai-router.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -171,6 +172,46 @@ function getApiKey(provider: any): string {
   return "";
 }
 
+async function recordProviderHealth(supabaseAdmin: any, provider: any, ok: boolean, responseTimeMs?: number, errorMessage?: string) {
+  if (!provider?.id) return;
+  await supabaseAdmin.from("provider_health_logs").insert({
+    provider_id: provider.id,
+    provider_name: provider.provider_name || "unknown",
+    provider_type: provider.provider_type || "image",
+    status: ok ? "success" : "failure",
+    response_time_ms: responseTimeMs || null,
+    error_message: errorMessage ? String(errorMessage).slice(0, 500) : null,
+  }).then(() => null, () => null);
+  await supabaseAdmin.from("ai_provider_settings").update(ok ? {
+    health_status: "healthy",
+    last_success_at: new Date().toISOString(),
+    failure_count: 0,
+  } : {
+    health_status: "degraded",
+    last_failure_at: new Date().toISOString(),
+    failure_count: Number(provider.failure_count || 0) + 1,
+  }).eq("id", provider.id).then(() => null, () => null);
+}
+
+async function generateWithProviderChain(supabaseAdmin: any, providers: any[], prompt: string, opts: any) {
+  let lastErr: any = null;
+  for (const provider of providers) {
+    const startedAt = Date.now();
+    try {
+      const adapter = getImageAdapter(provider.provider_name);
+      const apiKey = getApiKey(provider);
+      const result = await adapter.generate(apiKey, provider.model_name, prompt, opts);
+      if (!result.base64 && !result.url) throw new Error("empty_image_result");
+      await recordProviderHealth(supabaseAdmin, provider, true, Date.now() - startedAt);
+      return { result, provider };
+    } catch (err: any) {
+      lastErr = err;
+      await recordProviderHealth(supabaseAdmin, provider, false, Date.now() - startedAt, err?.message || err);
+    }
+  }
+  throw lastErr || new Error("__image_unavailable__");
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -228,14 +269,17 @@ serve(async (req) => {
       }
     }
 
-    // Get active + fallback image providers
+    // Get active image provider chain by admin priority + health.
     const { data: providerRows } = await supabaseAdmin
       .from("ai_provider_settings").select("*")
-      .eq("provider_type", "image").order("is_active", { ascending: false });
+      .eq("provider_type", "image")
+      .eq("is_active", true)
+      .neq("health_status", "down")
+      .order("priority", { ascending: true })
+      .order("is_fallback", { ascending: true });
 
-    const activeProvider = (providerRows || []).find((p: any) => p.is_active);
-    const fallbackProvider = (providerRows || []).find((p: any) => p.is_fallback && p.id !== activeProvider?.id);
-    const provider = activeProvider || { provider_name: "lovable", model_name: "google/gemini-3.1-flash-image-preview" };
+    const builtInFallback = { provider_name: "lovable", provider_type: "image", model_name: "google/gemini-3.1-flash-image-preview", priority: 999 };
+    const providerChain = buildProviderChain(providerRows || [], "image", builtInFallback);
 
     // Get prompt template
     const { data: promptTemplate } = await supabaseAdmin
@@ -265,28 +309,14 @@ The image should be visually striking, on-brand, and optimized for social media.
 
     const count = Math.min(num_images || 1, 4);
     const outputUrls: string[] = [];
+    let usedProvider = providerChain[0] || builtInFallback;
 
     for (let i = 0; i < count; i++) {
       if (i > 0) await new Promise(r => setTimeout(r, 2000));
 
-      let result: { base64?: string; url?: string } = {};
-      let usedProvider = provider;
-      const adapter = getImageAdapter(provider.provider_name);
-      const apiKey = getApiKey(provider);
-
-      try {
-        result = await adapter.generate(apiKey, provider.model_name, imagePrompt, { size: sizeMap[aspect_ratio], aspect_ratio });
-      } catch (err: any) {
-        if (fallbackProvider) {
-          console.log("Image fallback to:", fallbackProvider.provider_name);
-          const fbAdapter = getImageAdapter(fallbackProvider.provider_name);
-          const fbKey = getApiKey(fallbackProvider);
-          usedProvider = fallbackProvider;
-          result = await fbAdapter.generate(fbKey, fallbackProvider.model_name, imagePrompt, { size: sizeMap[aspect_ratio], aspect_ratio });
-        } else {
-          throw err;
-        }
-      }
+      const routed = await generateWithProviderChain(supabaseAdmin, providerChain, imagePrompt, { size: sizeMap[aspect_ratio], aspect_ratio });
+      const result: { base64?: string; url?: string } = routed.result;
+      usedProvider = routed.provider;
 
       // Upload to storage
       if (result.base64) {
@@ -314,7 +344,7 @@ The image should be visually striking, on-brand, and optimized for social media.
 
     await supabaseAdmin.from("ai_usage_logs").insert({
       user_id: user.id, generation_type: "image",
-      provider: provider.provider_name, model: provider.model_name,
+      provider: usedProvider.provider_name, model: usedProvider.model_name,
       prompt_input: imagePrompt.substring(0, 5000),
       output_result: JSON.stringify(outputUrls),
       status: "success", credits_used: count, response_time_ms: responseTimeMs,
@@ -325,11 +355,11 @@ The image should be visually striking, on-brand, and optimized for social media.
       platform: platform || null, image_style: image_style || null,
       input_params: body, output_urls: outputUrls,
       image_prompt_used: imagePrompt,
-      provider: provider.provider_name, model: provider.model_name,
+      provider: usedProvider.provider_name, model: usedProvider.model_name,
       status: "completed",
     });
 
-    return new Response(JSON.stringify({ images: outputUrls, prompt_used: imagePrompt, response_time_ms: responseTimeMs, provider_used: provider.provider_name }), {
+    return new Response(JSON.stringify({ images: outputUrls, prompt_used: imagePrompt, response_time_ms: responseTimeMs, provider_used: usedProvider.provider_name }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: any) {
