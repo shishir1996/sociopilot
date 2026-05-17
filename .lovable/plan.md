@@ -1,86 +1,96 @@
-# Growvix Workflow Overhaul Plan
+# Growvix Master Update — Phased Plan
 
-This is a multi-system overhaul touching onboarding, scheduling, content generation, and the content UI. I'll break it into phases so each can be verified before the next.
+This is a very large scope. I'll break it into 6 phases so each can be verified before moving on. **I recommend starting with Phase 1 + 2 immediately** since those address the "Generation Failed" error you're seeing right now and the user-side model exposure.
 
-## Phase 1 — Plan-Based Publishing Platform Restriction
+---
 
-**Onboarding: new final step "Publishing Platform Selection"**
-- After connecting platforms, add a step asking: *"Which platform do you want to use for automated publishing?"*
-- Free Trial / Basic → single-select (radio) limited to ONE platform
-- Pro → multi-select allowed
-- Persist selection into `posting_schedules` (apply chosen platform to all 7 days for trial/basic users automatically)
+## Phase 1 — Fix "Generation Failed" + Hide AI from Users (IMMEDIATE)
 
-**Schedule Settings page enforcement**
-- In `ScheduleSettings.tsx`, read `usePlanLimits` plan name
-- If `free_trial` or `basic`: lock platform choice across all days to the single selected platform. Clicking a different platform on any day shows the `UpgradeModal` ("Upgrade to Pro to publish across multiple platforms")
-- Pro: keep current multi-platform per-day behavior
-- Add platforms: Threads, YouTube to the `PLATFORMS` list
+**Diagnose the current edge function failure**
+- Pull recent `generate-content` edge function logs to see the actual error (likely AI provider/key issue based on the toast message)
+- Verify `ai_settings` row has a valid active provider + key, fix the failure mode
 
-## Phase 2 — Date-Aware Generation (Today-First, Timezone-Aware)
+**Make generation resilient**
+- Wrap AI call in retry loop (1 retry on same provider)
+- On second failure, automatically switch to next healthy provider from `ai_providers` table (priority order)
+- Add 30s timeout per request
+- Validate response (non-empty, parseable JSON) before saving
+- Always return `200 OK` with `{ ok, error, diagnostics }` (already the pattern)
+- User-facing toast: only generic "Generating your content…" / "Content ready" / "Something went wrong, please try again" — never expose provider names or API errors
 
-**Edge function `generate-content`**
-- Replace Monday-based day mapping with a dynamic algorithm:
-  1. Compute "now" in the business `timezone`
-  2. For each enabled `posting_schedule` row (sorted by next occurrence):
-     - For today: include only if `now <= scheduled_time - 30 min`; otherwise skip to next week
-     - For other days: take the next occurrence within the next 7 days
-  3. Map generated items to those concrete dates in order (Day 1 = earliest)
-- Save `scheduled_at` (UTC), `primary_platform`, `secondary_platforms`, `status='scheduled'` on every item that has a matching schedule slot
-- Items without a slot remain `draft`
+**Hide model selection from users**
+- Remove provider/model dropdowns from AI Studio and any user-facing settings
+- Keep them ONLY inside `AdminAIControlCenter`
 
-**Mirror the same algorithm in `auto-generate-weekly`** (drop the hardcoded "next Monday" logic)
+**Files**: `supabase/functions/generate-content/index.ts`, `src/pages/AIStudio.tsx`, possibly `src/pages/ContentPage.tsx`
 
-## Phase 3 — Platform-Specific AI Prompting
+---
 
-In `generate-content`, build the per-item prompt using the assigned platform:
-- LinkedIn → professional, long-form, thought leadership
-- X/Twitter → concise, viral hook, ≤280 chars
-- Instagram → emotional caption, hashtag-rich, visual CTA
-- Facebook → conversational, shareable
-- Threads → casual, conversational thread style
-- YouTube → video script / community post tone
-- GMB → local SEO, offer-driven
+## Phase 2 — Admin AI Router & Provider Abstraction
 
-Each day's content is generated against the platform assigned to that day (not generic).
+- DB: extend `ai_providers` (priority, enabled, health_status, last_failure_at), add `provider_health_logs`, `ai_usage_logs`
+- Build a `routeAIRequest()` helper in a shared edge function module: takes task type → picks healthiest enabled provider by priority → returns client + model
+- Admin UI in `AdminAIControlCenter`: provider list with priority drag, enable toggle, health badge, recent failure log, usage/token counts per provider
+- Add adapters for: OpenRouter, Gemini, Groq, Together, Anthropic, OpenAI, DeepSeek, MiniMax (uniform `chat()` interface)
+- All existing edge functions (`generate-content`, `ai-generate-text`, `ai-generate-image`) refactored to call the router instead of hardcoded provider
 
-## Phase 4 — Content Card UI Update
+---
 
-In `ContentPage.tsx` / `ContentCard.tsx`:
-- Show platform icon + name, scheduled date (e.g., "Saturday, 18 May 2026"), scheduled time (e.g., "7:00 PM"), status badge, and auto-publish indicator
-- Status badges: Draft, Scheduled, Published, Failed, Awaiting Approval
+## Phase 3 — Low-Cost Image Generation
 
-## Phase 5 — Auto-Publish / Approval Toggle
+- Add image providers to `ai_providers` (Together AI, OpenRouter, Stability)
+- Models: FLUX Schnell (default), FLUX Dev, SDXL
+- Wire into `generate-content`: after text generation, generate image prompt → call image router → store URL on content_item
+- Admin can set default image model + fallback chain
+- Storage: upload to Supabase Storage bucket `content-images`
 
-- Add `auto_publish_enabled` and `approval_required` booleans on `businesses` (or a settings row)
-- If `auto_publish_enabled = true` → newly generated items go straight to `scheduled`
-- If `approval_required = true` → status `awaiting_approval` instead; user must approve to move to `scheduled`
-- Surface the toggle on the Schedule page
+---
 
-## Technical Details
+## Phase 4 — Template-Based Video Generation
 
-**DB migration**
-- `businesses`: add `auto_publish_enabled boolean default true`, `approval_required boolean default false`
-- `content_items`: extend `status` allowed values to include `awaiting_approval` (text column, no enum change needed)
+- New edge function `generate-video` that calls Remotion render service (will need external render host — Lambda or self-hosted; **flag to user: this requires infra decision**)
+- Stock media: Pexels + Pixabay API integrations (need API keys via add_secret)
+- Edge TTS for narration (free tier)
+- 6 reusable templates: Educational, Motivational, Business Tips, Product Promo, Real Estate, Luxury Brand
+- AI generates: hook, script, CTA, scene breakdown → Template engine assembles → render to 1080x1920 MP4 → store in `content-videos` bucket
+- `video_templates` table in DB
 
-**Files to edit**
-- `src/pages/BusinessSetup.tsx` (or onboarding wizard) — add Publishing Platform Selection step
-- `src/pages/ScheduleSettings.tsx` — plan-based platform locking, add Threads/YouTube, auto-publish/approval toggles
-- `src/hooks/usePlanLimits.ts` — expose `canMultiPlatform` helper
-- `src/pages/ContentPage.tsx` + `src/components/ContentCard.tsx` — new card layout with platform/date/time/status
-- `supabase/functions/generate-content/index.ts` — today-first scheduling + per-platform prompts + auto-publish/approval routing
-- `supabase/functions/auto-generate-weekly/index.ts` — same today-first scheduling
+**⚠️ Infra note**: Remotion rendering can't run inside Supabase Edge Functions (no FFmpeg, no Chromium). Options: (a) Remotion Lambda, (b) self-host on Cloudflare/Fly.io, (c) use Shotstack API. **Need your decision.**
 
-**Out of scope (call out, do not build)**
-- Redis / BullMQ queue: the project already uses `pg_cron` + Supabase Edge Functions for `auto-post`. Introducing Redis/BullMQ requires external infra. I'll keep using `auto-post` + `pg_cron` (functionally equivalent, retries can be added in `auto-post`). If you specifically want Redis/BullMQ, that needs a separate hosting decision.
-- `generation_batch_id`: can add later if you need batch grouping; current `plan_id` already groups a week.
+---
 
-## Verification
+## Phase 5 — Queue System
 
-After each phase: deploy edge functions, run a test generation as a trial user, confirm:
-1. Only one platform selectable in schedule (Phase 1)
-2. Generation starts from today when within window, else next day (Phase 2)
-3. LinkedIn-day content reads like LinkedIn, X-day like X (Phase 3)
-4. Content cards show platform/date/time/status (Phase 4)
-5. Auto-publish vs approval routing works (Phase 5)
+**⚠️ Reality check**: Redis + BullMQ require always-on Node infra (not available on Supabase). The project already uses `pg_cron` + Edge Functions for `auto-post`, which is functionally equivalent for our scale.
 
-Approve and I'll implement Phase 1 → 5 in order.
+**My recommendation**: stick with `pg_cron` + a `queue_jobs` table (postgres-based queue) with status `pending/running/done/failed`, retry counter, and a worker edge function triggered every minute. Same result, no extra infra.
+
+If you specifically want Redis/BullMQ, you'd need to host a Node worker separately (Railway/Fly.io). Let me know which path.
+
+---
+
+## Phase 6 — Payment Failure Automation
+
+- Webhook handler (Razorpay/Stripe) updates `subscriptions.status`
+- DB trigger or guard in `generate-content` / `auto-post`: if status ∈ {past_due, canceled, payment_failed} → block AI calls + pause queue jobs, but preserve user data
+- Admin override toggle
+
+---
+
+## Out-of-scope clarifications
+
+- **"Next.js / FastAPI / Cloudflare R2"** — your existing stack is Vite + React + Supabase. Switching frameworks is a full rewrite and not in scope of this update. I'll keep the existing stack and use Supabase Storage instead of R2 (equivalent for this use case).
+- **LiteLLM** — runs as a separate Python service. The provider abstraction layer in Phase 2 gives you the same benefit inside edge functions without extra infra.
+
+---
+
+## Recommended order of execution
+
+1. **Phase 1 now** (fixes your current error + removes user-side model exposure) — ~1 turn
+2. **Phase 2 next** (admin router + abstraction) — foundation for everything else
+3. Then 3 → 6 in order, each as a separate turn so we can verify
+
+**Approve to start Phase 1 immediately**, or tell me which phases to skip/reorder. Also need decisions on:
+- Video render infra (Lambda / self-host / Shotstack)?
+- Queue system (postgres-based vs external Redis)?
+- Pexels / Pixabay / Stability AI API keys (I'll request via secrets tool when we reach those phases)

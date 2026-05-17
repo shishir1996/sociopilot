@@ -33,13 +33,51 @@ async function callTextProvider(provider: any, body: any) {
   const url = providerEndpoint(provider?.provider_name || "lovable");
   const apiKey = resolveApiKey(provider);
   if (!apiKey) {
-    throw new Error(`Missing API key for provider "${provider?.provider_name}". Configure it in Admin → AI Control Center.`);
+    throw new Error(`__provider_missing_key__:${provider?.provider_name || "unknown"}`);
   }
-  return fetch(url, {
+  // 45s timeout per provider attempt.
+  const ac = new AbortController();
+  const to = setTimeout(() => ac.abort(), 45000);
+  try {
+    return await fetch(url, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify(body),
+      signal: ac.signal,
   });
+  } finally {
+    clearTimeout(to);
+  }
+}
+
+// Try a request across multiple providers in order. Retries each provider once
+// on transient failure (network/timeout/5xx/429), then moves on to the next.
+// Returns the first OK response, or throws a generic error if all fail.
+async function callTextWithFailover(providers: any[], body: any): Promise<{ res: Response; provider: any }> {
+  let lastErr: any = null;
+  for (const provider of providers) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const reqBody = { ...body, model: provider.model_name || body.model };
+        const res = await callTextProvider(provider, reqBody);
+        if (res.ok) return { res, provider };
+        // Retry on 408/429/5xx; otherwise move to next provider.
+        if (![408, 429, 500, 502, 503, 504].includes(res.status)) {
+          const txt = await res.text().catch(() => "");
+          console.error(`Provider ${provider.provider_name} failed (${res.status}): ${txt.slice(0, 300)}`);
+          lastErr = new Error(`status_${res.status}`);
+          break;
+        }
+        console.warn(`Provider ${provider.provider_name} transient ${res.status}, attempt ${attempt + 1}/2`);
+        await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
+      } catch (e: any) {
+        console.error(`Provider ${provider.provider_name} threw:`, e?.message || e);
+        lastErr = e;
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    }
+  }
+  throw lastErr || new Error("all_providers_failed");
 }
 
 async function ensureBucketExists(supabaseAdmin: any) {
@@ -208,6 +246,7 @@ interface RunFullGenerationArgs {
   allowImage: boolean;
   allowVideo: boolean;
   textProvider: any;
+  textProviderFallbacks?: any[];
   imageProvider: any;
   lovableApiKey: string;
   brandContext: string;
@@ -219,9 +258,10 @@ interface RunFullGenerationArgs {
 async function runFullGeneration(args: RunFullGenerationArgs) {
   const {
     supabaseAdmin, supabaseUrl, supabaseKey, userId, business, businessId, generationRequestId,
-    weekNumber, allowImage, textProvider, imageProvider, lovableApiKey,
+    weekNumber, allowImage, textProvider, textProviderFallbacks, imageProvider, lovableApiKey,
     brandContext, colorContext, sloganContext, creativeDirectionContext,
   } = args;
+  const textProvidersChain: any[] = [textProvider, ...(textProviderFallbacks || [])].filter(Boolean);
 
   // ---- Build today-first, timezone-aware schedule slots ----------------
   // Returns up to 7 upcoming slots (one per day_number) using the user's
@@ -451,18 +491,13 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
     max_tokens: Number(textProvider.max_tokens ?? 4096),
   };
 
-  let aiResponse = await callTextProvider(textProvider, contentPlanRequest);
-  if (!aiResponse.ok && aiResponse.status === 404 && textProvider.provider_name === "openrouter" && contentPlanRequest.model !== "openrouter/auto") {
-    console.warn(`Configured OpenRouter model returned 404. Retrying with openrouter/auto.`);
-    aiResponse = await callTextProvider(
-      { ...textProvider, model_name: "openrouter/auto" },
-      { ...contentPlanRequest, model: "openrouter/auto" },
-    );
-  }
-  if (!aiResponse.ok) {
-    const errText = await aiResponse.text();
-    console.error("AI gateway error:", aiResponse.status, errText.slice(0, 500));
-    throw new Error(`AI provider failed (${aiResponse.status}). Check the active model/API key in Admin → AI Control Center.`);
+  let aiResponse: Response;
+  try {
+    const out = await callTextWithFailover(textProvidersChain, contentPlanRequest);
+    aiResponse = out.res;
+  } catch (e) {
+    console.error("All text providers failed (tool-call mode):", e);
+    throw new Error("__ai_unavailable__");
   }
 
   const aiData = await aiResponse.json();
@@ -480,12 +515,14 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
     if (firstBrace !== -1 && lastBrace > firstBrace) rawJson = rawJson.slice(firstBrace, lastBrace + 1);
   }
   if (!rawJson) {
-    console.warn("Tool-call response was empty; retrying with plain JSON mode.");
-    const fallbackResponse = await callTextProvider(textProvider, plainJsonRequest);
-    if (!fallbackResponse.ok) {
-      const errText = await fallbackResponse.text();
-      console.error("Plain JSON AI fallback error:", fallbackResponse.status, errText.slice(0, 500));
-      throw new Error(`AI provider failed (${fallbackResponse.status}). Check the active model/API key in Admin → AI Control Center.`);
+    console.warn("Tool-call response was empty; retrying with plain JSON mode across providers.");
+    let fallbackResponse: Response;
+    try {
+      const out = await callTextWithFailover(textProvidersChain, plainJsonRequest);
+      fallbackResponse = out.res;
+    } catch (e) {
+      console.error("All text providers failed (plain JSON mode):", e);
+      throw new Error("__ai_unavailable__");
     }
     const fallbackData = await fallbackResponse.json();
     rawJson = fallbackData.choices?.[0]?.message?.content?.trim();
@@ -497,12 +534,12 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
   }
   if (!rawJson) {
     console.error("AI response had no parsable content");
-    throw new Error("AI returned an empty content plan. Select a stronger text model in Admin → AI Control Center.");
+    throw new Error("__ai_empty__");
   }
 
   let plan: any;
   try { plan = JSON.parse(rawJson); }
-  catch { console.error("Failed to parse AI response"); throw new Error("AI returned invalid JSON. Select a stronger text model in Admin → AI Control Center."); }
+  catch { console.error("Failed to parse AI response"); throw new Error("__ai_invalid__"); }
 
   if (!Array.isArray(plan?.days)) {
     for (const k of ["plan", "content_plan", "result", "data", "output"]) {
@@ -510,7 +547,7 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
     }
   }
   if (Array.isArray(plan)) plan = { strategy_summary: `Week ${weekNumber} content plan`, days: plan };
-  if (!plan?.days?.length) { console.error("AI plan missing days"); throw new Error("AI returned 0 content days. Select a stronger text model in Admin → AI Control Center."); }
+  if (!plan?.days?.length) { console.error("AI plan missing days"); throw new Error("__ai_empty__"); }
 
   // Normalize
   const validFormats = ["text_only", "text_with_image", "image_carousel"];
@@ -693,9 +730,16 @@ serve(async (req) => {
       .select("*")
       .eq("is_active", true)
       .in("provider_type", ["text", "image", "video"]);
-    const textProvider =
-      (providerRows || []).find((p: any) => p.provider_type === "text") ||
-      { provider_name: "lovable", model_name: "google/gemini-2.5-flash" };
+    // Build ordered text provider chain: primary (is_fallback=false) first,
+    // then fallbacks. Always append the Lovable AI gateway as a final safety net.
+    const textRows = (providerRows || []).filter((p: any) => p.provider_type === "text");
+    const primaryText = textRows.find((p: any) => !p.is_fallback) || textRows[0];
+    const fallbackTexts = textRows.filter((p: any) => p !== primaryText);
+    const lovableFallback = { provider_name: "lovable", model_name: "google/gemini-2.5-flash" };
+    const textProvider = primaryText || lovableFallback;
+    const textProviderFallbacks = [...fallbackTexts, lovableFallback].filter(
+      (p: any) => p.provider_name !== textProvider.provider_name,
+    );
     const imageProvider =
       (providerRows || []).find((p: any) => p.provider_type === "image") || null;
 
@@ -813,6 +857,7 @@ serve(async (req) => {
           allowImage,
           allowVideo,
           textProvider,
+          textProviderFallbacks,
           imageProvider,
           lovableApiKey: LOVABLE_API_KEY,
           brandContext,
@@ -828,6 +873,16 @@ serve(async (req) => {
             .eq("id", generation_request_id)
             .eq("user_id", user.id);
         }
+        // Always notify the user with a generic, non-technical message.
+        try {
+          await supabaseAdmin.from("notifications").insert({
+            user_id: user.id,
+            title: "Generation could not complete",
+            message: "Something went wrong while generating your content. Please try again in a minute.",
+            type: "error",
+            action_url: "/ai-studio",
+          });
+        } catch (_) { /* noop */ }
       }
     })();
     // @ts-ignore -- EdgeRuntime is available in Supabase edge runtime
