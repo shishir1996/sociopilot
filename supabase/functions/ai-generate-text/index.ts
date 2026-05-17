@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildProviderChain } from "../_shared/ai-router.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -132,6 +133,50 @@ function getApiKey(provider: any): string {
     return Deno.env.get("LOVABLE_API_KEY") || "";
   }
   return "";
+}
+
+async function recordProviderHealth(supabaseAdmin: any, provider: any, ok: boolean, responseTimeMs?: number, errorMessage?: string) {
+  if (!provider?.id) return;
+  await supabaseAdmin.from("provider_health_logs").insert({
+    provider_id: provider.id,
+    provider_name: provider.provider_name || "unknown",
+    provider_type: provider.provider_type || "text",
+    status: ok ? "success" : "failure",
+    response_time_ms: responseTimeMs || null,
+    error_message: errorMessage ? String(errorMessage).slice(0, 500) : null,
+  }).then(() => null, () => null);
+  await supabaseAdmin.from("ai_provider_settings").update(ok ? {
+    health_status: "healthy",
+    last_success_at: new Date().toISOString(),
+    failure_count: 0,
+  } : {
+    health_status: "degraded",
+    last_failure_at: new Date().toISOString(),
+    failure_count: Number(provider.failure_count || 0) + 1,
+  }).eq("id", provider.id).then(() => null, () => null);
+}
+
+async function callTextProviderChain(supabaseAdmin: any, providers: any[], messages: any[], opts: any) {
+  let lastErr: any = null;
+  for (const provider of providers) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const startedAt = Date.now();
+      try {
+        const adapter = getAdapter(provider.provider_name);
+        const apiKey = getApiKey(provider);
+        const data = await adapter.call(apiKey, provider.model_name, messages, opts);
+        await recordProviderHealth(supabaseAdmin, provider, true, Date.now() - startedAt);
+        return { data, provider };
+      } catch (err: any) {
+        lastErr = err;
+        await recordProviderHealth(supabaseAdmin, provider, false, Date.now() - startedAt, err?.message || err);
+        const status = Number(err?.status || 0);
+        if (![0, 408, 429, 500, 502, 503, 504].includes(status)) break;
+        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+      }
+    }
+  }
+  throw lastErr || new Error("__ai_unavailable__");
 }
 
 serve(async (req) => {
