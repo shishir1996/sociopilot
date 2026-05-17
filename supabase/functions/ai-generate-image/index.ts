@@ -309,12 +309,14 @@ The image should be visually striking, on-brand, and optimized for social media.
 
     const count = Math.min(num_images || 1, 4);
     const outputUrls: string[] = [];
+    let usedProvider = providerChain[0] || builtInFallback;
 
     for (let i = 0; i < count; i++) {
       if (i > 0) await new Promise(r => setTimeout(r, 2000));
 
       const routed = await generateWithProviderChain(supabaseAdmin, providerChain, imagePrompt, { size: sizeMap[aspect_ratio], aspect_ratio });
       const result: { base64?: string; url?: string } = routed.result;
+      usedProvider = routed.provider;
 
       // Upload to storage
       if (result.base64) {
@@ -342,7 +344,7 @@ The image should be visually striking, on-brand, and optimized for social media.
 
     await supabaseAdmin.from("ai_usage_logs").insert({
       user_id: user.id, generation_type: "image",
-      provider: provider.provider_name, model: provider.model_name,
+      provider: usedProvider.provider_name, model: usedProvider.model_name,
       prompt_input: imagePrompt.substring(0, 5000),
       output_result: JSON.stringify(outputUrls),
       status: "success", credits_used: count, response_time_ms: responseTimeMs,
@@ -353,11 +355,11 @@ The image should be visually striking, on-brand, and optimized for social media.
       platform: platform || null, image_style: image_style || null,
       input_params: body, output_urls: outputUrls,
       image_prompt_used: imagePrompt,
-      provider: provider.provider_name, model: provider.model_name,
+      provider: usedProvider.provider_name, model: usedProvider.model_name,
       status: "completed",
     });
 
-    return new Response(JSON.stringify({ images: outputUrls, prompt_used: imagePrompt, response_time_ms: responseTimeMs, provider_used: provider.provider_name }), {
+    return new Response(JSON.stringify({ images: outputUrls, prompt_used: imagePrompt, response_time_ms: responseTimeMs, provider_used: usedProvider.provider_name }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: any) {
