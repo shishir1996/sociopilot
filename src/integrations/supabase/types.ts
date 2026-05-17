@@ -274,14 +274,19 @@ export type Database = {
           available_models: Json
           config_json: Json | null
           created_at: string
+          failure_count: number
           frequency_penalty: number | null
+          health_status: string
           id: string
           is_active: boolean | null
           is_fallback: boolean | null
+          last_failure_at: string | null
+          last_success_at: string | null
           max_tokens: number | null
           model_name: string
           models_synced_at: string | null
           presence_penalty: number | null
+          priority: number
           provider_name: string
           provider_type: string
           selected_image_models: string[]
@@ -296,14 +301,19 @@ export type Database = {
           available_models?: Json
           config_json?: Json | null
           created_at?: string
+          failure_count?: number
           frequency_penalty?: number | null
+          health_status?: string
           id?: string
           is_active?: boolean | null
           is_fallback?: boolean | null
+          last_failure_at?: string | null
+          last_success_at?: string | null
           max_tokens?: number | null
           model_name: string
           models_synced_at?: string | null
           presence_penalty?: number | null
+          priority?: number
           provider_name: string
           provider_type: string
           selected_image_models?: string[]
@@ -318,14 +328,19 @@ export type Database = {
           available_models?: Json
           config_json?: Json | null
           created_at?: string
+          failure_count?: number
           frequency_penalty?: number | null
+          health_status?: string
           id?: string
           is_active?: boolean | null
           is_fallback?: boolean | null
+          last_failure_at?: string | null
+          last_success_at?: string | null
           max_tokens?: number | null
           model_name?: string
           models_synced_at?: string | null
           presence_penalty?: number | null
+          priority?: number
           provider_name?: string
           provider_type?: string
           selected_image_models?: string[]
@@ -1029,6 +1044,47 @@ export type Database = {
             columns: ["business_id"]
             isOneToOne: false
             referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      provider_health_logs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          provider_id: string | null
+          provider_name: string
+          provider_type: string
+          response_time_ms: number | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          provider_id?: string | null
+          provider_name: string
+          provider_type: string
+          response_time_ms?: number | null
+          status: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          provider_id?: string | null
+          provider_name?: string
+          provider_type?: string
+          response_time_ms?: number | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_health_logs_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "ai_provider_settings"
             referencedColumns: ["id"]
           },
         ]
