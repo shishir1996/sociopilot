@@ -773,14 +773,12 @@ serve(async (req) => {
       .neq("health_status", "down")
       .order("priority", { ascending: true })
       .order("is_fallback", { ascending: true });
-    // Build ordered text provider chain: primary (is_fallback=false) first,
-    // then fallbacks. Always append the Lovable AI gateway as a final safety net.
-    const textRows = (providerRows || []).filter((p: any) => p.provider_type === "text");
-    const primaryText = textRows.find((p: any) => !p.is_fallback) || textRows[0];
-    const fallbackTexts = textRows.filter((p: any) => p !== primaryText);
+    // Build ordered text provider chain by admin priority + health. Always append
+    // the Lovable AI gateway as a final safety net.
     const lovableFallback = { provider_name: "lovable", provider_type: "text", model_name: "google/gemini-3-flash-preview", priority: 999 };
-    const textProvider = primaryText || lovableFallback;
-    const textProviderFallbacks = [...fallbackTexts, lovableFallback].filter(
+    const textChain = buildProviderChain(providerRows || [], "text", lovableFallback);
+    const textProvider = textChain[0] || lovableFallback;
+    const textProviderFallbacks = textChain.slice(1).filter(
       (p: any) => p.provider_name !== textProvider.provider_name,
     );
     const imageProvider =
