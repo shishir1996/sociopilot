@@ -38,7 +38,7 @@ serve(async (req) => {
 
     const allowedTables = [
       "ai_provider_settings", "ai_prompt_templates", "ai_plan_limits",
-      "ai_feature_flags",
+      "ai_feature_flags", "provider_health_logs",
     ];
     if (!allowedTables.includes(table)) throw new Error("Invalid table");
 
@@ -49,6 +49,8 @@ serve(async (req) => {
         const listQuery = supabaseAdmin.from(table).select("*");
         const orderedQuery = table === "ai_feature_flags"
           ? listQuery.order("feature_key", { ascending: true })
+          : table === "ai_provider_settings"
+            ? listQuery.order("priority", { ascending: true }).order("created_at", { ascending: false })
           : listQuery.order("created_at", { ascending: false });
         const { data: rows, error } = await orderedQuery;
         if (error) throw error;
