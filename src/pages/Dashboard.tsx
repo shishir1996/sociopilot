@@ -15,6 +15,7 @@ import { TrialBanner } from "@/components/dashboard/TrialBanner";
 import { PlanBadge } from "@/components/dashboard/PlanBadge";
 import { ImpersonationBanner } from "@/components/admin/ImpersonationBanner";
 import { UsageIndicators } from "@/components/dashboard/UsageIndicators";
+import { SetupProgress } from "@/components/dashboard/SetupProgress";
 
 interface Business {
   id: string;
@@ -211,6 +212,9 @@ export default function Dashboard() {
             <div className="mb-4">
               <TrialBanner />
             </div>
+
+            {/* Setup progress */}
+            <SetupProgress businessId={selectedBusiness} />
 
             {/* Usage Indicators */}
             {selectedBusiness && (
