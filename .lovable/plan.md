@@ -1,96 +1,101 @@
-# Growvix Master Update — Phased Plan
+# Growvix Master Upgrade — Phased Plan
 
-This is a very large scope. I'll break it into 6 phases so each can be verified before moving on. **I recommend starting with Phase 1 + 2 immediately** since those address the "Generation Failed" error you're seeing right now and the user-side model exposure.
-
----
-
-## Phase 1 — Fix "Generation Failed" + Hide AI from Users (IMMEDIATE)
-
-**Diagnose the current edge function failure**
-- Pull recent `generate-content` edge function logs to see the actual error (likely AI provider/key issue based on the toast message)
-- Verify `ai_settings` row has a valid active provider + key, fix the failure mode
-
-**Make generation resilient**
-- Wrap AI call in retry loop (1 retry on same provider)
-- On second failure, automatically switch to next healthy provider from `ai_providers` table (priority order)
-- Add 30s timeout per request
-- Validate response (non-empty, parseable JSON) before saving
-- Always return `200 OK` with `{ ok, error, diagnostics }` (already the pattern)
-- User-facing toast: only generic "Generating your content…" / "Content ready" / "Something went wrong, please try again" — never expose provider names or API errors
-
-**Hide model selection from users**
-- Remove provider/model dropdowns from AI Studio and any user-facing settings
-- Keep them ONLY inside `AdminAIControlCenter`
-
-**Files**: `supabase/functions/generate-content/index.ts`, `src/pages/AIStudio.tsx`, possibly `src/pages/ContentPage.tsx`
-
----
-
-## Phase 2 — Admin AI Router & Provider Abstraction
-
-- DB: extend `ai_providers` (priority, enabled, health_status, last_failure_at), add `provider_health_logs`, `ai_usage_logs`
-- Build a `routeAIRequest()` helper in a shared edge function module: takes task type → picks healthiest enabled provider by priority → returns client + model
-- Admin UI in `AdminAIControlCenter`: provider list with priority drag, enable toggle, health badge, recent failure log, usage/token counts per provider
-- Add adapters for: OpenRouter, Gemini, Groq, Together, Anthropic, OpenAI, DeepSeek, MiniMax (uniform `chat()` interface)
-- All existing edge functions (`generate-content`, `ai-generate-text`, `ai-generate-image`) refactored to call the router instead of hardcoded provider
-
----
-
-## Phase 3 — Low-Cost Image Generation
-
-- Add image providers to `ai_providers` (Together AI, OpenRouter, Stability)
-- Models: FLUX Schnell (default), FLUX Dev, SDXL
-- Wire into `generate-content`: after text generation, generate image prompt → call image router → store URL on content_item
-- Admin can set default image model + fallback chain
-- Storage: upload to Supabase Storage bucket `content-images`
-
----
-
-## Phase 4 — Template-Based Video Generation
-
-- New edge function `generate-video` that calls Remotion render service (will need external render host — Lambda or self-hosted; **flag to user: this requires infra decision**)
-- Stock media: Pexels + Pixabay API integrations (need API keys via add_secret)
-- Edge TTS for narration (free tier)
-- 6 reusable templates: Educational, Motivational, Business Tips, Product Promo, Real Estate, Luxury Brand
-- AI generates: hook, script, CTA, scene breakdown → Template engine assembles → render to 1080x1920 MP4 → store in `content-videos` bucket
-- `video_templates` table in DB
-
-**⚠️ Infra note**: Remotion rendering can't run inside Supabase Edge Functions (no FFmpeg, no Chromium). Options: (a) Remotion Lambda, (b) self-host on Cloudflare/Fly.io, (c) use Shotstack API. **Need your decision.**
-
----
-
-## Phase 5 — Queue System
-
-**⚠️ Reality check**: Redis + BullMQ require always-on Node infra (not available on Supabase). The project already uses `pg_cron` + Edge Functions for `auto-post`, which is functionally equivalent for our scale.
-
-**My recommendation**: stick with `pg_cron` + a `queue_jobs` table (postgres-based queue) with status `pending/running/done/failed`, retry counter, and a worker edge function triggered every minute. Same result, no extra infra.
-
-If you specifically want Redis/BullMQ, you'd need to host a Node worker separately (Railway/Fly.io). Let me know which path.
-
----
-
-## Phase 6 — Payment Failure Automation
-
-- Webhook handler (Razorpay/Stripe) updates `subscriptions.status`
-- DB trigger or guard in `generate-content` / `auto-post`: if status ∈ {past_due, canceled, payment_failed} → block AI calls + pause queue jobs, but preserve user data
-- Admin override toggle
-
----
+This is a very large upgrade. Existing platform already has: auth, AI provider routing + failover (Phase 1/2 done), content generation, schedule, AI Studio, dashboard, content menu, brand assets, Cashfree payments. This plan focuses on what is missing or needs restructuring, broken into shippable phases so each one can be verified.
 
 ## Out-of-scope clarifications
 
-- **"Next.js / FastAPI / Cloudflare R2"** — your existing stack is Vite + React + Supabase. Switching frameworks is a full rewrite and not in scope of this update. I'll keep the existing stack and use Supabase Storage instead of R2 (equivalent for this use case).
-- **LiteLLM** — runs as a separate Python service. The provider abstraction layer in Phase 2 gives you the same benefit inside edge functions without extra infra.
+- **Tech stack stays as-is**: Vite + React + Tailwind + Shadcn + Supabase Edge Functions + Postgres. We will NOT migrate to Next.js / FastAPI / LiteLLM / Cloudflare R2 / Redis+BullMQ — these would mean rebuilding the project from scratch. We will achieve equivalent behavior on the existing stack (pg_cron + queue table for BullMQ, Supabase Storage for R2, our existing ai-router for LiteLLM).
+- **Payments**: project currently uses Cashfree. The request asks for Razorpay Subscriptions. We will **add Razorpay Subscriptions alongside Cashfree** (admin can choose), not rip Cashfree out. India → Razorpay default, Global → Cashfree/Stripe.
+- **Free plan**: will be removed from the public pricing flow (Basic + Pro only, both with 2-day trial). Existing `free_trial` data stays for legacy users.
+- **Video generation via Remotion + FFmpeg + Pexels**: requires an external render host (Lambda/Fly/Shotstack) — Supabase Edge Functions cannot run FFmpeg/Chromium. Phase 5 will scaffold the edge function + DB schema + template definitions, and document the render host requirement (user will need to choose one).
 
----
+## Phase A — Onboarding gating + pending-tasks dashboard (ship first)
 
-## Recommended order of execution
+**Goal**: enforce the linear flow Signup → Phone → Connect Social → Plan → Subscription → Dashboard, and show a setup progress bar.
 
-1. **Phase 1 now** (fixes your current error + removes user-side model exposure) — ~1 turn
-2. **Phase 2 next** (admin router + abstraction) — foundation for everything else
-3. Then 3 → 6 in order, each as a separate turn so we can verify
+1. New `onboarding_progress` table per user with booleans: `phone_verified`, `social_connected`, `plan_selected`, `subscription_active`, `brand_complete`, `ai_studio_configured`, `first_content_generated`, `automation_active`.
+2. New route guard component `<OnboardingGate>` wrapping protected pages. Redirects to the first incomplete step.
+3. New pages / refactors:
+   - `/onboarding/phone` (OTP) — already partially exists in Auth flow, extract.
+   - `/onboarding/connect` — at least 1 platform required.
+   - `/onboarding/plan` — Basic / Pro (no Free).
+   - `/onboarding/subscribe` — Razorpay/Cashfree checkout.
+4. Dashboard: add `<SetupProgress>` card at top with the 5 tasks + progress bar; hides itself once all done.
 
-**Approve to start Phase 1 immediately**, or tell me which phases to skip/reorder. Also need decisions on:
-- Video render infra (Lambda / self-host / Shotstack)?
-- Queue system (postgres-based vs external Redis)?
-- Pexels / Pixabay / Stability AI API keys (I'll request via secrets tool when we reach those phases)
+## Phase B — Razorpay Subscriptions integration
+
+1. Admin secrets: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` (requested via secrets tool when phase starts).
+2. New tables: `razorpay_plans` (map plan_name+region → Razorpay plan_id), extend `subscriptions` with `razorpay_subscription_id`, `mandate_status`, `next_charge_at`.
+3. New edge functions:
+   - `razorpay-create-subscription` — creates subscription, returns checkout URL/short_url.
+   - `razorpay-webhook` — handles `subscription.activated`, `subscription.charged`, `subscription.halted`, `payment.failed`, `subscription.cancelled`. Updates `subscriptions.status`. On failure → pause automation (see Phase D).
+4. Frontend `/onboarding/subscribe` opens Razorpay checkout for India, falls back to Cashfree for global users (geo from existing geo_pricing).
+
+## Phase C — Credit system + post quotas
+
+1. New table `user_credits` (user_id, month_year, credits_total, credits_used, posts_used, expires_at).
+2. Monthly reset cron (pg_cron 1st of month).
+3. New `extra_pack_purchases` table; checkout flow for ₹2000 / $50 → +28 posts +1000 credits (one-time payment).
+4. `generate-content` and regeneration paths: pre-flight `assertCredits()` → 402 friendly error → upgrade prompt.
+5. Hard cap at 56 posts/month/user.
+6. Update `UsageIndicators` to show credits + post quota + extra-pack CTA.
+
+## Phase D — Subscription enforcement guards
+
+1. Shared helper `requireActiveSubscription(userId)` used by `generate-content`, `auto-generate-weekly`, `auto-post`, `post-to-social`.
+2. On `status ∈ {past_due, halted, cancelled, payment_failed}`: skip generation, skip auto-post, mark queued jobs `paused`, write notification "Subscription inactive — billing issue".
+3. Data preserved; resume on next successful webhook.
+
+## Phase E — Content date logic + Basic-plan single-platform lock
+
+1. **Date fix**: in `generate-content` and `auto-generate-weekly`, compute Day 1 = today if `now() + 30min < todaysScheduledTime`; else next enabled schedule day. (Builds on the fix already done in earlier turn — verify it covers both manual + weekly cron.)
+2. **Basic plan**: if `plan_name = 'basic'`, force `publishing_platforms = [firstSelected]` for all days; show "Upgrade to Pro for multi-platform" toast on attempts to add a 2nd.
+3. **Pro plan**: per-day platform mapping (already supported via `posting_schedules.platforms[]`); if a scheduled platform isn't in `social_accounts`, redirect to `/settings` with banner.
+
+## Phase F — Pro Brand Template system
+
+1. New table `brand_templates` (user_id, name, colors jsonb, typography jsonb, shapes jsonb, logo_url, watermark_url, cta_style, background_style). Limit 2–5 per Pro user via trigger.
+2. New page `/brand-templates` (Pro only).
+3. Image/video generation pipeline reads active template → passes style hints into image prompt + future video render.
+
+## Phase G — Template-based video engine (scaffold)
+
+1. New edge function `generate-video` that:
+   - Calls AI router for script (hook/scenes/CTA).
+   - Fetches stock clips from Pexels + Pixabay (needs `PEXELS_API_KEY`, `PIXABAY_API_KEY`).
+   - Generates voiceover via Edge TTS.
+   - Sends render job to external Remotion host (config: `REMOTION_RENDER_URL`).
+   - Stores MP4 in Supabase Storage bucket `content-videos`, sets `content_items.video_url`.
+2. 6 template definitions in DB: `video_templates` table.
+3. **Blocked on**: user choosing a render host (AWS Lambda + Remotion Lambda, self-hosted on Fly.io, or Shotstack API). Will request decision when starting Phase G.
+
+## Phase H — Admin Payment Configuration panel
+
+1. New page `/admin/payments` listing: Razorpay keys (managed via Secrets), Cashfree keys, webhook URLs (read-only copy buttons), subscription plan mappings (`razorpay_plans` CRUD), currency + tax % settings (`payment_settings` table).
+2. Tax % applied at checkout creation in both Razorpay + Cashfree edge functions.
+
+## Phase I — Queue system on Postgres (BullMQ-equivalent)
+
+1. New table `job_queue` (id, type, payload jsonb, status, attempts, run_at, locked_until). Types: `publish_post`, `generate_image`, `generate_video`, `regen_content`.
+2. Worker edge function `queue-worker` invoked every minute by pg_cron, claims up to N due jobs with `FOR UPDATE SKIP LOCKED`, retries with exponential backoff (max 3).
+3. Migrate `auto-post` to enqueue instead of direct call.
+
+## Technical notes
+
+- Provider routing + failover already exists (`_shared/ai-router.ts`). Phases C/E/F just call existing router — no model selection ever surfaced to end users (AI Studio model dropdowns were already removed in Phase 1).
+- All new edge functions follow the established pattern: return 200 OK with `{ ok, error, diagnostics }`, generic user-facing messages, full detail in logs.
+- All new tables include RLS: `auth.uid() = user_id` for user-owned rows; admin via `has_role(auth.uid(),'admin')`.
+
+## Recommended shipping order
+
+A (onboarding) → B (Razorpay) → D (enforcement) → C (credits) → E (date/basic-plan) → H (admin payments) → F (templates) → I (queue) → G (video).
+
+Each phase is its own turn so we can verify before moving on. Phase A is the smallest user-visible win and unblocks everything else.
+
+## Pending decisions before starting
+
+1. **Razorpay account** — do you have one, or should we proceed assuming you'll create one and add the keys when prompted?
+2. **Video render host** for Phase G (defer until we reach G).
+3. **Confirm**: keep Cashfree for non-India users alongside Razorpay? (yes = recommended)
+
+Reply "go" to start Phase A, or specify a different phase to start with.
