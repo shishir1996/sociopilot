@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   ArrowLeft, Shield, Users, Building2, CheckCircle, XCircle, Loader2,
-  BarChart3, Search, Eye, Cpu, Crown, Activity
+  BarChart3, Search, Eye, Cpu, Crown, Activity, CreditCard
 } from "lucide-react";
 
 interface UserProfile {
@@ -184,6 +184,9 @@ export default function AdminDashboard() {
             </Button>
             <Button variant="outline" size="sm" onClick={() => navigate("/admin/integrations")} className="text-xs">
               🔗 Integrations
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate("/admin/payments")} className="text-xs">
+              <CreditCard className="h-3.5 w-3.5 mr-1" /> Payments
             </Button>
             <Button variant="outline" size="sm" onClick={() => navigate("/")}>
               <ArrowLeft className="h-4 w-4 mr-1" /> Back
