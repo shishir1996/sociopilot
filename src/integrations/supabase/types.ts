@@ -746,6 +746,95 @@ export type Database = {
           },
         ]
       }
+      credit_packs: {
+        Row: {
+          created_at: string
+          credits_added: number
+          id: string
+          is_active: boolean
+          name: string
+          posts_added: number
+          price_inr: number
+          price_usd: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          credits_added?: number
+          id?: string
+          is_active?: boolean
+          name: string
+          posts_added?: number
+          price_inr?: number
+          price_usd?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          credits_added?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          posts_added?: number
+          price_inr?: number
+          price_usd?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      extra_pack_purchases: {
+        Row: {
+          amount: number
+          created_at: string
+          credits_added: number
+          currency: string
+          id: string
+          pack_id: string
+          payment_provider: string
+          posts_added: number
+          provider_payment_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          credits_added: number
+          currency: string
+          id?: string
+          pack_id: string
+          payment_provider: string
+          posts_added: number
+          provider_payment_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          credits_added?: number
+          currency?: string
+          id?: string
+          pack_id?: string
+          payment_provider?: string
+          posts_added?: number
+          provider_payment_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extra_pack_purchases_pack_id_fkey"
+            columns: ["pack_id"]
+            isOneToOne: false
+            referencedRelation: "credit_packs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       geo_pricing: {
         Row: {
           created_at: string
@@ -965,6 +1054,75 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_settings: {
+        Row: {
+          active_gateway_global: string
+          active_gateway_india: string
+          cashfree_app_id: string | null
+          cashfree_secret: string | null
+          created_at: string
+          credit_pack_credits: number
+          credit_pack_posts: number
+          credit_pack_price_inr: number
+          credit_pack_price_usd: number
+          default_currency_global: string
+          default_currency_india: string
+          id: string
+          monthly_post_hard_cap: number
+          monthly_post_limit: number
+          razorpay_key_id: string | null
+          razorpay_key_secret: string | null
+          razorpay_webhook_secret: string | null
+          singleton: boolean
+          tax_percent: number
+          updated_at: string
+        }
+        Insert: {
+          active_gateway_global?: string
+          active_gateway_india?: string
+          cashfree_app_id?: string | null
+          cashfree_secret?: string | null
+          created_at?: string
+          credit_pack_credits?: number
+          credit_pack_posts?: number
+          credit_pack_price_inr?: number
+          credit_pack_price_usd?: number
+          default_currency_global?: string
+          default_currency_india?: string
+          id?: string
+          monthly_post_hard_cap?: number
+          monthly_post_limit?: number
+          razorpay_key_id?: string | null
+          razorpay_key_secret?: string | null
+          razorpay_webhook_secret?: string | null
+          singleton?: boolean
+          tax_percent?: number
+          updated_at?: string
+        }
+        Update: {
+          active_gateway_global?: string
+          active_gateway_india?: string
+          cashfree_app_id?: string | null
+          cashfree_secret?: string | null
+          created_at?: string
+          credit_pack_credits?: number
+          credit_pack_posts?: number
+          credit_pack_price_inr?: number
+          credit_pack_price_usd?: number
+          default_currency_global?: string
+          default_currency_india?: string
+          id?: string
+          monthly_post_hard_cap?: number
+          monthly_post_limit?: number
+          razorpay_key_id?: string | null
+          razorpay_key_secret?: string | null
+          razorpay_webhook_secret?: string | null
+          singleton?: boolean
+          tax_percent?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount: number
@@ -1088,6 +1246,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      razorpay_plans: {
+        Row: {
+          amount: number
+          billing_period: string
+          created_at: string
+          currency: string
+          id: string
+          is_active: boolean
+          plan_name: string
+          razorpay_plan_id: string
+          region: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          billing_period: string
+          created_at?: string
+          currency?: string
+          id?: string
+          is_active?: boolean
+          plan_name: string
+          razorpay_plan_id: string
+          region?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          billing_period?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          is_active?: boolean
+          plan_name?: string
+          razorpay_plan_id?: string
+          region?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       regeneration_logs: {
         Row: {
@@ -1277,6 +1474,45 @@ export type Database = {
           monthly_posts?: number
           regeneration_count?: number
           total_posts_generated?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_credits: {
+        Row: {
+          created_at: string
+          credits_total: number
+          credits_used: number
+          expires_at: string
+          id: string
+          month_year: string
+          posts_limit: number
+          posts_used: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits_total?: number
+          credits_used?: number
+          expires_at?: string
+          id?: string
+          month_year?: string
+          posts_limit?: number
+          posts_used?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits_total?: number
+          credits_used?: number
+          expires_at?: string
+          id?: string
+          month_year?: string
+          posts_limit?: number
+          posts_used?: number
           updated_at?: string
           user_id?: string
         }
