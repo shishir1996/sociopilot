@@ -511,6 +511,42 @@ export type Database = {
           },
         ]
       }
+      brand_templates: {
+        Row: {
+          business_id: string | null
+          created_at: string
+          file_url: string
+          id: string
+          label: string | null
+          metadata: Json | null
+          template_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          business_id?: string | null
+          created_at?: string
+          file_url: string
+          id?: string
+          label?: string | null
+          metadata?: Json | null
+          template_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          business_id?: string | null
+          created_at?: string
+          file_url?: string
+          id?: string
+          label?: string | null
+          metadata?: Json | null
+          template_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       businesses: {
         Row: {
           approval_required: boolean
@@ -1375,6 +1411,7 @@ export type Database = {
           id: string
           is_trial: boolean
           plan_name: string | null
+          pro_features_activated_at: string | null
           razorpay_payment_id: string | null
           starts_at: string | null
           status: string
@@ -1391,6 +1428,7 @@ export type Database = {
           id?: string
           is_trial?: boolean
           plan_name?: string | null
+          pro_features_activated_at?: string | null
           razorpay_payment_id?: string | null
           starts_at?: string | null
           status?: string
@@ -1407,6 +1445,7 @@ export type Database = {
           id?: string
           is_trial?: boolean
           plan_name?: string | null
+          pro_features_activated_at?: string | null
           razorpay_payment_id?: string | null
           starts_at?: string | null
           status?: string
