@@ -139,7 +139,7 @@ export default function AIStudio() {
         description: "Please connect your social account to generate and publish content for this platform.",
         variant: "destructive",
       });
-      navigate("/settings/social");
+      navigate("/settings");
       return;
     }
     const current = daySelection[dayIndex] || [];
