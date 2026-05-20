@@ -84,6 +84,11 @@ Deno.serve(async (req) => {
           starts_at: new Date().toISOString(), ends_at: endsAt.toISOString(),
           razorpay_payment_id: subId, is_trial: false,
         };
+        // Unlock Pro advanced branding features on the first successful recurring
+        // payment (subscription.charged). Trial activation alone must NOT unlock these.
+        if (type === "subscription.charged" && plan === "pro") {
+          payload.pro_features_activated_at = new Date().toISOString();
+        }
         if (existingSub) {
           await admin.from("subscriptions").update(payload).eq("id", existingSub.id);
         } else {

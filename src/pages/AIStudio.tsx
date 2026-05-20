@@ -17,13 +17,14 @@ import { ContentCard } from "@/components/ContentCard";
 import { UpgradePrompt } from "@/components/upgrade/UpgradePrompt";
 import { UpgradeModal } from "@/components/upgrade/UpgradeModal";
 import { useGeoPricing } from "@/hooks/useGeoPricing";
+import { BrandTemplates } from "@/components/ai-studio/BrandTemplates";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const PLATFORMS = [
   { id: "instagram", label: "Instagram", color: "bg-pink-500" },
   { id: "facebook", label: "Facebook", color: "bg-blue-600" },
   { id: "linkedin", label: "LinkedIn", color: "bg-blue-700" },
-  { id: "twitter", label: "X (Twitter)", color: "bg-foreground" },
+  { id: "x_twitter", label: "X (Twitter)", color: "bg-foreground" },
 ];
 
 type Step = "calendar" | "context" | "generating" | "results";
@@ -50,6 +51,7 @@ export default function AIStudio() {
   const [showUpgrade, setShowUpgrade] = useState<string | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeModalTrigger, setUpgradeModalTrigger] = useState("");
+  const [connectedPlatforms, setConnectedPlatforms] = useState<string[]>([]);
 
   // Context form
   const [businessName, setBusinessName] = useState("");
@@ -62,6 +64,7 @@ export default function AIStudio() {
   const isTrial = subscription?.is_trial || planType === "free_trial";
   const isBasic = planType === "basic";
   const isPro = planType === "pro";
+  const proActivatedAt: string | null = subscription?.pro_features_activated_at || null;
 
   useEffect(() => {
     if (user) fetchAll();
@@ -79,6 +82,12 @@ export default function AIStudio() {
       setBusinessName(bizRes.data.name || "");
       setIndustry(bizRes.data.industry || "");
       setTargetAudience(bizRes.data.target_audience || "");
+      // Connected social platforms for this business
+      const { data: accs } = await supabase
+        .from("social_accounts")
+        .select("platform")
+        .eq("business_id", bizRes.data.id);
+      setConnectedPlatforms([...new Set(((accs as any[]) || []).map((a) => a.platform))]);
     }
     const sub = subRes.data || { plan_name: "free_trial", is_trial: true };
     setSubscription(sub);
@@ -123,6 +132,16 @@ export default function AIStudio() {
   };
 
   const handleMultiPlatformClick = (dayIndex: number, platformId: string) => {
+    // Block selection of platforms the user hasn't connected.
+    if (!connectedPlatforms.includes(platformId)) {
+      toast({
+        title: "Connect this platform first",
+        description: "Please connect your social account to generate and publish content for this platform.",
+        variant: "destructive",
+      });
+      navigate("/settings");
+      return;
+    }
     const current = daySelection[dayIndex] || [];
     if ((isBasic || isTrial) && current.length >= 1 && !current.includes(platformId)) {
       setUpgradeModalTrigger("multi_platform");
@@ -228,6 +247,31 @@ export default function AIStudio() {
     let activeRequestId: string | null = null;
     try {
       const generationStartedAt = new Date().toISOString();
+      // Persist the user's day/platform selections into posting_schedules so
+      // the backend Auto-Schedule Mapper assigns each generated post to the
+      // right day/time/platform automatically (no manual scheduling).
+      try {
+        await supabase.from("posting_schedules")
+          .delete()
+          .eq("user_id", user!.id)
+          .eq("business_id", business.id);
+        const rows = Object.entries(daySelection)
+          .filter(([, platforms]) => (platforms as string[])?.length > 0)
+          .map(([day, platforms]) => ({
+            user_id: user!.id,
+            business_id: business.id,
+            day_of_week: Number(day),
+            posting_time: "10:00:00",
+            platforms: platforms as string[],
+            enabled: true,
+          }));
+        if (rows.length > 0) {
+          await supabase.from("posting_schedules").insert(rows);
+        }
+      } catch (e) {
+        console.warn("posting_schedules upsert failed", e);
+      }
+
       const { data: generationRequest, error: requestError } = await supabase.from("weekly_generation_requests").insert({
         user_id: user!.id,
         business_id: business.id,
@@ -364,20 +408,27 @@ export default function AIStudio() {
                           {PLATFORMS.map(platform => {
                             const isSelected = selected.includes(platform.id);
                             const isLocked = !isPro && !isSelected && selected.length >= 1;
+                            const isConnected = connectedPlatforms.includes(platform.id);
 
                             return (
                               <button
                                 key={platform.id}
                                 onClick={() => handleMultiPlatformClick(dayIndex, platform.id)}
+                                title={!isConnected ? "Connect this platform to enable" : undefined}
                                 className={`relative px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                                   isSelected
                                     ? "gradient-primary text-primary-foreground shadow-sm"
+                                    : !isConnected
+                                    ? "bg-muted/40 text-muted-foreground/60 cursor-pointer"
                                     : isLocked
                                     ? "bg-muted/50 text-muted-foreground/50 cursor-pointer"
                                     : "bg-muted text-muted-foreground hover:bg-muted/80"
                                 }`}
                               >
-                                {isLocked && (
+                                {!isConnected && (
+                                  <Lock className="h-3 w-3 absolute -top-1 -right-1 text-muted-foreground" />
+                                )}
+                                {isConnected && isLocked && (
                                   <Lock className="h-3 w-3 absolute -top-1 -right-1 text-muted-foreground" />
                                 )}
                                 {platform.label}
@@ -405,6 +456,13 @@ export default function AIStudio() {
                 );
               })}
             </div>
+
+            {/* Brand templates (Pro, post-payment) */}
+            <BrandTemplates
+              businessId={business?.id || null}
+              isPro={isPro}
+              proActivatedAt={proActivatedAt}
+            />
 
             {/* Selection summary */}
             <div className="flex items-center justify-between p-4 rounded-xl bg-card border border-border">
