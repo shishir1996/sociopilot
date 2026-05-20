@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { useGeoPricing } from "@/hooks/useGeoPricing";
+import { CreditPacks } from "@/components/account/CreditPacks";
 
 export default function AccountSettings() {
   const { user, signOut } = useAuth();
@@ -185,6 +186,8 @@ export default function AccountSettings() {
             )}
           </CardContent>
         </Card>
+
+        <CreditPacks />
 
         {/* Danger Zone */}
         <Card className="border-destructive/30">
