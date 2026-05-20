@@ -408,20 +408,27 @@ export default function AIStudio() {
                           {PLATFORMS.map(platform => {
                             const isSelected = selected.includes(platform.id);
                             const isLocked = !isPro && !isSelected && selected.length >= 1;
+                            const isConnected = connectedPlatforms.includes(platform.id);
 
                             return (
                               <button
                                 key={platform.id}
                                 onClick={() => handleMultiPlatformClick(dayIndex, platform.id)}
+                                title={!isConnected ? "Connect this platform to enable" : undefined}
                                 className={`relative px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                                   isSelected
                                     ? "gradient-primary text-primary-foreground shadow-sm"
+                                    : !isConnected
+                                    ? "bg-muted/40 text-muted-foreground/60 cursor-pointer"
                                     : isLocked
                                     ? "bg-muted/50 text-muted-foreground/50 cursor-pointer"
                                     : "bg-muted text-muted-foreground hover:bg-muted/80"
                                 }`}
                               >
-                                {isLocked && (
+                                {!isConnected && (
+                                  <Lock className="h-3 w-3 absolute -top-1 -right-1 text-muted-foreground" />
+                                )}
+                                {isConnected && isLocked && (
                                   <Lock className="h-3 w-3 absolute -top-1 -right-1 text-muted-foreground" />
                                 )}
                                 {platform.label}
@@ -449,6 +456,13 @@ export default function AIStudio() {
                 );
               })}
             </div>
+
+            {/* Brand templates (Pro, post-payment) */}
+            <BrandTemplates
+              businessId={business?.id || null}
+              isPro={isPro}
+              proActivatedAt={proActivatedAt}
+            />
 
             {/* Selection summary */}
             <div className="flex items-center justify-between p-4 rounded-xl bg-card border border-border">
