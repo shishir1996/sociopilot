@@ -82,8 +82,11 @@ Deno.serve(async (req) => {
         const payload: any = {
           user_id: userId, plan_name: plan, status: "active",
           starts_at: new Date().toISOString(), ends_at: endsAt.toISOString(),
-          razorpay_payment_id: subId, is_trial: false,
+          razorpay_payment_id: subId, razorpay_subscription_id: subId, is_trial: false,
         };
+        if (type === "subscription.charged") {
+          payload.last_charged_at = new Date().toISOString();
+        }
         // Unlock Pro advanced branding features on the first successful recurring
         // payment (subscription.charged). Trial activation alone must NOT unlock these.
         if (type === "subscription.charged" && plan === "pro") {
@@ -103,11 +106,17 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (type === "subscription.cancelled" || type === "subscription.halted") {
+    if (type === "subscription.cancelled" || type === "subscription.halted" || type === "subscription.paused") {
       const sub = evt.payload?.subscription?.entity;
       const userId = sub?.notes?.user_id;
+      const newStatus = type === "subscription.cancelled" ? "cancelled" : "halted";
       if (userId) {
-        await admin.from("subscriptions").update({ status: "cancelled" }).eq("user_id", userId);
+        await admin.from("subscriptions").update({ status: newStatus }).eq("user_id", userId);
+        await admin.from("notifications").insert({
+          user_id: userId, type: "warning",
+          title: `Subscription ${newStatus}`,
+          message: `Your subscription has been ${newStatus}. Please update your payment method to continue.`,
+        });
       }
     }
 
