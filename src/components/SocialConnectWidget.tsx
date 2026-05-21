@@ -20,6 +20,7 @@ interface ConnectedAccount {
   account_name: string;
   account_id: string;
   expires_at: string | null;
+  pages?: Array<{ type: string; name: string; urn: string; picture?: string | null }>;
 }
 
 interface SocialConnectWidgetProps {
@@ -74,7 +75,7 @@ export function SocialConnectWidget({ businessId }: SocialConnectWidgetProps) {
   const fetchConnected = async () => {
     const { data } = await supabase
       .from("social_accounts")
-      .select("id, platform, account_name, account_id, expires_at")
+      .select("id, platform, account_name, account_id, expires_at, pages")
       .eq("business_id", businessId) as any;
     setConnected(data || []);
   };
@@ -193,6 +194,19 @@ export function SocialConnectWidget({ businessId }: SocialConnectWidgetProps) {
                       {expired && <AlertCircle className="h-3.5 w-3.5 text-destructive" />}
                     </p>
                     <p className="text-xs opacity-70">{acc.account_name || acc.account_id}</p>
+                    {acc.platform === "linkedin" && (
+                      <div className="mt-1 text-[11px] opacity-80">
+                        {acc.pages && acc.pages.length > 1 ? (
+                          <span>
+                            Posts to: {acc.pages.map(p => p.name).join(", ")}
+                          </span>
+                        ) : (
+                          <span className="text-amber-600">
+                            Personal profile only. Company-page posting requires LinkedIn Marketing Developer Platform approval.
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
