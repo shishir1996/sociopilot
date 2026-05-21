@@ -600,6 +600,20 @@ Deno.serve(async (req) => {
         });
       }
 
+      case "get_linkedin_pages": {
+        const { business_id } = body;
+        const q = supabaseAdmin
+          .from("social_accounts")
+          .select("pages, account_name, account_id")
+          .eq("user_id", user.id)
+          .eq("platform", "linkedin");
+        const { data: rows } = business_id ? await q.eq("business_id", business_id) : await q;
+        const pages = (rows || []).flatMap((r: any) => Array.isArray(r.pages) ? r.pages : []);
+        return new Response(JSON.stringify({ pages }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       default:
         return new Response(JSON.stringify({ error: "Unknown action" }), {
           status: 400,
