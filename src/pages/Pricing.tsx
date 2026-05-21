@@ -57,7 +57,7 @@ export default function Pricing() {
   };
 
   const handleUpgrade = (plan: string) => {
-    navigate(`/account?upgrade=${plan}&region=${region}&billing=${annual ? "annual" : "monthly"}`);
+    navigate(`/account?plan=${plan}&region=${region}&billing=${annual ? "annual" : "monthly"}`);
   };
 
   return (
