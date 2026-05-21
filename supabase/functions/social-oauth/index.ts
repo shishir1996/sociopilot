@@ -25,7 +25,7 @@ const OAUTH_CONFIGS: Record<string, { authUrl: string; tokenUrl: string; scopes:
   linkedin: {
     authUrl: "https://www.linkedin.com/oauth/v2/authorization",
     tokenUrl: "https://www.linkedin.com/oauth/v2/accessToken",
-    scopes: "openid,profile,w_member_social",
+    scopes: "openid profile email w_member_social w_organization_social r_organization_social rw_organization_admin",
   },
   x_twitter: {
     authUrl: "https://twitter.com/i/oauth2/authorize",
@@ -244,13 +244,17 @@ Deno.serve(async (req) => {
 
         let authUrl: string;
         if (platform === "x_twitter") {
-          // Twitter uses PKCE
-          const codeVerifier = crypto.randomUUID() + crypto.randomUUID();
+          // Twitter uses PKCE — generate a proper 32-byte random verifier
+          const verifierBytes = new Uint8Array(32);
+          crypto.getRandomValues(verifierBytes);
+          const b64url = (buf: Uint8Array) =>
+            btoa(String.fromCharCode(...buf))
+              .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+          const codeVerifier = b64url(verifierBytes);
           const encoder = new TextEncoder();
           const data = encoder.encode(codeVerifier);
           const digest = await crypto.subtle.digest("SHA-256", data);
-          const codeChallenge = btoa(String.fromCharCode(...new Uint8Array(digest)))
-            .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+          const codeChallenge = b64url(new Uint8Array(digest));
 
           // Store code_verifier temporarily (use state to pass it)
           const twitterState = btoa(JSON.stringify({
@@ -398,6 +402,7 @@ Deno.serve(async (req) => {
         // Fetch account info
         let accountName = platform;
         let accountId = "";
+        let linkedinPages: any[] = [];
 
         try {
           if (platform === "facebook") {
@@ -425,6 +430,43 @@ Deno.serve(async (req) => {
             const me = await meRes.json();
             accountName = me.name || "LinkedIn User";
             accountId = me.sub || "";
+            // Build destination list: personal profile first
+            const destinations: any[] = [
+              {
+                type: "person",
+                id: me.sub,
+                urn: `urn:li:person:${me.sub}`,
+                name: me.name || "Personal Profile",
+                picture: me.picture || null,
+              },
+            ];
+            // Fetch org admin pages (may fail without Marketing Dev Platform approval)
+            try {
+              const orgsRes = await fetch(
+                "https://api.linkedin.com/v2/organizationAcls?q=roleAssignee&role=ADMINISTRATOR&projection=(elements*(organization~(id,name,logoV2(original~:playableStreams))))",
+                { headers: { Authorization: `Bearer ${accessToken}`, "X-Restli-Protocol-Version": "2.0.0" } }
+              );
+              if (orgsRes.ok) {
+                const orgs = await orgsRes.json();
+                for (const el of (orgs.elements || [])) {
+                  const o = el["organization~"];
+                  if (!o?.id) continue;
+                  const logo = o.logoV2?.["original~"]?.elements?.[0]?.identifiers?.[0]?.identifier || null;
+                  destinations.push({
+                    type: "organization",
+                    id: String(o.id),
+                    urn: `urn:li:organization:${o.id}`,
+                    name: o.name || `Company ${o.id}`,
+                    picture: logo,
+                  });
+                }
+              } else {
+                console.log("LinkedIn orgs fetch failed (likely missing Marketing Dev Platform):", orgsRes.status);
+              }
+            } catch (e) {
+              console.error("LinkedIn org fetch error:", e);
+            }
+            linkedinPages = destinations;
           } else if (platform === "x_twitter") {
             const meRes = await fetch("https://api.x.com/2/users/me", {
               headers: { Authorization: `Bearer ${accessToken}` },
@@ -514,6 +556,7 @@ Deno.serve(async (req) => {
               account_name: accountName,
               account_id: accountId,
               expires_at: expiresAt,
+              pages: platform === "linkedin" ? linkedinPages : undefined,
               updated_at: new Date().toISOString(),
             })
             .eq("id", existing.id);
@@ -529,11 +572,12 @@ Deno.serve(async (req) => {
               account_name: accountName,
               account_id: accountId,
               expires_at: expiresAt,
+              pages: platform === "linkedin" ? linkedinPages : [],
             });
         }
 
         return new Response(
-          JSON.stringify({ ok: true, account_name: accountName, account_id: accountId }),
+          JSON.stringify({ ok: true, account_name: accountName, account_id: accountId, pages: linkedinPages }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -552,6 +596,20 @@ Deno.serve(async (req) => {
           enabledPlatforms.push("instagram");
         }
         return new Response(JSON.stringify({ platforms: enabledPlatforms }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      case "get_linkedin_pages": {
+        const { business_id } = body;
+        const q = supabaseAdmin
+          .from("social_accounts")
+          .select("pages, account_name, account_id")
+          .eq("user_id", user.id)
+          .eq("platform", "linkedin");
+        const { data: rows } = business_id ? await q.eq("business_id", business_id) : await q;
+        const pages = (rows || []).flatMap((r: any) => Array.isArray(r.pages) ? r.pages : []);
+        return new Response(JSON.stringify({ pages }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }

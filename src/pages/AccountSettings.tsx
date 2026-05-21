@@ -15,6 +15,21 @@ import { Input } from "@/components/ui/input";
 import { useGeoPricing } from "@/hooks/useGeoPricing";
 import { CreditPacks } from "@/components/account/CreditPacks";
 
+declare global {
+  interface Window { Razorpay: any }
+}
+
+function loadRazorpay(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (window.Razorpay) return resolve(true);
+    const s = document.createElement("script");
+    s.src = "https://checkout.razorpay.com/v1/checkout.js";
+    s.onload = () => resolve(true);
+    s.onerror = () => resolve(false);
+    document.body.appendChild(s);
+  });
+}
+
 export default function AccountSettings() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
@@ -73,6 +88,36 @@ export default function AccountSettings() {
   const handleUpgrade = async (plan: string) => {
     setUpgrading(true);
     try {
+      // India → Razorpay subscriptions (trial + billing on the 8th).
+      if (region === "india") {
+        const ok = await loadRazorpay();
+        if (!ok) throw new Error("Could not load Razorpay checkout. Please refresh and retry.");
+        const { data, error } = await supabase.functions.invoke("razorpay-create-subscription", {
+          body: { plan, billing_period: "monthly", region: "india" },
+        });
+        if (error) throw error;
+        if (!data?.ok) throw new Error(data?.error || "Subscription could not be created");
+        const rzp = new window.Razorpay({
+          key: data.key_id,
+          subscription_id: data.subscription_id,
+          name: "Growvix",
+          description: `${plan.toUpperCase()} plan — trial then auto-billed on the 8th`,
+          handler: () => {
+            toast({
+              title: "Subscription set up",
+              description: `Free trial active until ${new Date(data.trial_ends_at).toLocaleDateString()}. First charge on ${new Date(data.first_billing_date).toLocaleDateString()}.`,
+            });
+            fetchSubscription();
+          },
+          modal: { ondismiss: () => setUpgrading(false) },
+          prefill: { email: user?.email },
+          theme: { color: "#2563EB" },
+        });
+        rzp.open();
+        setUpgrading(false);
+        return;
+      }
+      // Global → existing Cashfree checkout.
       const { data, error } = await supabase.functions.invoke("create-checkout", {
         body: { plan, region },
       });

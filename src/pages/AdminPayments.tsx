@@ -31,6 +31,7 @@ interface Settings {
   credit_pack_credits: number;
   monthly_post_limit: number;
   monthly_post_hard_cap: number;
+  trial_days: number;
 }
 
 interface RzpPlan {
@@ -184,6 +185,11 @@ export default function AdminPayments() {
               <Label>Tax % (applied at checkout)</Label>
               <Input type="number" step="0.01" value={settings.tax_percent}
                 onChange={(e) => upd({ tax_percent: Number(e.target.value) })} />
+            </div>
+            <div>
+              <Label>Trial Period (days)</Label>
+              <Input type="number" min={0} value={settings.trial_days ?? 14}
+                onChange={(e) => upd({ trial_days: Number(e.target.value) })} />
             </div>
           </CardContent>
         </Card>

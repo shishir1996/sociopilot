@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { plan, billing_period, region = "india", total_count = 12 } = await req.json();
+    const { plan, billing_period, region = "india", total_count = 120 } = await req.json();
     if (!plan || !billing_period) {
       return new Response(JSON.stringify({ ok: false, error: "Missing plan/billing_period" }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -48,6 +48,17 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Trial + first-charge on 8th calculation
+    const trialDays = Number(settings.trial_days || 14);
+    const trialEnd = new Date();
+    trialEnd.setDate(trialEnd.getDate() + trialDays);
+    // Next 8th strictly after the trial end
+    const firstBilling = new Date(trialEnd.getFullYear(), trialEnd.getMonth(), 8, 9, 0, 0);
+    if (firstBilling <= trialEnd) {
+      firstBilling.setMonth(firstBilling.getMonth() + 1);
+    }
+    const startAt = Math.floor(firstBilling.getTime() / 1000);
+
     const basic = btoa(`${settings.razorpay_key_id}:${settings.razorpay_key_secret}`);
     const rzpRes = await fetch("https://api.razorpay.com/v1/subscriptions", {
       method: "POST",
@@ -55,8 +66,17 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         plan_id: planRow.razorpay_plan_id,
         total_count,
+        quantity: 1,
+        start_at: startAt,
         customer_notify: 1,
-        notes: { user_id: user.id, plan, billing_period, region },
+        notify_info: { notify_email: user.email },
+        notes: {
+          user_id: user.id,
+          plan,
+          billing_period,
+          region,
+          trial_end: trialEnd.toISOString(),
+        },
       }),
     });
     const sub = await rzpRes.json();
@@ -73,6 +93,23 @@ Deno.serve(async (req) => {
       provider_payment_id: sub.id, status: "pending",
     });
 
+    // Mark user as on trial immediately; webhook will flip to active on first charge.
+    const { data: existingSub } = await admin.from("subscriptions").select("id").eq("user_id", user.id).maybeSingle();
+    const subPayload: any = {
+      user_id: user.id,
+      plan_name: plan,
+      status: "trial",
+      is_trial: true,
+      trial_started_at: new Date().toISOString(),
+      trial_ends_at: trialEnd.toISOString(),
+      first_billing_date: firstBilling.toISOString(),
+      razorpay_subscription_id: sub.id,
+      starts_at: new Date().toISOString(),
+      ends_at: firstBilling.toISOString(),
+    };
+    if (existingSub) await admin.from("subscriptions").update(subPayload).eq("id", existingSub.id);
+    else await admin.from("subscriptions").insert(subPayload);
+
     return new Response(JSON.stringify({
       ok: true,
       subscription_id: sub.id,
@@ -80,6 +117,8 @@ Deno.serve(async (req) => {
       key_id: settings.razorpay_key_id,
       amount: planRow.amount,
       currency: planRow.currency,
+      trial_ends_at: trialEnd.toISOString(),
+      first_billing_date: firstBilling.toISOString(),
     }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e: any) {
     console.error(e);
