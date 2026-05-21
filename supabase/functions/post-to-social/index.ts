@@ -74,39 +74,56 @@ async function postToInstagram(account: any, fullCaption: string, imageUrl?: str
   return { success: true, post_id: publishData.id };
 }
 
-async function postToLinkedIn(account: any, fullCaption: string, imageUrl?: string): Promise<any> {
-  if (!account.access_token) return { success: false, error: "No access token configured" };
-
+async function postToLinkedInOne(accessToken: string, authorUrn: string, fullCaption: string, imageUrl?: string): Promise<any> {
   const shareContent: any = {
     shareCommentary: { text: fullCaption },
     shareMediaCategory: imageUrl ? "IMAGE" : "NONE",
   };
-
   if (imageUrl) {
-    shareContent.media = [{
-      status: "READY",
-      originalUrl: imageUrl,
-    }];
+    shareContent.media = [{ status: "READY", originalUrl: imageUrl }];
   }
-
   const response = await fetch("https://api.linkedin.com/v2/ugcPosts", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${account.access_token}`,
+      Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
       "X-Restli-Protocol-Version": "2.0.0",
     },
     body: JSON.stringify({
-      author: `urn:li:person:${account.account_id}`,
+      author: authorUrn,
       lifecycleState: "PUBLISHED",
       specificContent: { "com.linkedin.ugc.ShareContent": shareContent },
       visibility: { "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC" },
     }),
   });
-
   const data = await response.json();
-  if (response.ok) return { success: true, post_id: data.id };
-  return { success: false, error: JSON.stringify(data) };
+  if (response.ok) return { success: true, post_id: data.id, author: authorUrn };
+  return { success: false, error: JSON.stringify(data), author: authorUrn };
+}
+
+async function postToLinkedIn(account: any, fullCaption: string, imageUrl?: string): Promise<any> {
+  if (!account.access_token) return { success: false, error: "No access token configured" };
+  // Determine destinations: stored pages array, otherwise default to personal profile
+  const pages: any[] = Array.isArray(account.pages) && account.pages.length > 0
+    ? account.pages
+    : [{ urn: `urn:li:person:${account.account_id}`, type: "person", name: "Personal" }];
+  const settled = await Promise.allSettled(
+    pages.map((p) => postToLinkedInOne(account.access_token, p.urn, fullCaption, imageUrl))
+  );
+  const results = settled.map((s, i) => ({
+    destination: pages[i].name || pages[i].urn,
+    urn: pages[i].urn,
+    ...(s.status === "fulfilled" ? s.value : { success: false, error: String((s as any).reason) }),
+  }));
+  const allOk = results.every((r) => r.success);
+  const anyOk = results.some((r) => r.success);
+  console.log("LinkedIn fan-out results:", JSON.stringify(results));
+  return {
+    success: anyOk,
+    partial: !allOk && anyOk,
+    destinations: results,
+    error: allOk ? undefined : results.filter((r) => !r.success).map((r) => `${r.destination}: ${r.error}`).join("; "),
+  };
 }
 
 serve(async (req) => {
