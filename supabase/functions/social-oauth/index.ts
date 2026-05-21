@@ -429,6 +429,43 @@ Deno.serve(async (req) => {
             const me = await meRes.json();
             accountName = me.name || "LinkedIn User";
             accountId = me.sub || "";
+            // Build destination list: personal profile first
+            const destinations: any[] = [
+              {
+                type: "person",
+                id: me.sub,
+                urn: `urn:li:person:${me.sub}`,
+                name: me.name || "Personal Profile",
+                picture: me.picture || null,
+              },
+            ];
+            // Fetch org admin pages (may fail without Marketing Dev Platform approval)
+            try {
+              const orgsRes = await fetch(
+                "https://api.linkedin.com/v2/organizationAcls?q=roleAssignee&role=ADMINISTRATOR&projection=(elements*(organization~(id,name,logoV2(original~:playableStreams))))",
+                { headers: { Authorization: `Bearer ${accessToken}`, "X-Restli-Protocol-Version": "2.0.0" } }
+              );
+              if (orgsRes.ok) {
+                const orgs = await orgsRes.json();
+                for (const el of (orgs.elements || [])) {
+                  const o = el["organization~"];
+                  if (!o?.id) continue;
+                  const logo = o.logoV2?.["original~"]?.elements?.[0]?.identifiers?.[0]?.identifier || null;
+                  destinations.push({
+                    type: "organization",
+                    id: String(o.id),
+                    urn: `urn:li:organization:${o.id}`,
+                    name: o.name || `Company ${o.id}`,
+                    picture: logo,
+                  });
+                }
+              } else {
+                console.log("LinkedIn orgs fetch failed (likely missing Marketing Dev Platform):", orgsRes.status);
+              }
+            } catch (e) {
+              console.error("LinkedIn org fetch error:", e);
+            }
+            (body as any)._linkedin_pages = destinations;
           } else if (platform === "x_twitter") {
             const meRes = await fetch("https://api.x.com/2/users/me", {
               headers: { Authorization: `Bearer ${accessToken}` },
