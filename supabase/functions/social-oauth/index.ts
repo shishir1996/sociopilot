@@ -402,6 +402,7 @@ Deno.serve(async (req) => {
         // Fetch account info
         let accountName = platform;
         let accountId = "";
+        let linkedinPages: any[] = [];
 
         try {
           if (platform === "facebook") {
@@ -465,7 +466,7 @@ Deno.serve(async (req) => {
             } catch (e) {
               console.error("LinkedIn org fetch error:", e);
             }
-            (body as any)._linkedin_pages = destinations;
+            linkedinPages = destinations;
           } else if (platform === "x_twitter") {
             const meRes = await fetch("https://api.x.com/2/users/me", {
               headers: { Authorization: `Bearer ${accessToken}` },
@@ -555,6 +556,7 @@ Deno.serve(async (req) => {
               account_name: accountName,
               account_id: accountId,
               expires_at: expiresAt,
+              pages: platform === "linkedin" ? linkedinPages : undefined,
               updated_at: new Date().toISOString(),
             })
             .eq("id", existing.id);
@@ -570,11 +572,12 @@ Deno.serve(async (req) => {
               account_name: accountName,
               account_id: accountId,
               expires_at: expiresAt,
+              pages: platform === "linkedin" ? linkedinPages : [],
             });
         }
 
         return new Response(
-          JSON.stringify({ ok: true, account_name: accountName, account_id: accountId }),
+          JSON.stringify({ ok: true, account_name: accountName, account_id: accountId, pages: linkedinPages }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
