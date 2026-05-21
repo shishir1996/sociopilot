@@ -1111,6 +1111,7 @@ export type Database = {
           razorpay_webhook_secret: string | null
           singleton: boolean
           tax_percent: number
+          trial_days: number
           updated_at: string
         }
         Insert: {
@@ -1133,6 +1134,7 @@ export type Database = {
           razorpay_webhook_secret?: string | null
           singleton?: boolean
           tax_percent?: number
+          trial_days?: number
           updated_at?: string
         }
         Update: {
@@ -1155,6 +1157,7 @@ export type Database = {
           razorpay_webhook_secret?: string | null
           singleton?: boolean
           tax_percent?: number
+          trial_days?: number
           updated_at?: string
         }
         Relationships: []
@@ -1363,6 +1366,7 @@ export type Database = {
           created_at: string
           expires_at: string | null
           id: string
+          pages: Json
           platform: string
           refresh_token: string | null
           updated_at: string
@@ -1376,6 +1380,7 @@ export type Database = {
           created_at?: string
           expires_at?: string | null
           id?: string
+          pages?: Json
           platform: string
           refresh_token?: string | null
           updated_at?: string
@@ -1389,6 +1394,7 @@ export type Database = {
           created_at?: string
           expires_at?: string | null
           id?: string
+          pages?: Json
           platform?: string
           refresh_token?: string | null
           updated_at?: string
@@ -1408,11 +1414,14 @@ export type Database = {
         Row: {
           created_at: string
           ends_at: string | null
+          first_billing_date: string | null
           id: string
           is_trial: boolean
+          last_charged_at: string | null
           plan_name: string | null
           pro_features_activated_at: string | null
           razorpay_payment_id: string | null
+          razorpay_subscription_id: string | null
           starts_at: string | null
           status: string
           stripe_customer_id: string | null
@@ -1425,11 +1434,14 @@ export type Database = {
         Insert: {
           created_at?: string
           ends_at?: string | null
+          first_billing_date?: string | null
           id?: string
           is_trial?: boolean
+          last_charged_at?: string | null
           plan_name?: string | null
           pro_features_activated_at?: string | null
           razorpay_payment_id?: string | null
+          razorpay_subscription_id?: string | null
           starts_at?: string | null
           status?: string
           stripe_customer_id?: string | null
@@ -1442,11 +1454,14 @@ export type Database = {
         Update: {
           created_at?: string
           ends_at?: string | null
+          first_billing_date?: string | null
           id?: string
           is_trial?: boolean
+          last_charged_at?: string | null
           plan_name?: string | null
           pro_features_activated_at?: string | null
           razorpay_payment_id?: string | null
+          razorpay_subscription_id?: string | null
           starts_at?: string | null
           status?: string
           stripe_customer_id?: string | null
