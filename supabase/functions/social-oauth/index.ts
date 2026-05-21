@@ -25,7 +25,7 @@ const OAUTH_CONFIGS: Record<string, { authUrl: string; tokenUrl: string; scopes:
   linkedin: {
     authUrl: "https://www.linkedin.com/oauth/v2/authorization",
     tokenUrl: "https://www.linkedin.com/oauth/v2/accessToken",
-    scopes: "openid,profile,w_member_social",
+    scopes: "openid profile email w_member_social w_organization_social r_organization_social rw_organization_admin",
   },
   x_twitter: {
     authUrl: "https://twitter.com/i/oauth2/authorize",
@@ -244,13 +244,17 @@ Deno.serve(async (req) => {
 
         let authUrl: string;
         if (platform === "x_twitter") {
-          // Twitter uses PKCE
-          const codeVerifier = crypto.randomUUID() + crypto.randomUUID();
+          // Twitter uses PKCE — generate a proper 32-byte random verifier
+          const verifierBytes = new Uint8Array(32);
+          crypto.getRandomValues(verifierBytes);
+          const b64url = (buf: Uint8Array) =>
+            btoa(String.fromCharCode(...buf))
+              .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+          const codeVerifier = b64url(verifierBytes);
           const encoder = new TextEncoder();
           const data = encoder.encode(codeVerifier);
           const digest = await crypto.subtle.digest("SHA-256", data);
-          const codeChallenge = btoa(String.fromCharCode(...new Uint8Array(digest)))
-            .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+          const codeChallenge = b64url(new Uint8Array(digest));
 
           // Store code_verifier temporarily (use state to pass it)
           const twitterState = btoa(JSON.stringify({
