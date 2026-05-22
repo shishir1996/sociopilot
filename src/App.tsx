@@ -20,6 +20,8 @@ import AdminAIControlCenter from "./pages/AdminAIControlCenter";
 import AdminSocialIntegrations from "./pages/AdminSocialIntegrations";
 import AdminPayments from "./pages/AdminPayments";
 import AIStudio from "./pages/AIStudio";
+import AIVideoStudio from "./pages/AIVideoStudio";
+import AdminAIVideoEngine from "./pages/AdminAIVideoEngine";
 import Pricing from "./pages/Pricing";
 import GoogleMyBusiness from "./pages/GoogleMyBusiness";
 import AboutUs from "./pages/legal/AboutUs";
@@ -47,6 +49,7 @@ const App = () => (
             <Route path="/content" element={<ContentPage />} />
             <Route path="/schedule" element={<ScheduleSettings />} />
             <Route path="/ai-studio" element={<AIStudio />} />
+            <Route path="/ai-video" element={<AIVideoStudio />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/google-business" element={<GoogleMyBusiness />} />
             <Route path="/about" element={<AboutUs />} />
@@ -60,6 +63,7 @@ const App = () => (
             <Route path="/admin/ai" element={<AdminAIControlCenter />} />
             <Route path="/admin/integrations" element={<AdminSocialIntegrations />} />
             <Route path="/admin/payments" element={<AdminPayments />} />
+            <Route path="/admin/ai-video" element={<AdminAIVideoEngine />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

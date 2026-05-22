@@ -14,6 +14,81 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_ai_settings: {
+        Row: {
+          default_image_provider: string | null
+          default_stock_provider: string | null
+          default_voice_provider: string | null
+          enable_4k_rendering: boolean
+          enable_ai_avatar_generation: boolean
+          enable_ai_image_generation: boolean
+          enable_auto_branding: boolean
+          enable_auto_caption: boolean
+          enable_auto_cta_outro: boolean
+          enable_kling_generation: boolean
+          enable_motion_graphics: boolean
+          enable_pika_generation: boolean
+          enable_premium_video_generation: boolean
+          enable_premium_voice: boolean
+          enable_runway_generation: boolean
+          enable_stock_video_mode: boolean
+          enable_veo_generation: boolean
+          id: string
+          max_render_queue: number
+          max_video_length: number
+          singleton: boolean
+          updated_at: string
+        }
+        Insert: {
+          default_image_provider?: string | null
+          default_stock_provider?: string | null
+          default_voice_provider?: string | null
+          enable_4k_rendering?: boolean
+          enable_ai_avatar_generation?: boolean
+          enable_ai_image_generation?: boolean
+          enable_auto_branding?: boolean
+          enable_auto_caption?: boolean
+          enable_auto_cta_outro?: boolean
+          enable_kling_generation?: boolean
+          enable_motion_graphics?: boolean
+          enable_pika_generation?: boolean
+          enable_premium_video_generation?: boolean
+          enable_premium_voice?: boolean
+          enable_runway_generation?: boolean
+          enable_stock_video_mode?: boolean
+          enable_veo_generation?: boolean
+          id?: string
+          max_render_queue?: number
+          max_video_length?: number
+          singleton?: boolean
+          updated_at?: string
+        }
+        Update: {
+          default_image_provider?: string | null
+          default_stock_provider?: string | null
+          default_voice_provider?: string | null
+          enable_4k_rendering?: boolean
+          enable_ai_avatar_generation?: boolean
+          enable_ai_image_generation?: boolean
+          enable_auto_branding?: boolean
+          enable_auto_caption?: boolean
+          enable_auto_cta_outro?: boolean
+          enable_kling_generation?: boolean
+          enable_motion_graphics?: boolean
+          enable_pika_generation?: boolean
+          enable_premium_video_generation?: boolean
+          enable_premium_voice?: boolean
+          enable_runway_generation?: boolean
+          enable_stock_video_mode?: boolean
+          enable_veo_generation?: boolean
+          id?: string
+          max_render_queue?: number
+          max_video_length?: number
+          singleton?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       admin_logs: {
         Row: {
           action: string
@@ -544,6 +619,69 @@ export type Database = {
           template_type?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      business_brand_profiles: {
+        Row: {
+          brand_colors: string[] | null
+          business_description: string | null
+          business_id: string
+          business_name: string | null
+          created_at: string
+          cta_text: string | null
+          custom_keywords: string[] | null
+          id: string
+          industry: string | null
+          logo_url: string | null
+          preferred_platforms: string[] | null
+          preferred_video_style: string | null
+          product_services: string | null
+          target_audience: string | null
+          tone_of_voice: string | null
+          updated_at: string
+          user_id: string
+          website_url: string | null
+        }
+        Insert: {
+          brand_colors?: string[] | null
+          business_description?: string | null
+          business_id: string
+          business_name?: string | null
+          created_at?: string
+          cta_text?: string | null
+          custom_keywords?: string[] | null
+          id?: string
+          industry?: string | null
+          logo_url?: string | null
+          preferred_platforms?: string[] | null
+          preferred_video_style?: string | null
+          product_services?: string | null
+          target_audience?: string | null
+          tone_of_voice?: string | null
+          updated_at?: string
+          user_id: string
+          website_url?: string | null
+        }
+        Update: {
+          brand_colors?: string[] | null
+          business_description?: string | null
+          business_id?: string
+          business_name?: string | null
+          created_at?: string
+          cta_text?: string | null
+          custom_keywords?: string[] | null
+          id?: string
+          industry?: string | null
+          logo_url?: string | null
+          preferred_platforms?: string[] | null
+          preferred_video_style?: string | null
+          product_services?: string | null
+          target_audience?: string | null
+          tone_of_voice?: string | null
+          updated_at?: string
+          user_id?: string
+          website_url?: string | null
         }
         Relationships: []
       }
@@ -1410,6 +1548,57 @@ export type Database = {
           },
         ]
       }
+      subscription_feature_controls: {
+        Row: {
+          allow_1080p: boolean
+          allow_4k: boolean
+          allow_720p: boolean
+          allow_ai_images: boolean
+          allow_api_access: boolean
+          allow_avatar_generation: boolean
+          allow_custom_branding: boolean
+          allow_premium_generation: boolean
+          allow_premium_voice: boolean
+          id: string
+          max_video_minutes: number
+          max_videos_per_month: number
+          subscription_plan: string
+          updated_at: string
+        }
+        Insert: {
+          allow_1080p?: boolean
+          allow_4k?: boolean
+          allow_720p?: boolean
+          allow_ai_images?: boolean
+          allow_api_access?: boolean
+          allow_avatar_generation?: boolean
+          allow_custom_branding?: boolean
+          allow_premium_generation?: boolean
+          allow_premium_voice?: boolean
+          id?: string
+          max_video_minutes?: number
+          max_videos_per_month?: number
+          subscription_plan: string
+          updated_at?: string
+        }
+        Update: {
+          allow_1080p?: boolean
+          allow_4k?: boolean
+          allow_720p?: boolean
+          allow_ai_images?: boolean
+          allow_api_access?: boolean
+          allow_avatar_generation?: boolean
+          allow_custom_branding?: boolean
+          allow_premium_generation?: boolean
+          allow_premium_voice?: boolean
+          id?: string
+          max_video_minutes?: number
+          max_videos_per_month?: number
+          subscription_plan?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       subscriptions: {
         Row: {
           created_at: string
@@ -1590,6 +1779,93 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      video_generation_jobs: {
+        Row: {
+          blueprint_json: Json | null
+          business_id: string | null
+          content_id: string | null
+          created_at: string
+          generation_mode: string | null
+          id: string
+          is_premium_generation: boolean
+          music_type: string | null
+          output_url: string | null
+          platform_target: string | null
+          render_completed_at: string | null
+          render_engine: string | null
+          render_error: string | null
+          render_progress: number
+          render_started_at: string | null
+          render_status: string
+          script: string | null
+          subtitle_style: string | null
+          thumbnail_url: string | null
+          title: string | null
+          updated_at: string
+          user_id: string
+          video_duration: number | null
+          video_ratio: string | null
+          video_style: string | null
+          voice_type: string | null
+        }
+        Insert: {
+          blueprint_json?: Json | null
+          business_id?: string | null
+          content_id?: string | null
+          created_at?: string
+          generation_mode?: string | null
+          id?: string
+          is_premium_generation?: boolean
+          music_type?: string | null
+          output_url?: string | null
+          platform_target?: string | null
+          render_completed_at?: string | null
+          render_engine?: string | null
+          render_error?: string | null
+          render_progress?: number
+          render_started_at?: string | null
+          render_status?: string
+          script?: string | null
+          subtitle_style?: string | null
+          thumbnail_url?: string | null
+          title?: string | null
+          updated_at?: string
+          user_id: string
+          video_duration?: number | null
+          video_ratio?: string | null
+          video_style?: string | null
+          voice_type?: string | null
+        }
+        Update: {
+          blueprint_json?: Json | null
+          business_id?: string | null
+          content_id?: string | null
+          created_at?: string
+          generation_mode?: string | null
+          id?: string
+          is_premium_generation?: boolean
+          music_type?: string | null
+          output_url?: string | null
+          platform_target?: string | null
+          render_completed_at?: string | null
+          render_engine?: string | null
+          render_error?: string | null
+          render_progress?: number
+          render_started_at?: string | null
+          render_status?: string
+          script?: string | null
+          subtitle_style?: string | null
+          thumbnail_url?: string | null
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+          video_duration?: number | null
+          video_ratio?: string | null
+          video_style?: string | null
+          voice_type?: string | null
         }
         Relationships: []
       }
