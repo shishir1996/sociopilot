@@ -158,15 +158,40 @@ export default function AdminAIVideoEngine() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Required secrets (configure separately)</CardTitle>
-            <CardDescription>Add these in Lovable Cloud secrets when enabling a provider.</CardDescription>
+            <CardTitle className="flex items-center gap-2"><KeyRound className="h-5 w-5" /> Provider API keys & secrets</CardTitle>
+            <CardDescription>
+              Securely stored in Lovable Cloud secrets — never exposed to the browser. Ask Lovable to "set the {`{PROVIDER}`} API key" to add or update a value.
+            </CardDescription>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground space-y-1">
-            <div>• ELEVENLABS_API_KEY — premium voice</div>
-            <div>• PEXELS_API_KEY, PIXABAY_API_KEY — stock footage</div>
-            <div>• STABILITY_API_KEY, FAL_API_KEY — AI image generation</div>
-            <div>• RUNWAY_API_KEY, KLING_API_KEY, PIKA_API_KEY, VEO_API_KEY — premium AI video</div>
-            <div>• LOVABLE_API_KEY — already present (blueprint + default image gen)</div>
+          <CardContent className="space-y-3">
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" onClick={refreshSecretStatus} disabled={checkingSecrets}>
+                {checkingSecrets ? "Checking…" : "Refresh status"}
+              </Button>
+            </div>
+            <div className="grid md:grid-cols-2 gap-3">
+              {PROVIDER_SECRETS.map((s) => {
+                const configured = secretStatus[s.key];
+                return (
+                  <div key={s.key} className="p-3 rounded-lg border flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-medium flex items-center gap-2">
+                        {s.label}
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${configured ? "bg-green-500/15 text-green-600" : "bg-amber-500/15 text-amber-600"}`}>
+                          {configured ? "Configured" : "Not set"}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">{s.desc}</div>
+                      <div className="text-[11px] text-muted-foreground mt-1 font-mono truncate">{s.key}</div>
+                      <div className="text-[11px] text-muted-foreground">Get key: {s.where}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="text-xs text-muted-foreground pt-2 border-t">
+              To add or rotate any of these, tell Lovable: <em>"Set the RUNWAY_API_KEY"</em> (or any other key above). You'll get a secure prompt to paste the value — it's stored encrypted and made available to all video edge functions automatically.
+            </div>
           </CardContent>
         </Card>
       </div>
