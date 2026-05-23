@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, KeyRound } from "lucide-react";
+import { supabase as sb } from "@/integrations/supabase/client";
 
 const TOGGLES: { key: string; label: string; desc: string }[] = [
   { key: "enable_stock_video_mode", label: "Stock Video Engine", desc: "Pexels / Pixabay sourcing" },
@@ -27,12 +28,26 @@ const TOGGLES: { key: string; label: string; desc: string }[] = [
   { key: "enable_veo_generation", label: "Veo Engine", desc: "Requires VEO_API_KEY secret" },
 ];
 
+const PROVIDER_SECRETS: { key: string; label: string; desc: string; where: string }[] = [
+  { key: "PEXELS_API_KEY", label: "Pexels", desc: "Stock video/photo sourcing", where: "pexels.com/api" },
+  { key: "PIXABAY_API_KEY", label: "Pixabay", desc: "Stock video/photo sourcing", where: "pixabay.com/api/docs" },
+  { key: "ELEVENLABS_API_KEY", label: "ElevenLabs", desc: "Premium TTS voice", where: "elevenlabs.io → Profile → API Keys" },
+  { key: "STABILITY_API_KEY", label: "Stability AI", desc: "AI image generation", where: "platform.stability.ai" },
+  { key: "FAL_API_KEY", label: "Fal.ai", desc: "AI image/video generation", where: "fal.ai/dashboard/keys" },
+  { key: "RUNWAY_API_KEY", label: "Runway", desc: "Premium AI video engine", where: "dev.runwayml.com" },
+  { key: "KLING_API_KEY", label: "Kling", desc: "Premium AI video engine", where: "klingai.com" },
+  { key: "PIKA_API_KEY", label: "Pika", desc: "Premium AI video engine", where: "pika.art" },
+  { key: "VEO_API_KEY", label: "Veo (Google)", desc: "Premium AI video engine", where: "Google AI Studio" },
+];
+
 export default function AdminAIVideoEngine() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [settings, setSettings] = useState<any>(null);
   const [saving, setSaving] = useState(false);
+  const [secretStatus, setSecretStatus] = useState<Record<string, boolean>>({});
+  const [checkingSecrets, setCheckingSecrets] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -44,8 +59,23 @@ export default function AdminAIVideoEngine() {
       if (!admin) return;
       const { data } = await supabase.from("admin_ai_settings").select("*").eq("singleton", true).maybeSingle();
       setSettings(data);
+      refreshSecretStatus();
     })();
   }, [user, authLoading, navigate]);
+
+  const refreshSecretStatus = async () => {
+    setCheckingSecrets(true);
+    try {
+      const { data, error } = await sb.functions.invoke("admin-check-secrets", {
+        body: { keys: PROVIDER_SECRETS.map((s) => s.key) },
+      });
+      if (!error && data?.status) setSecretStatus(data.status);
+    } catch (e) {
+      // silent
+    } finally {
+      setCheckingSecrets(false);
+    }
+  };
 
   const update = (patch: any) => setSettings((s: any) => ({ ...s, ...patch }));
 
@@ -128,15 +158,40 @@ export default function AdminAIVideoEngine() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Required secrets (configure separately)</CardTitle>
-            <CardDescription>Add these in Lovable Cloud secrets when enabling a provider.</CardDescription>
+            <CardTitle className="flex items-center gap-2"><KeyRound className="h-5 w-5" /> Provider API keys & secrets</CardTitle>
+            <CardDescription>
+              Securely stored in Lovable Cloud secrets — never exposed to the browser. Ask Lovable to "set the {`{PROVIDER}`} API key" to add or update a value.
+            </CardDescription>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground space-y-1">
-            <div>• ELEVENLABS_API_KEY — premium voice</div>
-            <div>• PEXELS_API_KEY, PIXABAY_API_KEY — stock footage</div>
-            <div>• STABILITY_API_KEY, FAL_API_KEY — AI image generation</div>
-            <div>• RUNWAY_API_KEY, KLING_API_KEY, PIKA_API_KEY, VEO_API_KEY — premium AI video</div>
-            <div>• LOVABLE_API_KEY — already present (blueprint + default image gen)</div>
+          <CardContent className="space-y-3">
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" onClick={refreshSecretStatus} disabled={checkingSecrets}>
+                {checkingSecrets ? "Checking…" : "Refresh status"}
+              </Button>
+            </div>
+            <div className="grid md:grid-cols-2 gap-3">
+              {PROVIDER_SECRETS.map((s) => {
+                const configured = secretStatus[s.key];
+                return (
+                  <div key={s.key} className="p-3 rounded-lg border flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-medium flex items-center gap-2">
+                        {s.label}
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${configured ? "bg-green-500/15 text-green-600" : "bg-amber-500/15 text-amber-600"}`}>
+                          {configured ? "Configured" : "Not set"}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">{s.desc}</div>
+                      <div className="text-[11px] text-muted-foreground mt-1 font-mono truncate">{s.key}</div>
+                      <div className="text-[11px] text-muted-foreground">Get key: {s.where}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="text-xs text-muted-foreground pt-2 border-t">
+              To add or rotate any of these, tell Lovable: <em>"Set the RUNWAY_API_KEY"</em> (or any other key above). You'll get a secure prompt to paste the value — it's stored encrypted and made available to all video edge functions automatically.
+            </div>
           </CardContent>
         </Card>
       </div>
