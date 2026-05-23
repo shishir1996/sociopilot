@@ -98,20 +98,6 @@ export default function AdminAIVideoEngine() {
     loadKeys();
   };
 
-  const refreshSecretStatus = async () => {
-    setCheckingSecrets(true);
-    try {
-      const { data, error } = await sb.functions.invoke("admin-check-secrets", {
-        body: { keys: PROVIDER_SECRETS.map((s) => s.key) },
-      });
-      if (!error && data?.status) setSecretStatus(data.status);
-    } catch (e) {
-      // silent
-    } finally {
-      setCheckingSecrets(false);
-    }
-  };
-
   const update = (patch: any) => setSettings((s: any) => ({ ...s, ...patch }));
 
   const save = async () => {
