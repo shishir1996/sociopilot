@@ -1383,6 +1383,42 @@ export type Database = {
           },
         ]
       }
+      provider_api_keys: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          key_name: string
+          key_value: string | null
+          label: string | null
+          notes: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key_name: string
+          key_value?: string | null
+          label?: string | null
+          notes?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key_name?: string
+          key_value?: string | null
+          label?: string | null
+          notes?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       provider_health_logs: {
         Row: {
           created_at: string
