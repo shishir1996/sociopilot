@@ -86,13 +86,23 @@ Deno.serve(async (req) => {
         };
         if (type === "subscription.charged") {
           payload.last_charged_at = new Date().toISOString();
+          payload.has_ever_subscribed = true;
+          payload.first_subscription_at = existingSub ? undefined : new Date().toISOString();
         }
         // Unlock Pro advanced branding features on the first successful recurring
         // payment (subscription.charged). Trial activation alone must NOT unlock these.
         if (type === "subscription.charged" && plan === "pro") {
           payload.pro_features_activated_at = new Date().toISOString();
+          payload.has_used_pro_trial = true;
+        }
+        if (type === "subscription.charged" && plan === "basic") {
+          payload.has_used_basic_trial = true;
         }
         if (existingSub) {
+          // If row already has first_subscription_at, don't overwrite.
+          const { data: cur } = await admin.from("subscriptions").select("first_subscription_at").eq("id", existingSub.id).maybeSingle();
+          if (cur?.first_subscription_at) delete payload.first_subscription_at;
+          else if (type === "subscription.charged") payload.first_subscription_at = new Date().toISOString();
           await admin.from("subscriptions").update(payload).eq("id", existingSub.id);
         } else {
           await admin.from("subscriptions").insert(payload);
