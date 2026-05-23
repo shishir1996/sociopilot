@@ -46,6 +46,8 @@ export default function AdminAIVideoEngine() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [settings, setSettings] = useState<any>(null);
   const [saving, setSaving] = useState(false);
+  const [secretStatus, setSecretStatus] = useState<Record<string, boolean>>({});
+  const [checkingSecrets, setCheckingSecrets] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -57,8 +59,23 @@ export default function AdminAIVideoEngine() {
       if (!admin) return;
       const { data } = await supabase.from("admin_ai_settings").select("*").eq("singleton", true).maybeSingle();
       setSettings(data);
+      refreshSecretStatus();
     })();
   }, [user, authLoading, navigate]);
+
+  const refreshSecretStatus = async () => {
+    setCheckingSecrets(true);
+    try {
+      const { data, error } = await sb.functions.invoke("admin-check-secrets", {
+        body: { keys: PROVIDER_SECRETS.map((s) => s.key) },
+      });
+      if (!error && data?.status) setSecretStatus(data.status);
+    } catch (e) {
+      // silent
+    } finally {
+      setCheckingSecrets(false);
+    }
+  };
 
   const update = (patch: any) => setSettings((s: any) => ({ ...s, ...patch }));
 
