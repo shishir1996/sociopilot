@@ -203,33 +203,48 @@ export default function AdminAIVideoEngine() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex justify-end">
-              <Button variant="outline" size="sm" onClick={refreshSecretStatus} disabled={checkingSecrets}>
-                {checkingSecrets ? "Checking…" : "Refresh status"}
-              </Button>
-            </div>
-            <div className="grid md:grid-cols-2 gap-3">
+            <div className="space-y-3">
               {PROVIDER_SECRETS.map((s) => {
-                const configured = secretStatus[s.key];
+                const row = keys.find((k) => k.key_name === s.key);
+                const stored = !!row?.key_value;
+                const draft = keyDrafts[s.key];
+                const meta = PROVIDER_SECRETS.find((x) => x.key === s.key);
                 return (
-                  <div key={s.key} className="p-3 rounded-lg border flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="font-medium flex items-center gap-2">
-                        {s.label}
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${configured ? "bg-green-500/15 text-green-600" : "bg-amber-500/15 text-amber-600"}`}>
-                          {configured ? "Configured" : "Not set"}
-                        </span>
+                  <div key={s.key} className="p-3 rounded-lg border space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium flex items-center gap-2">
+                          {meta?.label}
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full ${stored ? "bg-green-500/15 text-green-600" : "bg-amber-500/15 text-amber-600"}`}>
+                            {stored ? "Saved" : "Empty"}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-muted-foreground font-mono">{s.key}</div>
+                        <div className="text-[11px] text-muted-foreground">Get key from: {meta?.where}</div>
                       </div>
-                      <div className="text-xs text-muted-foreground">{s.desc}</div>
-                      <div className="text-[11px] text-muted-foreground mt-1 font-mono truncate">{s.key}</div>
-                      <div className="text-[11px] text-muted-foreground">Get key: {s.where}</div>
+                      {stored && (
+                        <Button variant="ghost" size="sm" onClick={() => clearKey(row)} disabled={savingKey === s.key}>
+                          Clear
+                        </Button>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        type="password"
+                        placeholder={stored ? "•••••••••• (saved) — type to replace" : "Paste API key"}
+                        value={draft ?? ""}
+                        onChange={(e) => setKeyDrafts((d) => ({ ...d, [s.key]: e.target.value }))}
+                      />
+                      <Button
+                        onClick={() => row && saveKey(row)}
+                        disabled={!row || savingKey === s.key || draft === undefined || draft === ""}
+                      >
+                        {savingKey === s.key ? "Saving…" : "Save"}
+                      </Button>
                     </div>
                   </div>
                 );
               })}
-            </div>
-            <div className="text-xs text-muted-foreground pt-2 border-t">
-              To add or rotate any of these, tell Lovable: <em>"Set the RUNWAY_API_KEY"</em> (or any other key above). You'll get a secure prompt to paste the value — it's stored encrypted and made available to all video edge functions automatically.
             </div>
           </CardContent>
         </Card>
