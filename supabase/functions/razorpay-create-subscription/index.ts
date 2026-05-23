@@ -48,14 +48,32 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Trial + first-charge on 8th calculation
+    // ---- Trial eligibility (lifetime, per-plan) ----
+    // A user is only eligible for a free trial on a given plan if:
+    //  - they have never subscribed before (has_ever_subscribed = false)
+    //  - they have not already consumed the trial for this specific plan
+    const { data: existingSub } = await admin
+      .from("subscriptions")
+      .select("id, has_used_basic_trial, has_used_pro_trial, has_ever_subscribed")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    const usedThisPlanTrial =
+      plan === "pro" ? !!existingSub?.has_used_pro_trial : !!existingSub?.has_used_basic_trial;
+    const eligibleForTrial = !existingSub?.has_ever_subscribed && !usedThisPlanTrial;
+
     const trialDays = Number(settings.trial_days || 14);
-    const trialEnd = new Date();
-    trialEnd.setDate(trialEnd.getDate() + trialDays);
-    // Next 8th strictly after the trial end
-    const firstBilling = new Date(trialEnd.getFullYear(), trialEnd.getMonth(), 8, 9, 0, 0);
-    if (firstBilling <= trialEnd) {
-      firstBilling.setMonth(firstBilling.getMonth() + 1);
+    const now = new Date();
+    let trialEnd: Date | null = null;
+    let firstBilling: Date;
+    if (eligibleForTrial) {
+      trialEnd = new Date();
+      trialEnd.setDate(trialEnd.getDate() + trialDays);
+      firstBilling = new Date(trialEnd.getFullYear(), trialEnd.getMonth(), 8, 9, 0, 0);
+      if (firstBilling <= trialEnd) firstBilling.setMonth(firstBilling.getMonth() + 1);
+    } else {
+      // No trial — charge immediately (advance 1-month payment for upgrades / returning users)
+      firstBilling = new Date(now.getTime() + 60 * 1000); // ~1 minute from now
     }
     const startAt = Math.floor(firstBilling.getTime() / 1000);
 
@@ -75,7 +93,8 @@ Deno.serve(async (req) => {
           plan,
           billing_period,
           region,
-          trial_end: trialEnd.toISOString(),
+          trial_end: trialEnd ? trialEnd.toISOString() : null,
+          eligible_for_trial: eligibleForTrial,
         },
       }),
     });
@@ -93,22 +112,39 @@ Deno.serve(async (req) => {
       provider_payment_id: sub.id, status: "pending",
     });
 
-    // Mark user as on trial immediately; webhook will flip to active on first charge.
-    const { data: existingSub } = await admin.from("subscriptions").select("id").eq("user_id", user.id).maybeSingle();
-    const subPayload: any = {
-      user_id: user.id,
-      plan_name: plan,
-      status: "trial",
-      is_trial: true,
-      trial_started_at: new Date().toISOString(),
-      trial_ends_at: trialEnd.toISOString(),
-      first_billing_date: firstBilling.toISOString(),
-      razorpay_subscription_id: sub.id,
-      starts_at: new Date().toISOString(),
-      ends_at: firstBilling.toISOString(),
-    };
-    if (existingSub) await admin.from("subscriptions").update(subPayload).eq("id", existingSub.id);
-    else await admin.from("subscriptions").insert(subPayload);
+    // Only mark the subscription record. If eligible for trial, flag the trial
+    // and immediately set has_used_*_trial so it can never be reused. If NOT
+    // eligible, DO NOT change current plan/status — webhook will activate on
+    // verified `subscription.charged` event.
+    if (eligibleForTrial) {
+      const subPayload: any = {
+        user_id: user.id,
+        plan_name: plan,
+        status: "trial",
+        is_trial: true,
+        trial_started_at: now.toISOString(),
+        trial_ends_at: trialEnd!.toISOString(),
+        first_billing_date: firstBilling.toISOString(),
+        razorpay_subscription_id: sub.id,
+        starts_at: now.toISOString(),
+        ends_at: firstBilling.toISOString(),
+        trial_consumed_at: now.toISOString(),
+        ...(plan === "pro"
+          ? { has_used_pro_trial: true }
+          : { has_used_basic_trial: true }),
+      };
+      if (existingSub) await admin.from("subscriptions").update(subPayload).eq("id", existingSub.id);
+      else await admin.from("subscriptions").insert(subPayload);
+    } else {
+      // Record pending razorpay sub id only — preserve current plan/status until webhook.
+      if (existingSub) {
+        await admin
+          .from("subscriptions")
+          .update({ razorpay_subscription_id: sub.id })
+          .eq("id", existingSub.id);
+      }
+      // No insert for brand-new user without trial — webhook will create on charge.
+    }
 
     return new Response(JSON.stringify({
       ok: true,
@@ -117,8 +153,9 @@ Deno.serve(async (req) => {
       key_id: settings.razorpay_key_id,
       amount: planRow.amount,
       currency: planRow.currency,
-      trial_ends_at: trialEnd.toISOString(),
+      trial_ends_at: trialEnd ? trialEnd.toISOString() : null,
       first_billing_date: firstBilling.toISOString(),
+      eligible_for_trial: eligibleForTrial,
     }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e: any) {
     console.error(e);

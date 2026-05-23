@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Check, Crown, X, ArrowLeft, Sparkles } from "lucide-react";
 import { useGeoPricing } from "@/hooks/useGeoPricing";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 const TRIAL_FEATURES = [
   { label: "7 posts per week", included: true },
@@ -44,6 +46,35 @@ export default function Pricing() {
   const [annual, setAnnual] = useState(false);
   const navigate = useNavigate();
   const { currencySymbol, basicPrice, proPrice, loading, region } = useGeoPricing();
+  const { user } = useAuth();
+  const [sub, setSub] = useState<any>(null);
+  const [subLoaded, setSubLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!user) { setSubLoaded(true); return; }
+    (async () => {
+      const { data } = await supabase
+        .from("subscriptions")
+        .select("plan_name, status, is_trial, trial_ends_at, has_used_basic_trial, has_used_pro_trial, has_ever_subscribed")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      setSub(data);
+      setSubLoaded(true);
+    })();
+  }, [user]);
+
+  // Trials are ONLY for first-time onboarding (no prior trial + never subscribed).
+  const eligibleForAnyTrial =
+    !user
+      ? true
+      : !!sub
+        ? !sub.has_ever_subscribed && !sub.has_used_basic_trial && !sub.has_used_pro_trial
+        : true;
+
+  const currentPlan: string | null = sub?.status === "active" || sub?.is_trial ? (sub?.plan_name || null) : null;
+  const isOnBasic = currentPlan === "basic";
+  const isOnPro = currentPlan === "pro";
+  const isTrial = !!sub?.is_trial;
 
   const getPrice = (plan: string) => {
     const monthly = plan === "basic" ? basicPrice : proPrice;
@@ -77,10 +108,16 @@ export default function Pricing() {
       <main className="max-w-5xl mx-auto px-4 py-10">
         <div className="text-center mb-10">
           <h2 className="text-3xl font-bold text-foreground mb-3">
-            Simple, transparent pricing
+            {isOnPro ? "You are currently on Pro Plan"
+              : isOnBasic && isTrial ? "You are currently on Basic Trial"
+              : isOnBasic ? "You are currently on Basic Plan"
+              : isTrial && currentPlan === "pro" ? "You are currently on Pro Trial"
+              : "Simple, transparent pricing"}
           </h2>
           <p className="text-muted-foreground max-w-lg mx-auto">
-            Start free for 7 days. No credit card required. Upgrade anytime to unlock more features.
+            {eligibleForAnyTrial
+              ? "Start free for 7 days. No credit card required. Upgrade anytime to unlock more features."
+              : "Choose the plan that fits your business. Billed securely — no surprises."}
           </p>
 
           {/* Billing Toggle */}
@@ -100,9 +137,10 @@ export default function Pricing() {
           </div>
         </div>
 
-        {!loading && (
+        {!loading && subLoaded && (
           <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            {/* Free Trial */}
+            {/* Free Trial — only shown to brand-new users with no trial/sub history */}
+            {eligibleForAnyTrial && !currentPlan && (
             <div className="rounded-2xl border border-border p-1 hover:border-primary/30 hover:shadow-elevated transition-all">
               <div className="bg-card rounded-xl p-6 h-full flex flex-col">
                 <div className="mb-4">
@@ -131,6 +169,7 @@ export default function Pricing() {
                 </div>
               </div>
             </div>
+            )}
 
             {/* Basic */}
             <div className="rounded-2xl border border-border p-1 hover:border-primary/30 hover:shadow-elevated transition-all">
@@ -150,9 +189,19 @@ export default function Pricing() {
                     <p className="text-xs text-success mt-1">Save {currencySymbol}{getSavings("basic")} per year</p>
                   )}
                 </div>
-                <Button variant="outline" className="w-full mb-6" onClick={() => handleUpgrade("basic")}>
-                  Get Basic
-                </Button>
+                {isOnBasic ? (
+                  <Button variant="outline" className="w-full mb-6" disabled>
+                    Current plan
+                  </Button>
+                ) : isOnPro ? (
+                  <Button variant="outline" className="w-full mb-6" disabled>
+                    Included in Pro
+                  </Button>
+                ) : (
+                  <Button variant="outline" className="w-full mb-6" onClick={() => handleUpgrade("basic")}>
+                    {eligibleForAnyTrial ? "Get Basic" : "Subscribe to Basic"}
+                  </Button>
+                )}
                 <div className="space-y-3 flex-1">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Includes</p>
                   {BASIC_FEATURES.map(f => (
@@ -195,9 +244,16 @@ export default function Pricing() {
                     <p className="text-xs text-success mt-1">Save {currencySymbol}{getSavings("pro")} per year</p>
                   )}
                 </div>
-                <Button className="w-full gradient-primary border-0 shadow-glow mb-6" onClick={() => handleUpgrade("pro")}>
-                  <Crown className="h-4 w-4 mr-1" /> Upgrade to Pro
-                </Button>
+                {isOnPro ? (
+                  <Button className="w-full mb-6" variant="outline" disabled>
+                    <Crown className="h-4 w-4 mr-1" /> Current plan
+                  </Button>
+                ) : (
+                  <Button className="w-full gradient-primary border-0 shadow-glow mb-6" onClick={() => handleUpgrade("pro")}>
+                    <Crown className="h-4 w-4 mr-1" />
+                    {isOnBasic ? "Upgrade to Pro" : eligibleForAnyTrial ? "Start Pro Trial" : "Subscribe to Pro"}
+                  </Button>
+                )}
                 <div className="space-y-3 flex-1">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Everything in Basic, plus</p>
                   {PRO_FEATURES.map(f => (

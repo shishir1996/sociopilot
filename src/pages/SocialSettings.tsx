@@ -42,6 +42,7 @@ export default function SocialSettings() {
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState<string | null>(null);
   const [limitDialogOpen, setLimitDialogOpen] = useState(false);
+  const [onboardingHandoff, setOnboardingHandoff] = useState(false);
   const planLimits = usePlanLimits(businessId);
 
   const platformLimit = planLimits.platformLimit;
@@ -150,6 +151,22 @@ export default function SocialSettings() {
       if (data?.error) throw new Error(data.error);
       toast({ title: "✅ Connected!", description: `${platform} connected as ${data?.account_name}` });
       if (bid || businessId) await fetchConnected(bid || businessId);
+
+      // Onboarding hand-off: if user has no active subscription / trial yet, show
+      // a brief animation then push them to plan selection BEFORE the dashboard.
+      try {
+        const { data: subRow } = await supabase
+          .from("subscriptions")
+          .select("status, is_trial, has_ever_subscribed")
+          .eq("user_id", user!.id)
+          .maybeSingle();
+        const needsPlan =
+          !subRow || (subRow.status !== "active" && !subRow.is_trial);
+        if (needsPlan) {
+          setOnboardingHandoff(true);
+          setTimeout(() => navigate("/pricing"), 3000);
+        }
+      } catch {}
     } catch (err: any) {
       toast({ title: "Failed", description: err.message, variant: "destructive" });
     }
@@ -180,6 +197,20 @@ export default function SocialSettings() {
 
   return (
     <div className="min-h-screen bg-background">
+      {onboardingHandoff && (
+        <div className="fixed inset-0 z-[100] grid place-items-center bg-background/95 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="flex flex-col items-center gap-5 text-center px-6">
+            <div className="relative">
+              <div className="h-20 w-20 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+              <Check className="h-8 w-8 text-primary absolute inset-0 m-auto" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-foreground mb-1">Account connected 🎉</h2>
+              <p className="text-sm text-muted-foreground">Setting up your workspace — let's pick your plan next…</p>
+            </div>
+          </div>
+        </div>
+      )}
       <header className="border-b border-border bg-card">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => navigate("/")}>

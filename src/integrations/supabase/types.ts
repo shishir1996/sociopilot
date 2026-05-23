@@ -1640,6 +1640,10 @@ export type Database = {
           created_at: string
           ends_at: string | null
           first_billing_date: string | null
+          first_subscription_at: string | null
+          has_ever_subscribed: boolean
+          has_used_basic_trial: boolean
+          has_used_pro_trial: boolean
           id: string
           is_trial: boolean
           last_charged_at: string | null
@@ -1651,6 +1655,7 @@ export type Database = {
           status: string
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
+          trial_consumed_at: string | null
           trial_ends_at: string | null
           trial_started_at: string | null
           updated_at: string
@@ -1660,6 +1665,10 @@ export type Database = {
           created_at?: string
           ends_at?: string | null
           first_billing_date?: string | null
+          first_subscription_at?: string | null
+          has_ever_subscribed?: boolean
+          has_used_basic_trial?: boolean
+          has_used_pro_trial?: boolean
           id?: string
           is_trial?: boolean
           last_charged_at?: string | null
@@ -1671,6 +1680,7 @@ export type Database = {
           status?: string
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
+          trial_consumed_at?: string | null
           trial_ends_at?: string | null
           trial_started_at?: string | null
           updated_at?: string
@@ -1680,6 +1690,10 @@ export type Database = {
           created_at?: string
           ends_at?: string | null
           first_billing_date?: string | null
+          first_subscription_at?: string | null
+          has_ever_subscribed?: boolean
+          has_used_basic_trial?: boolean
+          has_used_pro_trial?: boolean
           id?: string
           is_trial?: boolean
           last_charged_at?: string | null
@@ -1691,6 +1705,7 @@ export type Database = {
           status?: string
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
+          trial_consumed_at?: string | null
           trial_ends_at?: string | null
           trial_started_at?: string | null
           updated_at?: string
