@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Loader2, KeyRound } from "lucide-react";
-import { supabase as sb } from "@/integrations/supabase/client";
 
 const TOGGLES: { key: string; label: string; desc: string }[] = [
   { key: "enable_stock_video_mode", label: "Stock Video Engine", desc: "Pexels / Pixabay sourcing" },
@@ -46,8 +45,6 @@ export default function AdminAIVideoEngine() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [settings, setSettings] = useState<any>(null);
   const [saving, setSaving] = useState(false);
-  const [secretStatus, setSecretStatus] = useState<Record<string, boolean>>({});
-  const [checkingSecrets, setCheckingSecrets] = useState(false);
   const [keys, setKeys] = useState<any[]>([]);
   const [keyDrafts, setKeyDrafts] = useState<Record<string, string>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -62,7 +59,6 @@ export default function AdminAIVideoEngine() {
       if (!admin) return;
       const { data } = await supabase.from("admin_ai_settings").select("*").eq("singleton", true).maybeSingle();
       setSettings(data);
-      refreshSecretStatus();
       loadKeys();
     })();
   }, [user, authLoading, navigate]);
