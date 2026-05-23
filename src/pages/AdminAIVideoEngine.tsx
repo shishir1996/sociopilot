@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, KeyRound } from "lucide-react";
+import { supabase as sb } from "@/integrations/supabase/client";
 
 const TOGGLES: { key: string; label: string; desc: string }[] = [
   { key: "enable_stock_video_mode", label: "Stock Video Engine", desc: "Pexels / Pixabay sourcing" },
@@ -25,6 +26,18 @@ const TOGGLES: { key: string; label: string; desc: string }[] = [
   { key: "enable_kling_generation", label: "Kling Engine", desc: "Requires KLING_API_KEY secret" },
   { key: "enable_pika_generation", label: "Pika Engine", desc: "Requires PIKA_API_KEY secret" },
   { key: "enable_veo_generation", label: "Veo Engine", desc: "Requires VEO_API_KEY secret" },
+];
+
+const PROVIDER_SECRETS: { key: string; label: string; desc: string; where: string }[] = [
+  { key: "PEXELS_API_KEY", label: "Pexels", desc: "Stock video/photo sourcing", where: "pexels.com/api" },
+  { key: "PIXABAY_API_KEY", label: "Pixabay", desc: "Stock video/photo sourcing", where: "pixabay.com/api/docs" },
+  { key: "ELEVENLABS_API_KEY", label: "ElevenLabs", desc: "Premium TTS voice", where: "elevenlabs.io → Profile → API Keys" },
+  { key: "STABILITY_API_KEY", label: "Stability AI", desc: "AI image generation", where: "platform.stability.ai" },
+  { key: "FAL_API_KEY", label: "Fal.ai", desc: "AI image/video generation", where: "fal.ai/dashboard/keys" },
+  { key: "RUNWAY_API_KEY", label: "Runway", desc: "Premium AI video engine", where: "dev.runwayml.com" },
+  { key: "KLING_API_KEY", label: "Kling", desc: "Premium AI video engine", where: "klingai.com" },
+  { key: "PIKA_API_KEY", label: "Pika", desc: "Premium AI video engine", where: "pika.art" },
+  { key: "VEO_API_KEY", label: "Veo (Google)", desc: "Premium AI video engine", where: "Google AI Studio" },
 ];
 
 export default function AdminAIVideoEngine() {
