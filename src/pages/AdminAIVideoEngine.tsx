@@ -48,6 +48,9 @@ export default function AdminAIVideoEngine() {
   const [saving, setSaving] = useState(false);
   const [secretStatus, setSecretStatus] = useState<Record<string, boolean>>({});
   const [checkingSecrets, setCheckingSecrets] = useState(false);
+  const [keys, setKeys] = useState<any[]>([]);
+  const [keyDrafts, setKeyDrafts] = useState<Record<string, string>>({});
+  const [savingKey, setSavingKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -60,8 +63,44 @@ export default function AdminAIVideoEngine() {
       const { data } = await supabase.from("admin_ai_settings").select("*").eq("singleton", true).maybeSingle();
       setSettings(data);
       refreshSecretStatus();
+      loadKeys();
     })();
   }, [user, authLoading, navigate]);
+
+  const loadKeys = async () => {
+    const { data } = await supabase
+      .from("provider_api_keys" as any)
+      .select("*")
+      .order("key_name", { ascending: true });
+    setKeys(data || []);
+  };
+
+  const saveKey = async (row: any) => {
+    const newVal = keyDrafts[row.key_name];
+    if (newVal === undefined) return;
+    setSavingKey(row.key_name);
+    const { error } = await supabase
+      .from("provider_api_keys" as any)
+      .update({ key_value: newVal, updated_by: user?.id })
+      .eq("id", row.id);
+    setSavingKey(null);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`${row.key_name} saved`);
+    setKeyDrafts((d) => { const n = { ...d }; delete n[row.key_name]; return n; });
+    loadKeys();
+  };
+
+  const clearKey = async (row: any) => {
+    setSavingKey(row.key_name);
+    const { error } = await supabase
+      .from("provider_api_keys" as any)
+      .update({ key_value: null })
+      .eq("id", row.id);
+    setSavingKey(null);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`${row.key_name} cleared`);
+    loadKeys();
+  };
 
   const refreshSecretStatus = async () => {
     setCheckingSecrets(true);
