@@ -18,6 +18,7 @@ interface GeoPricingResult {
   proPrice: number;
   loading: boolean;
   prices: PricingData[];
+  setRegion: (region: string) => void;
 }
 
 export function useGeoPricing(): GeoPricingResult {
