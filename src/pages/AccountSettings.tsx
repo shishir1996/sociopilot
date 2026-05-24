@@ -88,12 +88,23 @@ export default function AccountSettings() {
   const handleUpgrade = async (plan: string) => {
     setUpgrading(true);
     try {
-      // India → Razorpay subscriptions (trial + billing on the 8th).
-      if (region === "india") {
+      // Prefer Razorpay subscriptions whenever a plan is configured for the
+      // user's region (India INR or Global USD). Fall back to Cashfree only
+      // when no Razorpay plan exists for the region.
+      const { data: rzpPlan } = await supabase
+        .from("razorpay_plans")
+        .select("razorpay_plan_id, currency")
+        .eq("plan_name", plan)
+        .eq("billing_period", "monthly")
+        .eq("region", region)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (rzpPlan?.razorpay_plan_id) {
         const ok = await loadRazorpay();
         if (!ok) throw new Error("Could not load Razorpay checkout. Please refresh and retry.");
         const { data, error } = await supabase.functions.invoke("razorpay-create-subscription", {
-          body: { plan, billing_period: "monthly", region: "india" },
+          body: { plan, billing_period: "monthly", region },
         });
         if (error) throw error;
         if (!data?.ok) throw new Error(data?.error || "Subscription could not be created");
@@ -101,11 +112,13 @@ export default function AccountSettings() {
           key: data.key_id,
           subscription_id: data.subscription_id,
           name: "Growvix",
-          description: `${plan.toUpperCase()} plan — trial then auto-billed on the 8th`,
+          description: `${plan.toUpperCase()} plan (${rzpPlan.currency})`,
           handler: () => {
             toast({
               title: "Subscription set up",
-              description: `Free trial active until ${new Date(data.trial_ends_at).toLocaleDateString()}. First charge on ${new Date(data.first_billing_date).toLocaleDateString()}.`,
+              description: data.trial_ends_at
+                ? `Trial active until ${new Date(data.trial_ends_at).toLocaleDateString()}. First charge ${new Date(data.first_billing_date).toLocaleDateString()}.`
+                : `Your ${plan} plan is being activated.`,
             });
             fetchSubscription();
           },
@@ -117,7 +130,7 @@ export default function AccountSettings() {
         setUpgrading(false);
         return;
       }
-      // Global → existing Cashfree checkout.
+      // Fallback: Cashfree (legacy global path).
       const { data, error } = await supabase.functions.invoke("create-checkout", {
         body: { plan, region },
       });
