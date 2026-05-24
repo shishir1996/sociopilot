@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Check, Crown, X, ArrowLeft, Sparkles } from "lucide-react";
 import { useGeoPricing } from "@/hooks/useGeoPricing";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -45,7 +46,7 @@ const PRO_FEATURES = [
 export default function Pricing() {
   const [annual, setAnnual] = useState(false);
   const navigate = useNavigate();
-  const { currencySymbol, basicPrice, proPrice, loading, region } = useGeoPricing();
+  const { currencySymbol, basicPrice, proPrice, loading, region, setRegion } = useGeoPricing();
   const { user } = useAuth();
   const [sub, setSub] = useState<any>(null);
   const [subLoaded, setSubLoaded] = useState(false);
@@ -99,9 +100,14 @@ export default function Pricing() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <h1 className="text-xl font-heading font-bold text-foreground">Pricing</h1>
-          <Badge variant="outline" className="text-xs ml-auto">
-            {region === "india" ? "🇮🇳 India" : "🌍 Global"} pricing
-          </Badge>
+          <div className="ml-auto">
+            <Tabs value={region} onValueChange={setRegion}>
+              <TabsList className="h-8">
+                <TabsTrigger value="india" className="text-xs px-3">🇮🇳 India (₹)</TabsTrigger>
+                <TabsTrigger value="global" className="text-xs px-3">🌍 International ($)</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
         </div>
       </header>
 

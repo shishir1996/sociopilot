@@ -18,10 +18,11 @@ interface GeoPricingResult {
   proPrice: number;
   loading: boolean;
   prices: PricingData[];
+  setRegion: (region: string) => void;
 }
 
 export function useGeoPricing(): GeoPricingResult {
-  const [region, setRegion] = useState<string>("global");
+  const [region, setRegionState] = useState<string>("global");
   const [prices, setPrices] = useState<PricingData[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -30,7 +31,18 @@ export function useGeoPricing(): GeoPricingResult {
     fetchPrices();
   }, []);
 
+  const setRegion = (next: string) => {
+    localStorage.setItem("sp_region_v2", next);
+    localStorage.setItem("sp_region_override", "1");
+    setRegionState(next);
+  };
+
   const detectRegion = async () => {
+    // Honour explicit user override
+    if (localStorage.getItem("sp_region_override") === "1") {
+      const cached = localStorage.getItem("sp_region_v2");
+      if (cached) { setRegionState(cached); return; }
+    }
     // Timezone check (works offline, no CORS, no rate limits)
     const tzIsIndia = (() => {
       try {
@@ -43,7 +55,7 @@ export function useGeoPricing(): GeoPricingResult {
     const CACHE_KEY = "sp_region_v2";
     const cached = localStorage.getItem(CACHE_KEY);
     if (cached) {
-      setRegion(cached);
+      setRegionState(cached);
       return;
     }
     // Clean up old cache key
@@ -51,7 +63,7 @@ export function useGeoPricing(): GeoPricingResult {
 
     // Timezone is the most reliable signal for India — trust it immediately
     if (tzIsIndia) {
-      setRegion("india");
+      setRegionState("india");
       localStorage.setItem(CACHE_KEY, "india");
       return;
     }
@@ -71,7 +83,7 @@ export function useGeoPricing(): GeoPricingResult {
         const cc = (data?.[svc.key] || "").toString().toUpperCase();
         if (cc) {
           const detected = cc === "IN" ? "india" : "global";
-          setRegion(detected);
+          setRegionState(detected);
           localStorage.setItem("sp_region_v2", detected);
           return;
         }
@@ -79,7 +91,7 @@ export function useGeoPricing(): GeoPricingResult {
     }
 
     // All services failed → default global (timezone India already handled above)
-    setRegion("global");
+    setRegionState("global");
     localStorage.setItem("sp_region_v2", "global");
   };
 
@@ -97,5 +109,5 @@ export function useGeoPricing(): GeoPricingResult {
   const currency = regionPrices[0]?.currency || (region === "india" ? "INR" : "USD");
   const currencySymbol = regionPrices[0]?.currency_symbol || (region === "india" ? "₹" : "$");
 
-  return { region, currency, currencySymbol, basicPrice, proPrice, loading, prices };
+  return { region, currency, currencySymbol, basicPrice, proPrice, loading, prices, setRegion } as GeoPricingResult;
 }

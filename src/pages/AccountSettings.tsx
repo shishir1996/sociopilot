@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Trash2, User, Crown, CreditCard, Loader2 } from "lucide-react";
+import { ArrowLeft, Trash2, User, Crown, CreditCard, Loader2, Calendar, XCircle, RotateCcw } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -39,6 +39,7 @@ export default function AccountSettings() {
   const [deleting, setDeleting] = useState(false);
   const [subscription, setSubscription] = useState<any>(null);
   const [upgrading, setUpgrading] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const { currencySymbol, basicPrice, proPrice, region } = useGeoPricing();
 
   const upgradePlan = searchParams.get("plan");
@@ -88,12 +89,23 @@ export default function AccountSettings() {
   const handleUpgrade = async (plan: string) => {
     setUpgrading(true);
     try {
-      // India → Razorpay subscriptions (trial + billing on the 8th).
-      if (region === "india") {
+      // Prefer Razorpay subscriptions whenever a plan is configured for the
+      // user's region (India INR or Global USD). Fall back to Cashfree only
+      // when no Razorpay plan exists for the region.
+      const { data: rzpPlan } = await supabase
+        .from("razorpay_plans")
+        .select("razorpay_plan_id, currency")
+        .eq("plan_name", plan)
+        .eq("billing_period", "monthly")
+        .eq("region", region)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (rzpPlan?.razorpay_plan_id) {
         const ok = await loadRazorpay();
         if (!ok) throw new Error("Could not load Razorpay checkout. Please refresh and retry.");
         const { data, error } = await supabase.functions.invoke("razorpay-create-subscription", {
-          body: { plan, billing_period: "monthly", region: "india" },
+          body: { plan, billing_period: "monthly", region },
         });
         if (error) throw error;
         if (!data?.ok) throw new Error(data?.error || "Subscription could not be created");
@@ -101,11 +113,13 @@ export default function AccountSettings() {
           key: data.key_id,
           subscription_id: data.subscription_id,
           name: "Growvix",
-          description: `${plan.toUpperCase()} plan — trial then auto-billed on the 8th`,
+          description: `${plan.toUpperCase()} plan (${rzpPlan.currency})`,
           handler: () => {
             toast({
               title: "Subscription set up",
-              description: `Free trial active until ${new Date(data.trial_ends_at).toLocaleDateString()}. First charge on ${new Date(data.first_billing_date).toLocaleDateString()}.`,
+              description: data.trial_ends_at
+                ? `Trial active until ${new Date(data.trial_ends_at).toLocaleDateString()}. First charge ${new Date(data.first_billing_date).toLocaleDateString()}.`
+                : `Your ${plan} plan is being activated.`,
             });
             fetchSubscription();
           },
@@ -117,7 +131,7 @@ export default function AccountSettings() {
         setUpgrading(false);
         return;
       }
-      // Global → existing Cashfree checkout.
+      // Fallback: Cashfree (legacy global path).
       const { data, error } = await supabase.functions.invoke("create-checkout", {
         body: { plan, region },
       });
@@ -157,7 +171,46 @@ export default function AccountSettings() {
     setDeleting(false);
   };
 
+  const handleCancelSubscription = async () => {
+    if (!subscription?.razorpay_subscription_id) {
+      toast({ title: "Nothing to cancel", description: "No active Razorpay subscription found.", variant: "destructive" });
+      return;
+    }
+    setCancelling(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("razorpay-cancel-subscription", { body: {} });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || "Could not cancel subscription");
+      toast({
+        title: "Subscription cancelled",
+        description: subscription?.ends_at
+          ? `You can continue using ${subscription.plan_name} until ${new Date(subscription.ends_at).toLocaleDateString()}.`
+          : "Auto-renewal has been stopped.",
+      });
+      fetchSubscription();
+    } catch (err: any) {
+      toast({ title: "Cancellation failed", description: err.message, variant: "destructive" });
+    }
+    setCancelling(false);
+  };
+
+  const handleResumeSubscription = async () => {
+    setCancelling(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("razorpay-cancel-subscription", { body: { resume: true } });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || "Could not resume subscription");
+      toast({ title: "Subscription resumed", description: "Your plan will continue to renew." });
+      fetchSubscription();
+    } catch (err: any) {
+      toast({ title: "Resume failed", description: err.message, variant: "destructive" });
+    }
+    setCancelling(false);
+  };
+
   const currentPlan = subscription?.plan_name || "free_trial";
+  const isCancelling = subscription?.status === "cancelling";
+  const isActive = subscription?.status === "active" || isCancelling || subscription?.is_trial;
 
   return (
     <div className="min-h-screen bg-background">
@@ -203,8 +256,87 @@ export default function AccountSettings() {
                   {!subscription?.is_trial && subscription?.ends_at && `Renews ${new Date(subscription.ends_at).toLocaleDateString()}`}
                 </p>
               </div>
-              <Badge variant="outline" className="capitalize">{subscription?.status || "inactive"}</Badge>
+              <Badge
+                variant="outline"
+                className={`capitalize ${
+                  subscription?.status === "active" ? "border-success/40 text-success" :
+                  isCancelling ? "border-warning/40 text-warning" :
+                  subscription?.status === "cancelled" ? "border-destructive/40 text-destructive" : ""
+                }`}
+              >
+                {isCancelling ? "Cancelling" : (subscription?.status || "inactive")}
+              </Badge>
             </div>
+
+            {/* Active subscription management */}
+            {isActive && subscription?.razorpay_subscription_id && (
+              <div className="border-t border-border pt-4 space-y-3">
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Calendar className="h-3.5 w-3.5" />
+                    <span>
+                      {isCancelling ? "Access until" : subscription?.is_trial ? "Trial ends" : "Next charge"}:{" "}
+                      <span className="text-foreground font-medium">
+                        {subscription?.ends_at ? new Date(subscription.ends_at).toLocaleDateString() : "—"}
+                      </span>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <CreditCard className="h-3.5 w-3.5" />
+                    <span>
+                      Auto-renew:{" "}
+                      <span className={`font-medium ${isCancelling ? "text-warning" : "text-success"}`}>
+                        {isCancelling ? "Off" : "On"}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+                {isCancelling ? (
+                  <div className="rounded-lg bg-warning/10 border border-warning/20 p-3 space-y-2">
+                    <p className="text-xs text-foreground">
+                      Auto-renewal is off. You keep <span className="font-semibold capitalize">{currentPlan}</span> features until{" "}
+                      <span className="font-semibold">
+                        {subscription?.ends_at ? new Date(subscription.ends_at).toLocaleDateString() : "the end of the cycle"}
+                      </span>.
+                    </p>
+                    <Button size="sm" variant="outline" onClick={handleResumeSubscription} disabled={cancelling}>
+                      {cancelling ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <RotateCcw className="h-3.5 w-3.5 mr-1" />}
+                      Resume subscription
+                    </Button>
+                  </div>
+                ) : (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/5">
+                        <XCircle className="h-3.5 w-3.5 mr-1" /> Cancel subscription
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Cancel your subscription?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Auto-renewal will be turned off immediately. You will keep your{" "}
+                          <span className="font-semibold capitalize">{currentPlan}</span> features until{" "}
+                          <span className="font-semibold">
+                            {subscription?.ends_at ? new Date(subscription.ends_at).toLocaleDateString() : "the end of your billing cycle"}
+                          </span>. You can resume any time before then.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Keep my plan</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleCancelSubscription}
+                          disabled={cancelling}
+                          className="bg-destructive text-destructive-foreground"
+                        >
+                          {cancelling ? "Cancelling..." : "Yes, cancel"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </div>
+            )}
 
             {currentPlan !== "pro" && (
               <div className="grid sm:grid-cols-2 gap-3 pt-2">
