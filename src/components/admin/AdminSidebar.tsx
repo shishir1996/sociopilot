@@ -1,0 +1,107 @@
+import { useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import {
+  Shield, BarChart3, Cpu, Settings, CreditCard, Video,
+  ChevronLeft, ChevronRight, ArrowLeft, Users, Sparkles, Plug,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+
+type NavItem = { icon: any; label: string; route: string };
+type NavGroup = { label: string; items: NavItem[] };
+
+const groups: NavGroup[] = [
+  {
+    label: "Overview",
+    items: [
+      { icon: Shield, label: "Dashboard", route: "/admin" },
+      { icon: BarChart3, label: "Analytics", route: "/admin/analytics" },
+    ],
+  },
+  {
+    label: "AI Engine",
+    items: [
+      { icon: Cpu, label: "AI Control", route: "/admin/ai" },
+      { icon: Video, label: "AI Video", route: "/admin/ai-video" },
+    ],
+  },
+  {
+    label: "Integrations",
+    items: [
+      { icon: Plug, label: "Social APIs", route: "/admin/integrations" },
+      { icon: CreditCard, label: "Payments", route: "/admin/payments" },
+    ],
+  },
+];
+
+interface AdminSidebarProps {
+  brand?: string;
+  icon?: any;
+}
+
+export function AdminSidebar({ brand = "Admin", icon: Icon = Shield }: AdminSidebarProps) {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const [open, setOpen] = useState(true);
+
+  return (
+    <aside
+      className={cn(
+        open ? "w-56" : "w-16",
+        "bg-foreground transition-all duration-200 flex-col hidden md:flex flex-shrink-0 min-h-screen sticky top-0",
+      )}
+    >
+      <div className="p-4 flex items-center gap-2">
+        <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0">
+          <Icon className="h-4 w-4 text-primary-foreground" />
+        </div>
+        {open && <span className="text-sm font-bold text-primary-foreground truncate">{brand}</span>}
+      </div>
+      <nav className="flex-1 px-2 mt-2 space-y-4 overflow-y-auto">
+        {groups.map((g) => (
+          <div key={g.label} className="space-y-1">
+            {open && (
+              <div className="px-3 text-[10px] uppercase tracking-wider text-muted-foreground/40 font-semibold">
+                {g.label}
+              </div>
+            )}
+            {g.items.map((item) => {
+              const active = pathname === item.route;
+              return (
+                <button
+                  key={item.route}
+                  onClick={() => navigate(item.route)}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
+                    active
+                      ? "bg-primary/20 text-primary"
+                      : "text-muted-foreground/60 hover:text-muted-foreground/80 hover:bg-muted-foreground/5",
+                  )}
+                  title={!open ? item.label : undefined}
+                >
+                  <item.icon className="h-4 w-4 flex-shrink-0" />
+                  {open && <span>{item.label}</span>}
+                </button>
+              );
+            })}
+          </div>
+        ))}
+      </nav>
+      <div className="p-3 border-t border-muted-foreground/10 space-y-1">
+        <button
+          onClick={() => navigate("/")}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-muted-foreground/50 hover:text-muted-foreground/80 hover:bg-muted-foreground/5 transition-colors"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          {open && <span>Back to App</span>}
+        </button>
+        <button
+          onClick={() => setOpen(!open)}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-muted-foreground/50 hover:text-muted-foreground/80 hover:bg-muted-foreground/5 transition-colors"
+        >
+          {open ? <ChevronLeft className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+          {open && <span>Collapse</span>}
+        </button>
+      </div>
+    </aside>
+  );
+}
