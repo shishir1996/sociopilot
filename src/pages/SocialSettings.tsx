@@ -24,12 +24,22 @@ const PLATFORMS = [
   { value: "snapchat", label: "Snapchat", icon: "👻", color: "bg-yellow-400/20 text-yellow-700 border-yellow-200" },
 ];
 
+interface LinkedInPage {
+  type: string;
+  id: string;
+  urn: string;
+  name: string;
+  picture?: string | null;
+  enabled: boolean;
+}
+
 interface ConnectedAccount {
   id: string;
   platform: string;
   account_name: string;
   account_id: string;
   expires_at: string | null;
+  pages?: LinkedInPage[];
 }
 
 export default function SocialSettings() {
@@ -87,7 +97,7 @@ export default function SocialSettings() {
   const fetchConnected = async (bid: string) => {
     const { data } = await supabase
       .from("social_accounts")
-      .select("id, platform, account_name, account_id, expires_at")
+      .select("id, platform, account_name, account_id, expires_at, pages")
       .eq("business_id", bid) as any;
     setConnected(data || []);
   };
@@ -131,6 +141,28 @@ export default function SocialSettings() {
       toast({ title: "Error", description: err.message, variant: "destructive" });
       setConnecting(null);
     }
+  };
+
+  const updateLinkedInDestinations = async (accountId: string, pages: LinkedInPage[]) => {
+    if (!businessId) return;
+    const { error } = await supabase
+      .from("social_accounts")
+      .update({ pages } as any)
+      .eq("id", accountId)
+      .eq("business_id", businessId) as any;
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Updated", description: "LinkedIn posting destinations updated" });
+      await fetchConnected(businessId);
+    }
+  };
+
+  const toggleLinkedInPage = async (account: ConnectedAccount, pageUrn: string) => {
+    const updatedPages = (account.pages || []).map((p) =>
+      p.urn === pageUrn ? { ...p, enabled: !p.enabled } : p
+    );
+    await updateLinkedInDestinations(account.id, updatedPages);
   };
 
   const exchangeToken = async (platform: string, code: string, state: string, bid?: string) => {
@@ -252,38 +284,62 @@ export default function SocialSettings() {
               const p = PLATFORMS.find(pl => pl.value === acc.platform);
               const expired = isExpired(acc.expires_at);
               return (
-                <div key={acc.id} className={`flex items-center justify-between px-4 py-3 rounded-xl border ${expired ? "bg-destructive/5 border-destructive/20" : p?.color || "bg-muted"}`}>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl">{p?.icon}</span>
-                    <div>
-                      <p className="text-sm font-semibold flex items-center gap-1.5">
-                        {p?.label}
-                        {expired && <AlertCircle className="h-3.5 w-3.5 text-destructive" />}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{acc.account_name || acc.account_id}</p>
+                <div key={acc.id}>
+                  <div className={`flex items-center justify-between px-4 py-3 rounded-xl border ${expired ? "bg-destructive/5 border-destructive/20" : p?.color || "bg-muted"}`}>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">{p?.icon}</span>
+                      <div>
+                        <p className="text-sm font-semibold flex items-center gap-1.5">
+                          {p?.label}
+                          {expired && <AlertCircle className="h-3.5 w-3.5 text-destructive" />}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{acc.account_name || acc.account_id}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {expired ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleConnect(acc.platform)}
+                          disabled={connecting === acc.platform}
+                          className="text-xs gap-1"
+                        >
+                          {connecting === acc.platform ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                          Reconnect
+                        </Button>
+                      ) : (
+                        <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                          <Check className="h-3.5 w-3.5" /> Connected
+                        </span>
+                      )}
+                      <Button variant="ghost" size="sm" onClick={() => handleDisconnect(acc.id)} className="h-8 w-8 p-0">
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {expired ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleConnect(acc.platform)}
-                        disabled={connecting === acc.platform}
-                        className="text-xs gap-1"
-                      >
-                        {connecting === acc.platform ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-                        Reconnect
-                      </Button>
-                    ) : (
-                      <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
-                        <Check className="h-3.5 w-3.5" /> Connected
-                      </span>
-                    )}
-                    <Button variant="ghost" size="sm" onClick={() => handleDisconnect(acc.id)} className="h-8 w-8 p-0">
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
+                  {acc.platform === "linkedin" && acc.pages && acc.pages.length > 0 && (
+                    <div className="ml-8 mt-2 mb-1 space-y-1.5">
+                      <p className="text-xs font-medium text-muted-foreground">Posting destinations:</p>
+                      {acc.pages.map((page) => (
+                        <label
+                          key={page.urn}
+                          className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border/50 cursor-pointer hover:bg-muted/50 transition-colors"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={page.enabled}
+                            onChange={() => toggleLinkedInPage(acc, page.urn)}
+                            className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5"
+                          />
+                          <span className="text-xs text-foreground">{page.name}</span>
+                          <span className="text-[10px] text-muted-foreground ml-auto capitalize">
+                            {page.type}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}

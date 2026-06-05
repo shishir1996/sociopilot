@@ -438,6 +438,7 @@ Deno.serve(async (req) => {
                 urn: `urn:li:person:${me.sub}`,
                 name: me.name || "Personal Profile",
                 picture: me.picture || null,
+                enabled: true,
               },
             ];
             // Fetch org admin pages (may fail without Marketing Dev Platform approval)
@@ -458,6 +459,7 @@ Deno.serve(async (req) => {
                     urn: `urn:li:organization:${o.id}`,
                     name: o.name || `Company ${o.id}`,
                     picture: logo,
+                    enabled: true,
                   });
                 }
               } else {

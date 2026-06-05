@@ -285,6 +285,7 @@ export default function AdminPayments() {
             <p className="text-xs text-muted-foreground">Create the plan in Razorpay Dashboard → Subscriptions → Plans, then paste the plan id (plan_XXXX) here.</p>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -361,6 +362,7 @@ export default function AdminPayments() {
                 </TableRow>
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       </main>

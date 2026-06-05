@@ -103,9 +103,9 @@ async function postToLinkedInOne(accessToken: string, authorUrn: string, fullCap
 
 async function postToLinkedIn(account: any, fullCaption: string, imageUrl?: string): Promise<any> {
   if (!account.access_token) return { success: false, error: "No access token configured" };
-  // Determine destinations: stored pages array, otherwise default to personal profile
+  // Determine destinations: stored pages array (only enabled), otherwise default to personal profile
   const pages: any[] = Array.isArray(account.pages) && account.pages.length > 0
-    ? account.pages
+    ? account.pages.filter((p: any) => p.enabled !== false)
     : [{ urn: `urn:li:person:${account.account_id}`, type: "person", name: "Personal" }];
   const settled = await Promise.allSettled(
     pages.map((p) => postToLinkedInOne(account.access_token, p.urn, fullCaption, imageUrl))

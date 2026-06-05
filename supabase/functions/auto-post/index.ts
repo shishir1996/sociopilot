@@ -39,21 +39,43 @@ async function postToInstagram(account: any, caption: string, imageUrl?: string)
   return pubData.error ? { success: false, error: pubData.error.message } : { success: true, post_id: pubData.id };
 }
 
-async function postToLinkedIn(account: any, caption: string, imageUrl?: string) {
-  if (!account.access_token) return { success: false, error: "No access token" };
+async function postToLinkedInOne(accessToken: string, authorUrn: string, caption: string, imageUrl?: string) {
   const shareContent: any = { shareCommentary: { text: caption }, shareMediaCategory: imageUrl ? "IMAGE" : "NONE" };
   if (imageUrl) shareContent.media = [{ status: "READY", originalUrl: imageUrl }];
   const res = await fetch("https://api.linkedin.com/v2/ugcPosts", {
     method: "POST",
-    headers: { Authorization: `Bearer ${account.access_token}`, "Content-Type": "application/json", "X-Restli-Protocol-Version": "2.0.0" },
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", "X-Restli-Protocol-Version": "2.0.0" },
     body: JSON.stringify({
-      author: `urn:li:person:${account.account_id}`, lifecycleState: "PUBLISHED",
+      author: authorUrn, lifecycleState: "PUBLISHED",
       specificContent: { "com.linkedin.ugc.ShareContent": shareContent },
       visibility: { "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC" },
     }),
   });
   const data = await res.json();
-  return res.ok ? { success: true, post_id: data.id } : { success: false, error: JSON.stringify(data) };
+  return res.ok ? { success: true, post_id: data.id, author: authorUrn } : { success: false, error: JSON.stringify(data), author: authorUrn };
+}
+
+async function postToLinkedIn(account: any, caption: string, imageUrl?: string) {
+  if (!account.access_token) return { success: false, error: "No access token" };
+  const pages: any[] = Array.isArray(account.pages) && account.pages.length > 0
+    ? account.pages.filter((p: any) => p.enabled !== false)
+    : [{ urn: `urn:li:person:${account.account_id}`, type: "person", name: "Personal" }];
+  const results = await Promise.allSettled(
+    pages.map((p) => postToLinkedInOne(account.access_token, p.urn, caption, imageUrl))
+  );
+  const mapped = results.map((s, i) => ({
+    destination: pages[i].name || pages[i].urn,
+    urn: pages[i].urn,
+    ...(s.status === "fulfilled" ? s.value : { success: false, error: String((s as any).reason) }),
+  }));
+  const allOk = mapped.every((r) => r.success);
+  const anyOk = mapped.some((r) => r.success);
+  return {
+    success: anyOk,
+    partial: !allOk && anyOk,
+    destinations: mapped,
+    error: allOk ? undefined : mapped.filter((r) => !r.success).map((r) => `${r.destination}: ${r.error}`).join("; "),
+  };
 }
 
 serve(async (req) => {
@@ -122,6 +144,7 @@ serve(async (req) => {
           else if (platform.includes("linkedin")) results[account.platform] = await postToLinkedIn(account, fullCaption, imageUrl);
 
           if (results[account.platform] && !results[account.platform].success) hasError = true;
+          if (results[account.platform]?.partial) hasError = true;
         } catch (err) {
           results[account.platform] = { success: false, error: String(err) };
           hasError = true;
