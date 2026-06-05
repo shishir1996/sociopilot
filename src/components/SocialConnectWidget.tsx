@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Check, Trash2, ChevronDown, ChevronUp, Loader2, ExternalLink, RefreshCw, AlertCircle } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 const PLATFORMS = [
   { value: "facebook", label: "Facebook", icon: "📘", color: "bg-blue-500/10 text-blue-600 border-blue-200" },
@@ -20,7 +21,7 @@ interface ConnectedAccount {
   account_name: string;
   account_id: string;
   expires_at: string | null;
-  pages?: Array<{ type: string; name: string; urn: string; picture?: string | null }>;
+  pages?: Array<{ type: string; name: string; urn: string; picture?: string | null; enabled?: boolean }>;
 }
 
 interface SocialConnectWidgetProps {
@@ -150,6 +151,24 @@ export function SocialConnectWidget({ businessId }: SocialConnectWidgetProps) {
     await supabase.from("social_accounts").delete().eq("id", id) as any;
     toast({ title: "Disconnected", description: "Account removed." });
     fetchConnected();
+  };
+
+  const toggleLinkedInPage = async (account: ConnectedAccount, urn: string, enabled: boolean) => {
+    const nextPages = (account.pages || []).map((p) =>
+      p.urn === urn ? { ...p, enabled } : p
+    );
+    // Optimistic
+    setConnected((prev) => prev.map((a) => (a.id === account.id ? { ...a, pages: nextPages } : a)));
+    try {
+      const { error } = await supabase.functions.invoke("social-oauth", {
+        body: { action: "update_linkedin_pages", social_account_id: account.id, pages: nextPages },
+      });
+      if (error) throw error;
+      toast({ title: "Updated", description: "LinkedIn destinations saved." });
+    } catch (err: any) {
+      toast({ title: "Save failed", description: err.message, variant: "destructive" });
+      fetchConnected();
+    }
   };
 
   const isExpired = (expiresAt: string | null) => {

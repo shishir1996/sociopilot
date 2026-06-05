@@ -616,6 +616,37 @@ Deno.serve(async (req) => {
         });
       }
 
+      case "update_linkedin_pages": {
+        const { social_account_id, pages } = body;
+        if (!social_account_id || !Array.isArray(pages)) {
+          return new Response(JSON.stringify({ error: "social_account_id and pages[] are required" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const { data: acc, error: accErr } = await supabaseAdmin
+          .from("social_accounts")
+          .select("id, user_id, platform")
+          .eq("id", social_account_id)
+          .maybeSingle();
+        if (accErr || !acc || acc.user_id !== user.id || acc.platform !== "linkedin") {
+          return new Response(JSON.stringify({ error: "LinkedIn account not found" }), {
+            status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const { error: upErr } = await supabaseAdmin
+          .from("social_accounts")
+          .update({ pages, updated_at: new Date().toISOString() })
+          .eq("id", social_account_id);
+        if (upErr) {
+          return new Response(JSON.stringify({ error: upErr.message }), {
+            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       default:
         return new Response(JSON.stringify({ error: "Unknown action" }), {
           status: 400,
