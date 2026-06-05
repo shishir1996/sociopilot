@@ -23,6 +23,7 @@ import { GeoPricingPanel } from "@/components/admin/GeoPricingPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
+import { AdminSidebar } from "@/components/admin/AdminSidebar";
 
 // Helper to call the ai-admin-settings edge function
 async function adminApi(body: any) {
@@ -1099,7 +1100,9 @@ export default function AdminAIControlCenter() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex">
+      <AdminSidebar brand="AI Control" icon={Cpu} />
+      <div className="flex-1 min-w-0">
       <header className="border-b border-border bg-card">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => navigate("/admin")}>
