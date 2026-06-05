@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Shield, CreditCard, Loader2, Plus, Trash2, Eye, EyeOff } from "lucide-react";
+import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -133,7 +134,9 @@ export default function AdminPayments() {
   const upd = (patch: Partial<Settings>) => setSettings({ ...settings, ...patch });
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex">
+      <AdminSidebar brand="Payments" icon={CreditCard} />
+      <div className="flex-1 min-w-0">
       <header className="border-b border-border bg-card">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -366,6 +369,7 @@ export default function AdminPayments() {
           </CardContent>
         </Card>
       </main>
+      </div>
     </div>
   );
 }
