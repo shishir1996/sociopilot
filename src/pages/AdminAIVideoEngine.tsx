@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Loader2, KeyRound } from "lucide-react";
+import { Loader2, KeyRound, Video } from "lucide-react";
+import { AdminSidebar } from "@/components/admin/AdminSidebar";
 
 const TOGGLES: { key: string; label: string; desc: string }[] = [
   { key: "enable_stock_video_mode", label: "Stock Video Engine", desc: "Pexels / Pixabay sourcing" },
@@ -118,7 +119,9 @@ export default function AdminAIVideoEngine() {
   if (!settings) return <div className="min-h-screen grid place-items-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className="min-h-screen bg-background flex">
+      <AdminSidebar brand="AI Video" icon={Video} />
+      <div className="flex-1 min-w-0 p-6">
       <div className="max-w-5xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -230,6 +233,7 @@ export default function AdminAIVideoEngine() {
             </div>
           </CardContent>
         </Card>
+      </div>
       </div>
     </div>
   );
