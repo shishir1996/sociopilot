@@ -1144,6 +1144,7 @@ export default function AdminAIControlCenter() {
           <TabsContent value="gmb"><AdminGMBPanel /></TabsContent>
         </Tabs>
       </main>
+      </div>
     </div>
   );
 }
