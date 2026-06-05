@@ -9,7 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Shield, Loader2, Eye, EyeOff, Save, Facebook, Linkedin, Music2, MessageCircle, Image as ImageIcon, AtSign, Ghost, BookOpen } from "lucide-react";
+import { ArrowLeft, Shield, Loader2, Eye, EyeOff, Save, Facebook, Linkedin, Music2, MessageCircle, Image as ImageIcon, AtSign, Ghost, BookOpen, Plug } from "lucide-react";
+import { AdminSidebar } from "@/components/admin/AdminSidebar";
 
 interface PlatformConfig {
   platform: string;
@@ -273,7 +274,9 @@ export default function AdminSocialIntegrations() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex">
+      <AdminSidebar brand="Integrations" icon={Plug} />
+      <div className="flex-1 min-w-0">
       <header className="border-b border-border bg-card">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -361,6 +364,7 @@ export default function AdminSocialIntegrations() {
           );
         })}
       </main>
+      </div>
     </div>
   );
 }
