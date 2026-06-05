@@ -18,8 +18,11 @@ const PORT = process.env.PORT || 8080;
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-const ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
-const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+
+function getSupabase() {
+  if (!SUPABASE_URL || !SERVICE_KEY) return null;
+  return createClient(SUPABASE_URL, SERVICE_KEY);
+}
 
 app.use(express.static(join(__dirname, "dist")));
 
@@ -38,7 +41,8 @@ async function fireAndForget(jobId) {
   let tmpDir = null;
   try {
     tmpDir = mkdtempSync(join(tmpdir(), "gv-video-"));
-    const admin = supabase;
+    const admin = getSupabase();
+    if (!admin) return;
 
     // Load job
     const { data: job } = await admin
@@ -358,7 +362,8 @@ async function fireAndForget(jobId) {
 
   } catch (err) {
     try {
-      await supabase.from("video_generation_jobs").update({
+      const admin = getSupabase();
+      if (admin) await admin.from("video_generation_jobs").update({
         render_status: "failed",
         render_error: err?.message || "render error",
       }).eq("id", jobId);
@@ -440,8 +445,10 @@ async function updateJob(admin, jobId, status, progress) {
 
 // ── Poll for pending video jobs ─────────────────────────────────────────────
 setInterval(async () => {
+  const admin = getSupabase();
+  if (!admin) return;
   try {
-    const { data: pendingJobs } = await supabase
+    const { data: pendingJobs } = await admin
       .from("video_generation_jobs")
       .select("id")
       .eq("render_status", "pending")
@@ -449,7 +456,7 @@ setInterval(async () => {
 
     if (pendingJobs?.length) {
       for (const job of pendingJobs) {
-        await supabase.from("video_generation_jobs").update({
+        await admin.from("video_generation_jobs").update({
           render_status: "queued",
           render_progress: 15,
         }).eq("id", job.id);
