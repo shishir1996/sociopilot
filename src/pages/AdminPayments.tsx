@@ -369,6 +369,7 @@ export default function AdminPayments() {
           </CardContent>
         </Card>
       </main>
+      </div>
     </div>
   );
 }
