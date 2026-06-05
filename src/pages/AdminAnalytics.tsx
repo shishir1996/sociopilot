@@ -7,18 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  ArrowLeft, ChevronLeft, ChevronRight, Shield, TrendingUp, TrendingDown, Users, DollarSign,
-  BarChart3, Activity, Crown, Loader2, CreditCard, UserMinus, UserPlus, Cpu, Settings, Video
+  ArrowLeft, Shield, TrendingUp, TrendingDown, Users, DollarSign,
+  BarChart3, Activity, Crown, Loader2, CreditCard, UserMinus, UserPlus,
 } from "lucide-react";
-
-const adminNav = [
-  { icon: Shield, label: "Dashboard", route: "/admin" },
-  { icon: BarChart3, label: "Analytics", route: "/admin/analytics" },
-  { icon: Cpu, label: "AI Control", route: "/admin/ai" },
-  { icon: Settings, label: "Integrations", route: "/admin/integrations" },
-  { icon: CreditCard, label: "Payments", route: "/admin/payments" },
-  { icon: Video, label: "AI Video", route: "/admin/ai-video" },
-];
+import { AdminSidebar } from "@/components/admin/AdminSidebar";
 
 interface MetricCard {
   label: string;
