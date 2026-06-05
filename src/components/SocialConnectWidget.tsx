@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Check, Trash2, ChevronDown, ChevronUp, Loader2, ExternalLink, RefreshCw, AlertCircle } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 const PLATFORMS = [
   { value: "facebook", label: "Facebook", icon: "📘", color: "bg-blue-500/10 text-blue-600 border-blue-200" },
@@ -20,7 +21,7 @@ interface ConnectedAccount {
   account_name: string;
   account_id: string;
   expires_at: string | null;
-  pages?: Array<{ type: string; name: string; urn: string; picture?: string | null }>;
+  pages?: Array<{ type: string; name: string; urn: string; picture?: string | null; enabled?: boolean }>;
 }
 
 interface SocialConnectWidgetProps {
@@ -152,6 +153,24 @@ export function SocialConnectWidget({ businessId }: SocialConnectWidgetProps) {
     fetchConnected();
   };
 
+  const toggleLinkedInPage = async (account: ConnectedAccount, urn: string, enabled: boolean) => {
+    const nextPages = (account.pages || []).map((p) =>
+      p.urn === urn ? { ...p, enabled } : p
+    );
+    // Optimistic
+    setConnected((prev) => prev.map((a) => (a.id === account.id ? { ...a, pages: nextPages } : a)));
+    try {
+      const { error } = await supabase.functions.invoke("social-oauth", {
+        body: { action: "update_linkedin_pages", social_account_id: account.id, pages: nextPages },
+      });
+      if (error) throw error;
+      toast({ title: "Updated", description: "LinkedIn destinations saved." });
+    } catch (err: any) {
+      toast({ title: "Save failed", description: err.message, variant: "destructive" });
+      fetchConnected();
+    }
+  };
+
   const isExpired = (expiresAt: string | null) => {
     if (!expiresAt) return false;
     return new Date(expiresAt) < new Date();
@@ -185,7 +204,8 @@ export function SocialConnectWidget({ businessId }: SocialConnectWidgetProps) {
             const p = PLATFORMS.find(pl => pl.value === acc.platform);
             const expired = isExpired(acc.expires_at);
             return (
-              <div key={acc.id} className={`flex items-center justify-between px-3 py-2.5 rounded-lg border ${expired ? "bg-destructive/5 border-destructive/20" : p?.color || "bg-muted"}`}>
+              <div key={acc.id}>
+              <div className={`flex items-center justify-between px-3 py-2.5 rounded-lg border ${expired ? "bg-destructive/5 border-destructive/20" : p?.color || "bg-muted"}`}>
                 <div className="flex items-center gap-2">
                   <span className="text-lg">{p?.icon}</span>
                   <div>
@@ -194,19 +214,6 @@ export function SocialConnectWidget({ businessId }: SocialConnectWidgetProps) {
                       {expired && <AlertCircle className="h-3.5 w-3.5 text-destructive" />}
                     </p>
                     <p className="text-xs opacity-70">{acc.account_name || acc.account_id}</p>
-                    {acc.platform === "linkedin" && (
-                      <div className="mt-1 text-[11px] opacity-80">
-                        {acc.pages && acc.pages.length > 1 ? (
-                          <span>
-                            Posts to: {acc.pages.map(p => p.name).join(", ")}
-                          </span>
-                        ) : (
-                          <span className="text-amber-600">
-                            Personal profile only. Company-page posting requires LinkedIn Marketing Developer Platform approval.
-                          </span>
-                        )}
-                      </div>
-                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -227,6 +234,32 @@ export function SocialConnectWidget({ businessId }: SocialConnectWidgetProps) {
                     <Trash2 className="h-3.5 w-3.5 text-destructive" />
                   </Button>
                 </div>
+              </div>
+              {acc.platform === "linkedin" && acc.pages && acc.pages.length > 0 && (
+                <div className="mt-2 ml-1 space-y-1.5">
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium">Publish destinations</p>
+                  {acc.pages.map((pg) => (
+                    <div key={pg.urn} className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md bg-background/60 border border-border/60">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-xs">{pg.type === "organization" ? "🏢" : "👤"}</span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium truncate">{pg.name}</p>
+                          <p className="text-[10px] text-muted-foreground capitalize">{pg.type}</p>
+                        </div>
+                      </div>
+                      <Switch
+                        checked={pg.enabled !== false}
+                        onCheckedChange={(v) => toggleLinkedInPage(acc, pg.urn, v)}
+                      />
+                    </div>
+                  ))}
+                  {acc.pages.length === 1 && acc.pages[0].type === "person" && (
+                    <p className="text-[10px] text-amber-600">
+                      Only personal profile detected. Company-page posting requires LinkedIn Marketing Developer Platform approval.
+                    </p>
+                  )}
+                </div>
+              )}
               </div>
             );
           })}
