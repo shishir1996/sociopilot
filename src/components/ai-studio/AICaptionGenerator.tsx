@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -41,7 +42,7 @@ export default function AICaptionGenerator({ business }: { business: any }) {
     Instagram: 2200, Facebook: 63206, LinkedIn: 3000, Twitter: 280, YouTube: 5000, Threads: 500,
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!topic.trim()) {
       toast({ title: "Please enter a topic", variant: "destructive" });
       return;
@@ -49,33 +50,47 @@ export default function AICaptionGenerator({ business }: { business: any }) {
     setGenerating(true);
     setResults([]);
 
-    // Simulate generation (will be replaced with real API in Phase 2)
-    setTimeout(() => {
-      setResults([
-        {
-          title: "Engaging Hook Style",
-          content: `🚀 Stop scrolling — this changes everything about ${topic}.\n\nMost people don't realize that the key to success in ${topic} is consistency, not perfection.\n\nHere's what I've learned after working with hundreds of ${audience || "professionals"}:\n\n✅ Start small, think big\n✅ Focus on value, not vanity metrics\n✅ Show up every single day\n\nThe best time to start was yesterday. The second best time? Right now.`,
-          cta: goal || "Save this post and share it with someone who needs to hear this 💡",
-          hashtags: ["ContentCreation", topic.replace(/\s/g, ""), "SocialMediaTips", "GrowthMindset", "DigitalMarketing"],
-          tag: "🔥 High Engagement",
-        },
-        {
-          title: "Professional & Informative",
-          content: `${topic} is transforming the way ${audience || "businesses"} operate.\n\nIn today's landscape, staying ahead means embracing change and adapting quickly.\n\nHere are 3 things you should know:\n\n1️⃣ The market is shifting towards authenticity\n2️⃣ Your audience wants value, not noise\n3️⃣ Consistency beats viral content every time\n\nWhat's your take on this? Drop your thoughts below 👇`,
-          cta: goal || "Follow for more insights on " + topic,
-          hashtags: [topic.replace(/\s/g, ""), "BusinessTips", "Entrepreneur", "Marketing", "Strategy"],
-        },
-        {
-          title: "Story-Driven Approach",
-          content: `I used to think ${topic} was just another buzzword.\n\nThen I saw the results.\n\nOne of my clients went from zero to 10K followers in 90 days — not by going viral, but by being genuinely helpful.\n\nThe secret? Understanding your ${audience || "audience"} deeply and giving them exactly what they need.\n\nStop chasing trends. Start building trust.`,
-          cta: goal || "DM me 'GROWTH' to learn how we can help",
-          hashtags: ["StoryTime", topic.replace(/\s/g, ""), "GrowOnline", "ContentStrategy", "RealResults"],
-          tag: "📢 Best for Ads",
-        },
-      ]);
-      setGenerating(false);
-      toast({ title: "✨ Captions generated!", description: "3 variations ready for you." });
-    }, 2000);
+    const prompt = `Write 3 social media captions for ${platform} (${contentType}) about "${topic}".
+Tone: ${tone}.
+Target audience: ${audience}.
+Goal: ${goal || "engagement"}.
+${details ? `Additional context: ${details}` : ""}
+${business?.name ? `Brand: ${business.name}. Industry: ${business.industry || ""}.` : ""}
+
+For each caption, provide:
+- A compelling title (2-4 words)
+- The main caption body (under ${platforms.includes(platform) ? "the platform character limit" : "2500 chars"})
+- A clear call-to-action
+- 5-8 relevant hashtags without the # symbol
+- A tag like "🔥 High Engagement" or "📢 Best for Ads"
+
+Return as a JSON array: [{title, content, cta, hashtags: string[], tag}]`;
+
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-generate-text", {
+        body: { prompt, temperature: 0.7, max_tokens: 2000 },
+      });
+
+      if (error) throw error;
+      const text = data?.text || data?.content || "[]";
+      let parsed: any[];
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        // Try to extract JSON from markdown
+        const jsonMatch = text.match(/\[[\s\S]*\]/);
+        parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
+      }
+      if (parsed.length) {
+        setResults(parsed);
+        toast({ title: "Captions generated!", description: `${parsed.length} variations ready.` });
+      } else {
+        toast({ title: "Could not parse captions", variant: "destructive" });
+      }
+    } catch (err: any) {
+      toast({ title: "Generation failed", description: err.message, variant: "destructive" });
+    }
+    setGenerating(false);
   };
 
   const copyToClipboard = (caption: GeneratedCaption) => {

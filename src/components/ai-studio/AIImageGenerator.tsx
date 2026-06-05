@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -28,7 +29,7 @@ export default function AIImageGenerator({ business }: { business: any }) {
   const [promptDetails, setPromptDetails] = useState("");
   const [aspectRatio, setAspectRatio] = useState("1:1");
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!mainText.trim() && !promptDetails.trim()) {
       toast({ title: "Please describe what you want", variant: "destructive" });
       return;
@@ -36,15 +37,40 @@ export default function AIImageGenerator({ business }: { business: any }) {
     setGenerating(true);
     setImages([]);
 
-    // Simulated — will be replaced in Phase 2
-    setTimeout(() => {
-      setImages([
-        "https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=600&h=600&fit=crop",
-        "https://images.unsplash.com/photo-1611162616305-c69b3fa7fbe0?w=600&h=600&fit=crop",
-      ]);
-      setGenerating(false);
-      toast({ title: "🎨 Images generated!", description: "2 images ready for download." });
-    }, 3000);
+    const prompt = [
+      brandName && `Brand: ${brandName}`,
+      mainText && `Text: ${mainText}`,
+      offer && `Offer: ${offer}`,
+      colorPref && `Colors: ${colorPref}`,
+      promptDetails,
+      `Style: ${imageStyle}`,
+      `Platform: ${platform}`,
+    ].filter(Boolean).join(". ");
+
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-generate-image", {
+        body: {
+          prompt,
+          aspect_ratio: aspectRatio,
+          count: 2,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.image_url) {
+        setImages([data.image_url]);
+      } else if (data?.images?.length) {
+        setImages(data.images);
+      } else {
+        toast({ title: "No images returned", variant: "destructive" });
+      }
+      if (data?.image_url || data?.images?.length) {
+        toast({ title: "Images generated!", description: "Ready for download." });
+      }
+    } catch (err: any) {
+      toast({ title: "Generation failed", description: err.message, variant: "destructive" });
+    }
+    setGenerating(false);
   };
 
   return (

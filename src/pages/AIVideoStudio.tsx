@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { Film, Loader2, Sparkles } from "lucide-react";
+import { Film, Loader2, Sparkles, Download, Play, ExternalLink } from "lucide-react";
 
 export default function AIVideoStudio() {
   const { user, loading: authLoading } = useAuth();
@@ -214,8 +214,28 @@ export default function AIVideoStudio() {
                   <Progress value={j.render_progress ?? 0} />
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>{j.video_ratio} · {j.video_duration}s · {j.generation_mode}</span>
-                    {j.output_url && <a href={j.output_url} target="_blank" rel="noreferrer" className="text-primary">Open</a>}
+                    {j.output_url && (
+                      <div className="flex gap-2">
+                        <a href={j.output_url} target="_blank" rel="noreferrer" className="text-primary flex items-center gap-1 hover:underline">
+                          <Play className="h-3 w-3" /> Play
+                        </a>
+                        <a href={j.output_url} download className="text-primary flex items-center gap-1 hover:underline">
+                          <Download className="h-3 w-3" /> Download
+                        </a>
+                      </div>
+                    )}
                   </div>
+                  {/* Video preview for completed jobs */}
+                  {j.render_status === "completed" && j.output_url && (
+                    <video
+                      src={j.output_url}
+                      controls
+                      preload="metadata"
+                      className="w-full rounded-lg max-h-48 object-contain bg-black/5"
+                    >
+                      Your browser does not support video playback.
+                    </video>
+                  )}
                   {j.render_error && <div className="text-xs text-destructive">{j.render_error}</div>}
                 </div>
               ))}
