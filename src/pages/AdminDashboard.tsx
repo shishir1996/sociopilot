@@ -17,9 +17,10 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
-  ArrowLeft, ChevronLeft, ChevronRight, Shield, Users, Building2, CheckCircle, XCircle, Loader2,
-  BarChart3, Search, Eye, Cpu, Crown, Activity, CreditCard, Settings, Video
+  ArrowLeft, Shield, Users, CheckCircle, XCircle, Loader2,
+  Search, Eye, Crown, Activity,
 } from "lucide-react";
+import { AdminSidebar } from "@/components/admin/AdminSidebar";
 
 interface UserProfile {
   user_id: string;
@@ -34,20 +35,10 @@ interface UserProfile {
   is_trial?: boolean;
 }
 
-const adminNav = [
-  { icon: Shield, label: "Dashboard", route: "/admin" },
-  { icon: BarChart3, label: "Analytics", route: "/admin/analytics" },
-  { icon: Cpu, label: "AI Control", route: "/admin/ai" },
-  { icon: Settings, label: "Integrations", route: "/admin/integrations" },
-  { icon: CreditCard, label: "Payments", route: "/admin/payments" },
-  { icon: Video, label: "AI Video", route: "/admin/ai-video" },
-];
-
 export default function AdminDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<UserProfile[]>([]);
