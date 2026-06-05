@@ -205,7 +205,7 @@ export function SocialConnectWidget({ businessId }: SocialConnectWidgetProps) {
             const expired = isExpired(acc.expires_at);
             return (
               <div key={acc.id}>
-              <div key={acc.id} className={`flex items-center justify-between px-3 py-2.5 rounded-lg border ${expired ? "bg-destructive/5 border-destructive/20" : p?.color || "bg-muted"}`}>
+              <div className={`flex items-center justify-between px-3 py-2.5 rounded-lg border ${expired ? "bg-destructive/5 border-destructive/20" : p?.color || "bg-muted"}`}>
                 <div className="flex items-center gap-2">
                   <span className="text-lg">{p?.icon}</span>
                   <div>
