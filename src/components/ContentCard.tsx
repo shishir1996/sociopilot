@@ -4,9 +4,10 @@ import { PlatformBadge } from "./PlatformBadge";
 import { ContentTypeBadge } from "./ContentTypeBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ContentDetailModal } from "./ContentDetailModal";
 import {
   Clock, Lightbulb, MessageSquare, Target, Send, CalendarClock,
-  ChevronDown, ChevronUp, Copy, Hash, Check, Trash2, Image as ImageIcon,
+  ChevronDown, ChevronUp, Copy, Hash, Check, Trash2, Expand,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -39,6 +40,7 @@ interface ContentCardProps {
   imageUrl?: string;
   visualStyle?: string;
   repurposingSuggestion?: string;
+  carouselSlides?: any[] | null;
   onStatusChange?: () => void;
   onDelete?: () => void;
 }
@@ -47,10 +49,11 @@ export function ContentCard({
   id, dayNumber, theme, goal, primaryPlatform, secondaryPlatforms,
   contentType, topic, hook, painPoint, coreMessage, cta, postingTime, scheduledAt,
   whyItMatters, status, caption, hashtags, imagePrompt, imageUrl,
-  visualStyle, repurposingSuggestion, onStatusChange, onDelete,
+  visualStyle, repurposingSuggestion, carouselSlides, onStatusChange, onDelete,
 }: ContentCardProps) {
   const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const { toast } = useToast();
+  const [detailOpen, setDetailOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [posting, setPosting] = useState(false);
   const [showReschedule, setShowReschedule] = useState(false);
@@ -58,6 +61,32 @@ export function ContentCard({
   const [scheduleDate, setScheduleDate] = useState("");
   const [copied, setCopied] = useState(false);
   const [currentImageUrl, setCurrentImageUrl] = useState(imageUrl);
+
+  const detailItem = {
+    id,
+    dayNumber,
+    theme,
+    goal,
+    primaryPlatform,
+    secondaryPlatforms,
+    contentType,
+    topic,
+    hook,
+    painPoint,
+    coreMessage,
+    cta,
+    postingTime,
+    scheduledAt,
+    whyItMatters,
+    status,
+    caption,
+    hashtags,
+    imagePrompt,
+    imageUrl: currentImageUrl,
+    visualStyle,
+    repurposingSuggestion,
+    carouselSlides: carouselSlides || null,
+  };
 
   const statusColors: Record<string, string> = {
     draft: "secondary",
@@ -153,7 +182,9 @@ export function ContentCard({
   // Removed regenerate - images auto-generate with the plan
 
   return (
-    <Card className="shadow-card hover:shadow-elevated transition-shadow animate-fade-in group">
+    <>
+    <ContentDetailModal open={detailOpen} onOpenChange={setDetailOpen} item={detailItem} />
+    <Card className="shadow-card hover:shadow-elevated transition-shadow animate-fade-in group cursor-pointer" onClick={() => setDetailOpen(true)}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -173,9 +204,11 @@ export function ContentCard({
             </Badge>
             <AlertDialog>
               <AlertDialogTrigger asChild>
+                <div onClick={e => e.stopPropagation()}>
                 <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive">
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
+                </div>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
@@ -263,7 +296,7 @@ export function ContentCard({
         {/* Expandable section */}
         {(caption || hashtags?.length) && (
           <button
-            onClick={() => setExpanded(!expanded)}
+            onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
             className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium w-full"
           >
             {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
@@ -277,7 +310,7 @@ export function ContentCard({
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-semibold text-foreground">Caption</p>
-                  <button onClick={handleCopyCaption} className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1">
+                  <button onClick={(e) => { e.stopPropagation(); handleCopyCaption(); }} className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1">
                     {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                     {copied ? "Copied" : "Copy"}
                   </button>
@@ -331,7 +364,7 @@ export function ContentCard({
 
         {/* Reschedule / Delete actions */}
         {status !== "posted" && (
-          <div className="flex gap-2 pt-2">
+          <div className="flex gap-2 pt-2" onClick={e => e.stopPropagation()}>
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button size="sm" variant="destructive" className="text-xs">
@@ -349,7 +382,7 @@ export function ContentCard({
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-            <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={() => setShowReschedule(!showReschedule)}>
+            <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={(e) => { e.stopPropagation(); setShowReschedule(!showReschedule); }}>
               <CalendarClock className="h-3 w-3 mr-1" /> Reschedule
             </Button>
           </div>
@@ -370,5 +403,6 @@ export function ContentCard({
         )}
       </CardContent>
     </Card>
+    </>
   );
 }
