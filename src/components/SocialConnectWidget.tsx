@@ -213,19 +213,6 @@ export function SocialConnectWidget({ businessId }: SocialConnectWidgetProps) {
                       {expired && <AlertCircle className="h-3.5 w-3.5 text-destructive" />}
                     </p>
                     <p className="text-xs opacity-70">{acc.account_name || acc.account_id}</p>
-                    {acc.platform === "linkedin" && (
-                      <div className="mt-1 text-[11px] opacity-80">
-                        {acc.pages && acc.pages.length > 1 ? (
-                          <span>
-                            Posts to: {acc.pages.map(p => p.name).join(", ")}
-                          </span>
-                        ) : (
-                          <span className="text-amber-600">
-                            Personal profile only. Company-page posting requires LinkedIn Marketing Developer Platform approval.
-                          </span>
-                        )}
-                      </div>
-                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -247,6 +234,31 @@ export function SocialConnectWidget({ businessId }: SocialConnectWidgetProps) {
                   </Button>
                 </div>
               </div>
+              {acc.platform === "linkedin" && acc.pages && acc.pages.length > 0 && (
+                <div className="mt-2 ml-1 space-y-1.5">
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium">Publish destinations</p>
+                  {acc.pages.map((pg) => (
+                    <div key={pg.urn} className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md bg-background/60 border border-border/60">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-xs">{pg.type === "organization" ? "🏢" : "👤"}</span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium truncate">{pg.name}</p>
+                          <p className="text-[10px] text-muted-foreground capitalize">{pg.type}</p>
+                        </div>
+                      </div>
+                      <Switch
+                        checked={pg.enabled !== false}
+                        onCheckedChange={(v) => toggleLinkedInPage(acc, pg.urn, v)}
+                      />
+                    </div>
+                  ))}
+                  {acc.pages.length === 1 && acc.pages[0].type === "person" && (
+                    <p className="text-[10px] text-amber-600">
+                      Only personal profile detected. Company-page posting requires LinkedIn Marketing Developer Platform approval.
+                    </p>
+                  )}
+                </div>
+              )}
             );
           })}
 
