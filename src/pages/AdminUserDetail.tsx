@@ -14,6 +14,7 @@ import {
   ArrowLeft, Shield, Loader2, UserCog, Calendar, BarChart3,
   Crown, LogIn, RotateCcw, Ban, Pencil, Save
 } from "lucide-react";
+import { AdminSidebar } from "@/components/admin/AdminSidebar";
 
 export default function AdminUserDetail() {
   const { user } = useAuth();
@@ -222,7 +223,9 @@ export default function AdminUserDetail() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex">
+      <AdminSidebar brand="Users" icon={UserCog} />
+      <div className="flex-1 min-w-0">
       <header className="border-b border-border bg-card">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -366,6 +369,7 @@ export default function AdminUserDetail() {
           </CardContent>
         </Card>
       </main>
+      </div>
     </div>
   );
 }
