@@ -12,8 +12,31 @@ function buildCaption(item: any): string {
   return `${caption}\n\n${hashtags}`;
 }
 
-async function postToFacebook(account: any, caption: string, imageUrl?: string) {
+async function postToFacebook(account: any, caption: string, imageUrl?: string, carouselUrls?: string[]) {
   if (!account.access_token) return { success: false, error: "No access token" };
+
+  // Carousel: multi-image post
+  if (carouselUrls && carouselUrls.length > 1) {
+    try {
+      const photoIds: string[] = [];
+      for (const url of carouselUrls) {
+        const pubRes = await fetch(`https://graph.facebook.com/v19.0/${account.account_id}/photos`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url, published: false, access_token: account.access_token }),
+        });
+        const pubData = await pubRes.json();
+        if (pubData.id) photoIds.push(pubData.id);
+      }
+      if (photoIds.length < 2) return { success: false, error: "Not enough carousel images" };
+      const feedRes = await fetch(`https://graph.facebook.com/v19.0/${account.account_id}/feed`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: caption, attached_media: photoIds.map(id => ({ media_fbid: id })), access_token: account.access_token }),
+      });
+      const feedData = await feedRes.json();
+      return feedData.error ? { success: false, error: feedData.error.message } : { success: true, post_id: feedData.id, carousel: true };
+    } catch (err) { return { success: false, error: String(err) }; }
+  }
+
   const body: any = { message: caption, access_token: account.access_token };
   let endpoint = `https://graph.facebook.com/v19.0/${account.account_id}/feed`;
   if (imageUrl) { endpoint = `https://graph.facebook.com/v19.0/${account.account_id}/photos`; body.url = imageUrl; }
@@ -22,8 +45,37 @@ async function postToFacebook(account: any, caption: string, imageUrl?: string) 
   return data.error ? { success: false, error: data.error.message } : { success: true, post_id: data.id };
 }
 
-async function postToInstagram(account: any, caption: string, imageUrl?: string) {
+async function postToInstagram(account: any, caption: string, imageUrl?: string, carouselUrls?: string[]) {
   if (!account.access_token) return { success: false, error: "No access token" };
+
+  // Instagram carousel: multi-image carousel post
+  if (carouselUrls && carouselUrls.length > 1) {
+    try {
+      const childrenIds: string[] = [];
+      for (const url of carouselUrls) {
+        const childRes = await fetch(`https://graph.facebook.com/v19.0/${account.account_id}/media`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image_url: url, is_carousel_item: true, access_token: account.access_token }),
+        });
+        const childData = await childRes.json();
+        if (childData.id) childrenIds.push(childData.id);
+      }
+      if (childrenIds.length < 2) return { success: false, error: "Not enough carousel items" };
+      const carouselRes = await fetch(`https://graph.facebook.com/v19.0/${account.account_id}/media`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ media_type: "CAROUSEL", children: childrenIds, caption, access_token: account.access_token }),
+      });
+      const carouselData = await carouselRes.json();
+      if (carouselData.error) return { success: false, error: carouselData.error.message };
+      const pubRes = await fetch(`https://graph.facebook.com/v19.0/${account.account_id}/media_publish`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ creation_id: carouselData.id, access_token: account.access_token }),
+      });
+      const pubData = await pubRes.json();
+      return pubData.error ? { success: false, error: pubData.error.message } : { success: true, post_id: pubData.id, carousel: true };
+    } catch (err) { return { success: false, error: String(err) }; }
+  }
+
   if (!imageUrl) return { success: false, error: "Instagram requires an image" };
   const createRes = await fetch(`https://graph.facebook.com/v19.0/${account.account_id}/media`, {
     method: "POST", headers: { "Content-Type": "application/json" },
@@ -39,7 +91,31 @@ async function postToInstagram(account: any, caption: string, imageUrl?: string)
   return pubData.error ? { success: false, error: pubData.error.message } : { success: true, post_id: pubData.id };
 }
 
-async function postToLinkedInOne(accessToken: string, authorUrn: string, caption: string, imageUrl?: string) {
+async function postToLinkedInOne(accessToken: string, authorUrn: string, caption: string, imageUrl?: string, carouselUrls?: string[]) {
+  // LinkedIn carousel = PDF with each image as a page
+  if (carouselUrls && carouselUrls.length > 1) {
+    try {
+      const pdfParts: string[] = [];
+      for (const url of carouselUrls) {
+        const imgRes = await fetch(url);
+        if (!imgRes.ok) continue;
+        const buf = await imgRes.arrayBuffer();
+        pdfParts.push(btoa(String.fromCharCode(...new Uint8Array(buf))));
+      }
+      if (pdfParts.length > 1) {
+        const pdfDataUrl = `data:application/pdf;base64,${pdfParts.join(",")}`;
+        const shareContent: any = { shareCommentary: { text: caption }, shareMediaCategory: "DOCUMENT", media: [{ status: "READY", originalUrl: pdfDataUrl }] };
+        const res = await fetch("https://api.linkedin.com/v2/ugcPosts", {
+          method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", "X-Restli-Protocol-Version": "2.0.0" },
+          body: JSON.stringify({ author: authorUrn, lifecycleState: "PUBLISHED", specificContent: { "com.linkedin.ugc.ShareContent": shareContent }, visibility: { "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC" } }),
+        });
+        const data = await res.json();
+        if (res.ok) return { success: true, post_id: data.id, author: authorUrn, carousel: true, slides: carouselUrls.length };
+        return { success: false, error: JSON.stringify(data), author: authorUrn };
+      }
+    } catch (e) { console.error("LinkedIn carousel error:", e); }
+  }
+
   const shareContent: any = { shareCommentary: { text: caption }, shareMediaCategory: imageUrl ? "IMAGE" : "NONE" };
   if (imageUrl) shareContent.media = [{ status: "READY", originalUrl: imageUrl }];
   const res = await fetch("https://api.linkedin.com/v2/ugcPosts", {
@@ -60,8 +136,11 @@ async function postToLinkedIn(account: any, caption: string, imageUrl?: string) 
   const pages: any[] = Array.isArray(account.pages) && account.pages.length > 0
     ? account.pages.filter((p: any) => p.enabled !== false)
     : [{ urn: `urn:li:person:${account.account_id}`, type: "person", name: "Personal" }];
+  const carouselUrls = account.carousel_slides
+    ? (Array.isArray(account.carousel_slides) ? account.carousel_slides.map((s: any) => typeof s === "string" ? s : s?.image_url).filter(Boolean) : undefined)
+    : undefined;
   const results = await Promise.allSettled(
-    pages.map((p) => postToLinkedInOne(account.access_token, p.urn, caption, imageUrl))
+    pages.map((p) => postToLinkedInOne(account.access_token, p.urn, caption, imageUrl, carouselUrls))
   );
   const mapped = results.map((s, i) => ({
     destination: pages[i].name || pages[i].urn,
@@ -134,14 +213,31 @@ serve(async (req) => {
       let hasError = false;
       const results: Record<string, any> = {};
 
+      // Fetch carousel slides if this is a carousel item
+      let carouselUrls: string[] | undefined;
+      if (item.content_type === "Carousel" || (item as any).carousel_slides) {
+        const { data: fullItem } = await supabase
+          .from("content_items")
+          .select("carousel_slides")
+          .eq("id", item.id)
+          .maybeSingle();
+        if (fullItem?.carousel_slides) {
+          const slides = Array.isArray(fullItem.carousel_slides)
+            ? fullItem.carousel_slides
+            : typeof fullItem.carousel_slides === "string" ? JSON.parse(fullItem.carousel_slides) : [];
+          carouselUrls = slides.map((s: any) => typeof s === "string" ? s : s?.image_url).filter(Boolean);
+        }
+      }
+      const useCarousel = carouselUrls && carouselUrls.length > 1;
+
       for (const account of accounts) {
         const platform = account.platform.toLowerCase();
         if (!targetPlatforms.some((tp: string) => platform.includes(tp) || tp.includes(platform))) continue;
 
         try {
-          if (platform.includes("facebook")) results[account.platform] = await postToFacebook(account, fullCaption, imageUrl);
-          else if (platform.includes("instagram")) results[account.platform] = await postToInstagram(account, fullCaption, imageUrl);
-          else if (platform.includes("linkedin")) results[account.platform] = await postToLinkedIn(account, fullCaption, imageUrl);
+          if (platform.includes("facebook")) results[account.platform] = await postToFacebook(account, fullCaption, imageUrl || (carouselUrls?.[0]), useCarousel ? carouselUrls : undefined);
+          else if (platform.includes("instagram")) results[account.platform] = await postToInstagram(account, fullCaption, imageUrl || (carouselUrls?.[0]), useCarousel ? carouselUrls : undefined);
+          else if (platform.includes("linkedin")) results[account.platform] = await postToLinkedIn(account, fullCaption, imageUrl || (carouselUrls?.[0]), useCarousel ? carouselUrls : undefined);
 
           if (results[account.platform] && !results[account.platform].success) hasError = true;
           if (results[account.platform]?.partial) hasError = true;

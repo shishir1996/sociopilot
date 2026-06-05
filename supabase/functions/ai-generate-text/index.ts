@@ -267,6 +267,14 @@ serve(async (req) => {
 
     let systemPrompt = promptTemplate?.system_prompt || `You are an expert social media content creator and copywriter.`;
     if (promptTemplate?.hidden_instructions) systemPrompt += `\n\n${promptTemplate.hidden_instructions}`;
+
+    // Build strict brand context
+    systemPrompt += `\n\n========== CRITICAL BRAND INTEGRITY RULES ==========
+1. The brand name "${brand_name || "Not specified"}" must appear EXACTLY as written — never abbreviate, misspell, or alter it.
+2. Do NOT invent features, awards, certifications, locations, or capabilities not explicitly provided.
+3. Spell-check every word before output. Zero tolerance for spelling or grammar errors in brand name or product names.
+4. The tone must precisely match "${tone || "Professional yet friendly"}" — do not deviate.`;
+
     if (brandPreset) {
       systemPrompt += `\n\nBRAND CONTEXT:\n- Brand Voice: ${brandPreset.brand_voice}\n- Tone: ${brandPreset.tone}\n- CTA Style: ${brandPreset.cta_style}\n- Post Structure: ${brandPreset.post_structure}\n- Target Audience: ${brandPreset.audience_profile}\n- Default Hashtags: ${(brandPreset.default_hashtags || []).join(", ")}`;
     }

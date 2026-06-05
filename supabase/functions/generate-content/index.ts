@@ -230,6 +230,66 @@ async function uploadBase64Image(
   }
 }
 
+async function generateSliderPrompts(basePrompt: string, slideCount: number): Promise<string[]> {
+  const prompts: string[] = [];
+  for (let i = 0; i < slideCount; i++) {
+    const slideLabels = [
+      "hook/intro slide with headline",
+      "problem/pain point visual",
+      "solution/benefits showcase",
+      "call-to-action/closing slide",
+    ];
+    const label = slideLabels[i] || `slide ${i + 1}`;
+    prompts.push(`${basePrompt} [SLIDE ${i + 1} of ${slideCount}: ${label} — create a distinct visual for this carousel slide that flows sequentially from the previous slide]`);
+  }
+  return prompts;
+}
+
+async function generateImagesForCarousel(
+  basePrompt: string,
+  slideCount: number,
+  itemId: string,
+  planId: string,
+  dayNumber: number,
+  supabaseAdmin: any,
+  supabaseUrl: string,
+  imageProvider: any | null,
+  lovableApiKey: string,
+) {
+  const slidePrompts = await generateSliderPrompts(basePrompt, slideCount);
+  const slides: Array<{ prompt: string; image_url: string | null }> = [];
+
+  for (let i = 0; i < slidePrompts.length; i++) {
+    try {
+      const result = await generateImage(slidePrompts[i], imageProvider, lovableApiKey);
+      if (result.data) {
+        const fileName = `${planId}/carousel-${itemId}-slide-${i + 1}-${Date.now()}.png`;
+        const url = await uploadBase64Image(supabaseAdmin, result.data, fileName, supabaseUrl);
+        slides.push({ prompt: slidePrompts[i], image_url: url });
+      } else {
+        slides.push({ prompt: slidePrompts[i], image_url: null });
+      }
+    } catch (err) {
+      console.error(`Carousel slide ${i + 1} failed:`, err);
+      slides.push({ prompt: slidePrompts[i], image_url: null });
+    }
+    await new Promise((r) => setTimeout(r, 4000));
+  }
+
+  const imageUrls = slides.map(s => s.image_url).filter(Boolean) as string[];
+  if (imageUrls.length > 0) {
+    await supabaseAdmin
+      .from("content_items")
+      .update({
+        image_url: imageUrls[0],
+        carousel_slides: slides,
+      })
+      .eq("id", itemId);
+    console.log(`Carousel generated with ${imageUrls.length} slides for item ${itemId}`);
+  }
+  return slides;
+}
+
 async function generateImagesInBackground(
   insertedItems: any[],
   planId: string,
@@ -247,6 +307,16 @@ async function generateImagesInBackground(
   console.log(`Generating images for ${imageItems.length} of ${insertedItems.length} items (skipping text-only posts)`);
 
   for (const item of imageItems) {
+    if (item.post_format === "image_carousel") {
+      console.log(`Generating carousel (${item.content_type}) for day ${item.day_number} — creating 3-4 slides`);
+      await generateImagesForCarousel(
+        item.image_prompt, 4, item.id, planId,
+        item.day_number, supabaseAdmin, supabaseUrl,
+        imageProvider, lovableApiKey,
+      );
+      continue;
+    }
+
     try {
       const result = await generateImage(item.image_prompt, imageProvider, lovableApiKey);
       if (!result.data) {
@@ -428,21 +498,47 @@ Do NOT reuse the same caption across days even if platforms differ — each day 
 EVERY post MUST use post_format = "text_only", content_type = "Text Post",
 image_prompt = "" and visual_style = "". Do NOT suggest carousels or images.`;
 
+  const brandColorsJson = business.brand_colors && business.brand_colors.length > 0
+    ? JSON.stringify(business.brand_colors)
+    : "[]";
+  const brandProfileJson = JSON.stringify({
+    name: business.name,
+    industry: business.industry || null,
+    products_services: business.products_services || null,
+    location: business.location || null,
+    target_audience: business.target_audience || null,
+    goals: business.goals || [],
+    brand_tone: business.brand_tone || null,
+    content_style: business.content_style || null,
+    main_offers: business.main_offers || null,
+    competitors: business.competitors || null,
+    posting_goals: business.posting_goals || [],
+    slogan: business.slogan || null,
+    brand_colors: brandColorsJson,
+    creative_direction: business.creative_direction || null,
+  }, null, 2);
+
   const systemPrompt = `You are a senior AI Content Strategist specialized in ${business.industry || "business"} marketing.
 You create hyper-personalized, niche-specific social media content plans.
 
-BUSINESS PROFILE:
-- Name: ${business.name}
-- Industry/Niche: ${business.industry || "General"}
-- Products/Services: ${business.products_services || "Not specified"}
-- Location: ${business.location || "Not specified"}
-- Target Audience: ${business.target_audience || "General audience"}
-- Business Goals: ${(business.goals || []).join(", ") || "Brand awareness"}
-- Brand Tone: ${business.brand_tone || "Professional"}
-- Content Style: ${business.content_style || "Balanced"}
-- Main Offers: ${business.main_offers || "Not specified"}
-- Competitors: ${business.competitors || "Not specified"}
-- Posting Goals: ${(business.posting_goals || ["engagement"]).join(", ")}${colorContext}${sloganContext}${brandContext}${creativeDirectionContext}
+========== BRAND PROFILE (REFERENCE THIS EXACTLY — DO NOT ALTER) ==========
+\`\`\`json
+${brandProfileJson}
+\`\`\`
+
+=== BRAND ASSETS ===
+${brandContext || "No brand assets provided."}
+${creativeDirectionContext}
+
+=== CRITICAL BRAND INTEGRITY RULES (VIOLATIONS WILL BE REJECTED) ===
+1. The brand name "${business.name}" must appear EXACTLY as written — never abbreviate, misspell, or alter it.
+2. ${business.slogan ? `The slogan "${business.slogan}" must be quoted EXACTLY when referenced — never rephrase, paraphrase, or modify it.` : "No slogan specified — do not invent one."}
+3. ${business.brand_colors && business.brand_colors.length > 0 ? `Brand colors are ${business.brand_colors.join(", ")} — use these exact hex values for any color references in image prompts.` : "No brand colors specified."}
+4. Products/services must be described factually using ONLY the information provided above — do not invent features or capabilities.
+5. Every post caption must mention the business name or a specific product/service naturally in context.
+6. Spell-check every word before output. Zero tolerance for spelling or grammar errors in brand name, products, or offers.
+7. Never claim awards, certifications, locations, or capabilities that are not explicitly stated in the brand profile.
+8. The tone must precisely match "${business.brand_tone || "Professional"}" — do not deviate into overly casual or overly formal unless specified.
 
 === FORMAT DECISION RULES (CRITICAL — FOLLOW EXACTLY) ===
 ${formatGuidance}
@@ -455,6 +551,7 @@ ${formatGuidance}
 4. CTAs must drive specific actions: calls, DMs, website visits, bookings.
 5. Hashtags must include brand-specific, location-specific, and niche-specific tags.
 6. Each day must target a DIFFERENT content goal.
+7. Carousel posts (image_carousel) must have an image_prompt that describes MULTIPLE slides for a multi-image series.
 
 Generate exactly 7 days with diverse, non-repetitive content.${previousTopicsSummary}
 
