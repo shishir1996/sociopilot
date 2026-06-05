@@ -4,7 +4,7 @@ RUN apt-get update && apt-get install -y ffmpeg fontconfig && rm -rf /var/lib/ap
 
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 COPY . .
 RUN npm run build
 
