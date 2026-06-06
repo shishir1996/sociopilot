@@ -566,11 +566,31 @@ setInterval(async () => {
 
 // ── Admin setup endpoint (one-shot: add admin role by email) ──────────────
 app.post("/api/admin/setup", async (req, res) => {
-  const { email, secret, list } = req.body || {};
+  const { email, secret, list, test } = req.body || {};
   if (secret !== "growvix-admin-2026") return res.status(403).json({ error: "Invalid secret" });
   const admin = getSupabase();
   if (!admin) return res.status(500).json({ error: "Supabase not configured" });
   try {
+    if (test) {
+      // Test queries to verify Supabase access
+      const { data: userList, error: listErr } = await admin.auth.admin.listUsers();
+      const { data: roles } = await admin.from("user_roles").select("*").limit(5);
+      const { data: biz } = await admin.from("businesses").select("user_id, name").limit(5);
+      // Try searching for the email directly
+      const { data: userByEmail, error: searchErr } = test === true
+        ? { data: null, error: null }
+        : await admin.auth.admin.getUserByEmail(test);
+      return res.json({
+        ok: true,
+        listUsersError: listErr?.message || null,
+        totalUsers: userList?.users?.length || 0,
+        users: (userList?.users || []).map((u) => ({ id: u.id, email: u.email, phone: u.phone, created_at: u.created_at?.slice(0, 10) })),
+        roles,
+        businesses: biz,
+        userByEmail: userByEmail || null,
+        searchError: searchErr?.message || null,
+      });
+    }
     if (list) {
       const { data: userList } = await admin.auth.admin.listUsers();
       const users = (userList?.users || []).map((u) => ({ id: u.id, email: u.email, created_at: u.created_at }));
