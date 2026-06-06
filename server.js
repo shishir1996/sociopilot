@@ -564,48 +564,6 @@ setInterval(async () => {
   } catch (_) {}
 }, 15000);
 
-// ── Admin setup endpoint (one-shot: add admin role by email) ──────────────
-app.post("/api/admin/setup", async (req, res) => {
-  const { email, secret, list, test } = req.body || {};
-  if (secret !== "growvix-admin-2026") return res.status(403).json({ error: "Invalid secret" });
-  const admin = getSupabase();
-  if (!admin) return res.status(500).json({ error: "Supabase not configured" });
-  try {
-    if (test) {
-      const { data: userList, error: listErr } = await admin.auth.admin.listUsers();
-      // Check which tables exist
-      const tableNames = ["user_roles", "businesses", "content_posts", "video_generation_jobs", "social_accounts", "analytics", "admin_logs", "brands", "razorpay_plans", "subscriptions"];
-      const tableResults = {};
-      for (const t of tableNames) {
-        try {
-          const { data, error } = await admin.from(t).select("*").limit(1);
-          tableResults[t] = error ? error.message : `ok (${data?.length || 0} rows)`;
-        } catch (e) { tableResults[t] = e?.message; }
-      }
-      return res.json({
-        ok: true, listUsersError: listErr?.message || null, totalUsers: userList?.users?.length || 0,
-        users: (userList?.users || []).map((u) => ({ id: u.id, email: u.email })),
-        tables: tableResults,
-      });
-    }
-    if (list) {
-      const { data: userList } = await admin.auth.admin.listUsers();
-      const users = (userList?.users || []).map((u) => ({ id: u.id, email: u.email, created_at: u.created_at }));
-      return res.json({ ok: true, count: users.length, users });
-    }
-    if (!email) return res.status(400).json({ error: "email required" });
-    const { data: userList } = await admin.auth.admin.listUsers();
-    const found = (userList?.users || []).find((u) => u.email?.toLowerCase() === email.toLowerCase());
-    if (!found) return res.status(404).json({ error: `User ${email} not found` });
-    await admin.from("user_roles")
-      .upsert({ user_id: found.id, role: "admin" }, { onConflict: "user_id,role", ignoreDuplicates: true });
-    console.log(`Admin role added to ${email} (${found.id})`);
-    res.json({ ok: true, user_id: found.id, email });
-  } catch (e) {
-    res.status(500).json({ error: e?.message || "Setup failed" });
-  }
-});
-
 // ── Legacy SPA fallback ────────────────────────────────────────────────────
 app.get("*", (_, res) => {
   res.sendFile(join(__dirname, "dist", "index.html"));

@@ -99,6 +99,32 @@ serve(async (req) => {
       });
     }
 
+    if (action === "make_admin") {
+      const { target_user_id, email } = body;
+      if (!target_user_id && !email) throw new Error("target_user_id or email required");
+      let targetId = target_user_id;
+      if (!targetId && email) {
+        const { data: userList } = await supabaseAdmin.auth.admin.listUsers();
+        const found = (userList?.users || []).find((u: any) => u.email?.toLowerCase() === email.toLowerCase());
+        if (!found) throw new Error(`User with email ${email} not found`);
+        targetId = found.id;
+      }
+      // Insert admin role (ignore if already exists)
+      const { error: roleError } = await supabaseAdmin
+        .from("user_roles")
+        .upsert({ user_id: targetId, role: "admin" }, { onConflict: "user_id,role", ignoreDuplicates: true });
+      if (roleError) throw roleError;
+      await supabaseAdmin.from("admin_logs").insert({
+        admin_id: user.id,
+        target_user_id: targetId,
+        action: "make_admin",
+        details: { email },
+      }).then(() => {}).catch(() => {});
+      return new Response(JSON.stringify({ success: true, user_id: targetId }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (action === "remove_user") {
       const { target_user_id } = body;
       if (!target_user_id) throw new Error("target_user_id required");

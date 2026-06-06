@@ -5,11 +5,14 @@ ALTER TABLE public.businesses ADD COLUMN IF NOT EXISTS timezone text NOT NULL DE
 -- Enforce one business per user
 ALTER TABLE public.businesses ADD CONSTRAINT businesses_user_id_unique UNIQUE (user_id);
 
--- Create role enum
-CREATE TYPE public.app_role AS ENUM ('admin', 'user');
+-- Create role enum (idempotent)
+DO $$ BEGIN
+  CREATE TYPE public.app_role AS ENUM ('admin', 'user');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Create user_roles table
-CREATE TABLE public.user_roles (
+CREATE TABLE IF NOT EXISTS public.user_roles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   role app_role NOT NULL,

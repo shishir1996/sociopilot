@@ -1,1 +1,1 @@
-ALTER TABLE public.businesses ADD COLUMN creative_direction text DEFAULT NULL;
+ALTER TABLE public.businesses ADD COLUMN IF NOT EXISTS creative_direction text DEFAULT NULL;
