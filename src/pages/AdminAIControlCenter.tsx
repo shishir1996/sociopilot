@@ -28,7 +28,11 @@ import { AdminSidebar } from "@/components/admin/AdminSidebar";
 // Helper to call the ai-admin-settings edge function
 async function adminApi(body: any) {
   const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error("Not authenticated");
+  if (!session) {
+    await supabase.auth.signOut();
+    window.location.href = "/admin";
+    throw new Error("Session expired — please sign in again");
+  }
   const res = await fetch(
     `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-admin-settings`,
     {
@@ -42,8 +46,18 @@ async function adminApi(body: any) {
     }
   );
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: "Request failed" }));
-    throw new Error(err.error || "Request failed");
+    let detail: string;
+    try {
+      const body = await res.json();
+      detail = body.message || body.error || `HTTP ${res.status}`;
+    } catch {
+      detail = `HTTP ${res.status}`;
+    }
+    if (detail.toLowerCase().includes("jwt") || detail.toLowerCase().includes("auth") || res.status === 401) {
+      await supabase.auth.signOut();
+      window.location.href = "/admin";
+    }
+    throw new Error(detail);
   }
   return res.json();
 }
@@ -93,20 +107,30 @@ function TextModelsPanel() {
     setTestResult(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        await supabase.auth.signOut();
+        window.location.href = "/admin";
+        return;
+      }
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-validate-key`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${session?.access_token}`,
+            Authorization: `Bearer ${session.access_token}`,
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           },
           body: JSON.stringify({ provider: editing.provider_name, api_key: editing.api_key_secret_name }),
         }
       );
+      if (res.status === 401 || res.status === 403) {
+        await supabase.auth.signOut();
+        window.location.href = "/admin";
+        return;
+      }
       const json = await res.json();
-      setTestResult({ ok: !!json.ok, msg: json.ok ? json.message : (json.error || "Unknown error") });
+      setTestResult({ ok: !!json.ok, msg: json.ok ? json.message : (json.error || json.message || "Unknown error") });
     } catch (e: any) {
       setTestResult({ ok: false, msg: e?.message || "Validation failed" });
     } finally {
@@ -944,17 +968,27 @@ function ModelDiscoveryPanel() {
     setSyncingId(provider.id);
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        await supabase.auth.signOut();
+        window.location.href = "/admin";
+        return;
+      }
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-list-models`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.access_token}`,
+          Authorization: `Bearer ${session.access_token}`,
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
         body: JSON.stringify({ provider_id: provider.id }),
       });
+      if (res.status === 401 || res.status === 403) {
+        await supabase.auth.signOut();
+        window.location.href = "/admin";
+        return;
+      }
       const j = await res.json();
-      if (!j.ok) throw new Error(j.error || "Sync failed");
+      if (!j.ok) throw new Error(j.error || j.message || "Sync failed");
       toast({ title: `Synced ${j.count} models` });
       load();
     } catch (e: any) {
