@@ -26,6 +26,70 @@ function getSupabase() {
 
 app.use(express.static(join(__dirname, "dist")));
 
+// ── PDF merge endpoint ─────────────────────────────────────────────────────
+app.post("/api/pdf/merge", async (req, res) => {
+  const { images, job_id } = req.body || {};
+  if (!Array.isArray(images) || images.length === 0) {
+    return res.status(400).json({ error: "images array required" });
+  }
+
+  let tmpDir = null;
+  let pdfUrl = null;
+  let error = null;
+  try {
+    tmpDir = mkdtempSync(join(tmpdir(), "gv-pdf-"));
+    const imgFiles = [];
+
+    for (let i = 0; i < images.length; i++) {
+      const imgPath = join(tmpDir, `slide_${i}.jpg`);
+      try {
+        const resp = await fetch(images[i]);
+        if (resp.ok) {
+          writeFileSync(imgPath, Buffer.from(await resp.arrayBuffer()));
+          imgFiles.push(imgPath);
+        }
+      } catch {}
+    }
+
+    if (imgFiles.length === 0) {
+      error = "Could not download any images";
+    } else {
+      const pdfPath = join(tmpDir, "output.pdf");
+      const inputs = imgFiles.map(f => `-i "${f}"`).join(" ");
+
+      try {
+        execSync(`ffmpeg -y ${inputs} "${pdfPath}"`, { stdio: "pipe", timeout: 60000, shell: true });
+      } catch {}
+
+      if (!existsSync(pdfPath) || readFileSync(pdfPath).length < 100) {
+        error = "FFmpeg PDF generation failed";
+      } else {
+        const pdfBuffer = readFileSync(pdfPath);
+        const admin = getSupabase();
+        if (admin) {
+          const fileName = `video-output/pdf-${job_id || Date.now()}.pdf`;
+          const { error: uploadErr } = await admin.storage
+            .from("content-images")
+            .upload(fileName, pdfBuffer, { contentType: "application/pdf", upsert: true });
+          if (uploadErr) {
+            error = `Upload failed: ${uploadErr.message}`;
+          } else {
+            const { data: urlData } = admin.storage.from("content-images").getPublicUrl(fileName);
+            pdfUrl = urlData?.publicUrl;
+          }
+        } else {
+          error = "Supabase not configured";
+        }
+      }
+    }
+  } catch (err) {
+    error = err?.message || "PDF merge error";
+  } finally {
+    if (tmpDir) try { execSync(`rm -rf "${tmpDir}"`); } catch {}
+    res.json({ ok: !error, pdf_url: pdfUrl, error, pages: pdfUrl ? images.length : 0 });
+  }
+});
+
 // ── Video render endpoint ──────────────────────────────────────────────────
 app.post("/api/video/render", async (req, res) => {
   const { job_id } = req.body || {};

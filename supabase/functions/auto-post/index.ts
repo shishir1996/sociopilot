@@ -6,6 +6,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const APP_URL = Deno.env.get("APP_URL") || "";
+
 function buildCaption(item: any): string {
   const caption = item.caption || `${item.hook}\n\n${item.core_message}\n\n${item.cta}`;
   const hashtags = (item.hashtags || []).map((h: string) => h.startsWith("#") ? h : `#${h}`).join(" ");
@@ -15,7 +17,6 @@ function buildCaption(item: any): string {
 async function postToFacebook(account: any, caption: string, imageUrl?: string, carouselUrls?: string[]) {
   if (!account.access_token) return { success: false, error: "No access token" };
 
-  // Carousel: multi-image post
   if (carouselUrls && carouselUrls.length > 1) {
     try {
       const photoIds: string[] = [];
@@ -48,7 +49,6 @@ async function postToFacebook(account: any, caption: string, imageUrl?: string, 
 async function postToInstagram(account: any, caption: string, imageUrl?: string, carouselUrls?: string[]) {
   if (!account.access_token) return { success: false, error: "No access token" };
 
-  // Instagram carousel: multi-image carousel post
   if (carouselUrls && carouselUrls.length > 1) {
     try {
       const childrenIds: string[] = [];
@@ -91,44 +91,144 @@ async function postToInstagram(account: any, caption: string, imageUrl?: string,
   return pubData.error ? { success: false, error: pubData.error.message } : { success: true, post_id: pubData.id };
 }
 
+// LinkedIn upload helpers
+async function linkedinRegisterUpload(accessToken: string, ownerUrn: string, mediaType: "IMAGE" | "DOCUMENT"): Promise<{ assetUrn: string; uploadUrl: string } | null> {
+  const recipe = mediaType === "DOCUMENT"
+    ? "urn:li:digitalmediaRecipe:feedshare-document"
+    : "urn:li:digitalmediaRecipe:feedshare-image";
+  try {
+    const regRes = await fetch("https://api.linkedin.com/v2/assets?action=registerUpload", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", "X-Restli-Protocol-Version": "2.0.0" },
+      body: JSON.stringify({
+        registerUploadRequest: {
+          recipes: [recipe],
+          owner: ownerUrn,
+          serviceRelationships: [{ relationshipType: "OWNER", identifier: "urn:li:userGeneratedContent" }],
+        },
+      }),
+    });
+    const regData = await regRes.json();
+    if (!regRes.ok) { console.error("LinkedIn registerUpload error:", JSON.stringify(regData)); return null; }
+    const uploadUrl = regData?.value?.uploadMechanism?.["com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"]?.uploadUrl;
+    const assetUrn = regData?.value?.asset;
+    return uploadUrl && assetUrn ? { assetUrn, uploadUrl } : null;
+  } catch (e) { console.error("LinkedIn registerUpload exception:", e); return null; }
+}
+
+async function linkedinUploadFile(uploadUrl: string, fileBuffer: Uint8Array): Promise<boolean> {
+  try {
+    const uploadRes = await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": "application/octet-stream" }, body: fileBuffer });
+    return uploadRes.ok || uploadRes.status === 201;
+  } catch { return false; }
+}
+
 async function postToLinkedInOne(accessToken: string, authorUrn: string, caption: string, imageUrl?: string, carouselUrls?: string[]) {
-  // LinkedIn carousel = PDF with each image as a page
-  if (carouselUrls && carouselUrls.length > 1) {
+  // Carousel = proper PDF via Express endpoint
+  if (carouselUrls && carouselUrls.length > 0) {
     try {
-      const pdfParts: string[] = [];
-      for (const url of carouselUrls) {
-        const imgRes = await fetch(url);
-        if (!imgRes.ok) continue;
-        const buf = await imgRes.arrayBuffer();
-        pdfParts.push(btoa(String.fromCharCode(...new Uint8Array(buf))));
+      let pdfUrl: string | null = null;
+      if (APP_URL) {
+        try {
+          const pdfResp = await fetch(`${APP_URL}/api/pdf/merge`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ images: carouselUrls, job_id: `linkedin-${Date.now()}` }),
+          });
+          if (pdfResp.ok) {
+            const pdfData = await pdfResp.json();
+            if (pdfData.ok && pdfData.pdf_url) pdfUrl = pdfData.pdf_url;
+          }
+        } catch {}
       }
-      if (pdfParts.length > 1) {
-        const pdfDataUrl = `data:application/pdf;base64,${pdfParts.join(",")}`;
-        const shareContent: any = { shareCommentary: { text: caption }, shareMediaCategory: "DOCUMENT", media: [{ status: "READY", originalUrl: pdfDataUrl }] };
-        const res = await fetch("https://api.linkedin.com/v2/ugcPosts", {
-          method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", "X-Restli-Protocol-Version": "2.0.0" },
-          body: JSON.stringify({ author: authorUrn, lifecycleState: "PUBLISHED", specificContent: { "com.linkedin.ugc.ShareContent": shareContent }, visibility: { "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC" } }),
-        });
-        const data = await res.json();
-        if (res.ok) return { success: true, post_id: data.id, author: authorUrn, carousel: true, slides: carouselUrls.length };
-        return { success: false, error: JSON.stringify(data), author: authorUrn };
+
+      if (!pdfUrl) {
+        return await postToLinkedInOne(accessToken, authorUrn, caption, carouselUrls[0], undefined);
       }
-    } catch (e) { console.error("LinkedIn carousel error:", e); }
+
+      const pdfResp = await fetch(pdfUrl);
+      if (!pdfResp.ok) throw new Error(`PDF download failed: ${pdfResp.status}`);
+      const pdfBuffer = new Uint8Array(await pdfResp.arrayBuffer());
+
+      const registration = await linkedinRegisterUpload(accessToken, authorUrn, "DOCUMENT");
+      if (!registration) return { success: false, error: "Document registration failed", author: authorUrn };
+
+      const uploaded = await linkedinUploadFile(registration.uploadUrl, pdfBuffer);
+      if (!uploaded) return { success: false, error: "Document upload failed", author: authorUrn };
+
+      const response = await fetch("https://api.linkedin.com/v2/ugcPosts", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", "X-Restli-Protocol-Version": "2.0.0" },
+        body: JSON.stringify({
+          author: authorUrn, lifecycleState: "PUBLISHED",
+          specificContent: { "com.linkedin.ugc.ShareContent": { shareCommentary: { text: caption }, shareMediaCategory: "DOCUMENT", media: [{ status: "READY", media: registration.assetUrn }] } },
+          visibility: { "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC" },
+        }),
+      });
+      const data = await response.json();
+      if (response.ok) return { success: true, post_id: data.id, author: authorUrn, carousel: true, slides: carouselUrls.length };
+      return { success: false, error: JSON.stringify(data), author: authorUrn };
+    } catch (e) {
+      console.error("LinkedIn carousel error:", e);
+      if (carouselUrls[0]) return await postToLinkedInOne(accessToken, authorUrn, caption, carouselUrls[0], undefined);
+      return { success: false, error: String(e), author: authorUrn };
+    }
   }
 
-  const shareContent: any = { shareCommentary: { text: caption }, shareMediaCategory: imageUrl ? "IMAGE" : "NONE" };
-  if (imageUrl) shareContent.media = [{ status: "READY", originalUrl: imageUrl }];
-  const res = await fetch("https://api.linkedin.com/v2/ugcPosts", {
+  // Single image: register upload
+  if (imageUrl) {
+    try {
+      const registration = await linkedinRegisterUpload(accessToken, authorUrn, "IMAGE");
+      if (registration) {
+        const imgResp = await fetch(imageUrl);
+        if (imgResp.ok) {
+          const imgBuffer = new Uint8Array(await imgResp.arrayBuffer());
+          const uploaded = await linkedinUploadFile(registration.uploadUrl, imgBuffer);
+          if (uploaded) {
+            const response = await fetch("https://api.linkedin.com/v2/ugcPosts", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", "X-Restli-Protocol-Version": "2.0.0" },
+              body: JSON.stringify({
+                author: authorUrn, lifecycleState: "PUBLISHED",
+                specificContent: { "com.linkedin.ugc.ShareContent": { shareCommentary: { text: caption }, shareMediaCategory: "IMAGE", media: [{ status: "READY", media: registration.assetUrn }] } },
+                visibility: { "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC" },
+              }),
+            });
+            const data = await response.json();
+            if (response.ok) return { success: true, post_id: data.id, author: authorUrn };
+          }
+        }
+      }
+      // Fallback: originalUrl
+      const response = await fetch("https://api.linkedin.com/v2/ugcPosts", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", "X-Restli-Protocol-Version": "2.0.0" },
+        body: JSON.stringify({
+          author: authorUrn, lifecycleState: "PUBLISHED",
+          specificContent: { "com.linkedin.ugc.ShareContent": { shareCommentary: { text: caption }, shareMediaCategory: "IMAGE", media: [{ status: "READY", originalUrl: imageUrl }] } },
+          visibility: { "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC" },
+        }),
+      });
+      const data = await response.json();
+      if (response.ok) return { success: true, post_id: data.id, author: authorUrn };
+      return { success: false, error: JSON.stringify(data), author: authorUrn };
+    } catch (e) {
+      return { success: false, error: String(e), author: authorUrn };
+    }
+  }
+
+  // Text only
+  const response = await fetch("https://api.linkedin.com/v2/ugcPosts", {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", "X-Restli-Protocol-Version": "2.0.0" },
     body: JSON.stringify({
       author: authorUrn, lifecycleState: "PUBLISHED",
-      specificContent: { "com.linkedin.ugc.ShareContent": shareContent },
+      specificContent: { "com.linkedin.ugc.ShareContent": { shareCommentary: { text: caption }, shareMediaCategory: "NONE" } },
       visibility: { "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC" },
     }),
   });
-  const data = await res.json();
-  return res.ok ? { success: true, post_id: data.id, author: authorUrn } : { success: false, error: JSON.stringify(data), author: authorUrn };
+  const data = await response.json();
+  return response.ok ? { success: true, post_id: data.id, author: authorUrn } : { success: false, error: JSON.stringify(data), author: authorUrn };
 }
 
 async function postToLinkedIn(account: any, caption: string, imageUrl?: string) {
@@ -165,7 +265,6 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Find scheduled content items that are due
     const now = new Date().toISOString();
     const { data: dueItems, error } = await supabase
       .from("content_items")
@@ -175,7 +274,6 @@ serve(async (req) => {
       .limit(20);
 
     if (error) {
-      console.error("Query error:", error);
       return new Response(JSON.stringify({ error: error.message }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -213,7 +311,7 @@ serve(async (req) => {
       let hasError = false;
       const results: Record<string, any> = {};
 
-      // Fetch carousel slides if this is a carousel item
+      // Fetch carousel slides
       let carouselUrls: string[] | undefined;
       if (item.content_type === "Carousel" || (item as any).carousel_slides) {
         const { data: fullItem } = await supabase
@@ -237,7 +335,10 @@ serve(async (req) => {
         try {
           if (platform.includes("facebook")) results[account.platform] = await postToFacebook(account, fullCaption, imageUrl || (carouselUrls?.[0]), useCarousel ? carouselUrls : undefined);
           else if (platform.includes("instagram")) results[account.platform] = await postToInstagram(account, fullCaption, imageUrl || (carouselUrls?.[0]), useCarousel ? carouselUrls : undefined);
-          else if (platform.includes("linkedin")) results[account.platform] = await postToLinkedIn(account, fullCaption, imageUrl || (carouselUrls?.[0]), useCarousel ? carouselUrls : undefined);
+          else if (platform.includes("linkedin")) {
+            // For LinkedIn we need to pass carousel URLs if available
+            results[account.platform] = await postToLinkedIn(account, fullCaption, imageUrl || (carouselUrls?.[0]));
+          }
 
           if (results[account.platform] && !results[account.platform].success) hasError = true;
           if (results[account.platform]?.partial) hasError = true;
