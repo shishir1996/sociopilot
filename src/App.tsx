@@ -3,11 +3,13 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { Loader2 } from "lucide-react";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import BusinessSetup from "./pages/BusinessSetup";
 import AdminDashboard from "./pages/AdminDashboard";
+import AdminLoginPage from "./pages/AdminLoginPage";
 import AdminAnalytics from "./pages/AdminAnalytics";
 import AdminUserDetail from "./pages/AdminUserDetail";
 import NotFound from "./pages/NotFound";
@@ -31,6 +33,17 @@ import PrivacyPolicy from "./pages/legal/PrivacyPolicy";
 import Disclaimer from "./pages/legal/Disclaimer";
 
 const queryClient = new QueryClient();
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-950">
+      <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+    </div>
+  );
+  if (!user) return <AdminLoginPage />;
+  return <>{children}</>;
+}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -57,13 +70,13 @@ const App = () => (
             <Route path="/refund-policy" element={<RefundPolicy />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/disclaimer" element={<Disclaimer />} />
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/analytics" element={<AdminAnalytics />} />
-            <Route path="/admin/user" element={<AdminUserDetail />} />
-            <Route path="/admin/ai" element={<AdminAIControlCenter />} />
-            <Route path="/admin/integrations" element={<AdminSocialIntegrations />} />
-            <Route path="/admin/payments" element={<AdminPayments />} />
-            <Route path="/admin/ai-video" element={<AdminAIVideoEngine />} />
+            <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+            <Route path="/admin/analytics" element={<AdminRoute><AdminAnalytics /></AdminRoute>} />
+            <Route path="/admin/user" element={<AdminRoute><AdminUserDetail /></AdminRoute>} />
+            <Route path="/admin/ai" element={<AdminRoute><AdminAIControlCenter /></AdminRoute>} />
+            <Route path="/admin/integrations" element={<AdminRoute><AdminSocialIntegrations /></AdminRoute>} />
+            <Route path="/admin/payments" element={<AdminRoute><AdminPayments /></AdminRoute>} />
+            <Route path="/admin/ai-video" element={<AdminRoute><AdminAIVideoEngine /></AdminRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
