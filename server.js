@@ -572,23 +572,20 @@ app.post("/api/admin/setup", async (req, res) => {
   if (!admin) return res.status(500).json({ error: "Supabase not configured" });
   try {
     if (test) {
-      // Test queries to verify Supabase access
       const { data: userList, error: listErr } = await admin.auth.admin.listUsers();
-      const { data: roles } = await admin.from("user_roles").select("*").limit(5);
-      const { data: biz } = await admin.from("businesses").select("user_id, name").limit(5);
-      // Try searching for the email directly
-      const { data: userByEmail, error: searchErr } = test === true
-        ? { data: null, error: null }
-        : await admin.auth.admin.getUserByEmail(test);
+      // Check which tables exist
+      const tableNames = ["user_roles", "businesses", "content_posts", "video_generation_jobs", "social_accounts", "analytics", "admin_logs", "brands", "razorpay_plans", "subscriptions"];
+      const tableResults = {};
+      for (const t of tableNames) {
+        try {
+          const { data, error } = await admin.from(t).select("*").limit(1);
+          tableResults[t] = error ? error.message : `ok (${data?.length || 0} rows)`;
+        } catch (e) { tableResults[t] = e?.message; }
+      }
       return res.json({
-        ok: true,
-        listUsersError: listErr?.message || null,
-        totalUsers: userList?.users?.length || 0,
-        users: (userList?.users || []).map((u) => ({ id: u.id, email: u.email, phone: u.phone, created_at: u.created_at?.slice(0, 10) })),
-        roles,
-        businesses: biz,
-        userByEmail: userByEmail || null,
-        searchError: searchErr?.message || null,
+        ok: true, listUsersError: listErr?.message || null, totalUsers: userList?.users?.length || 0,
+        users: (userList?.users || []).map((u) => ({ id: u.id, email: u.email })),
+        tables: tableResults,
       });
     }
     if (list) {
