@@ -43,26 +43,59 @@ app.post("/api/pdf/merge", async (req, res) => {
     for (let i = 0; i < images.length; i++) {
       const imgPath = join(tmpDir, `slide_${i}.jpg`);
       try {
-        const resp = await fetch(images[i]);
+        const resp = await fetch(images[i], { signal: AbortSignal.timeout(15000) });
         if (resp.ok) {
           writeFileSync(imgPath, Buffer.from(await resp.arrayBuffer()));
           imgFiles.push(imgPath);
+        } else {
+          console.error(`PDF merge: failed to fetch image ${i}, HTTP ${resp.status}`);
         }
-      } catch {}
+      } catch (e) {
+        console.error(`PDF merge: download error for image ${i}:`, e?.message);
+      }
     }
 
     if (imgFiles.length === 0) {
       error = "Could not download any images";
     } else {
       const pdfPath = join(tmpDir, "output.pdf");
-      const inputs = imgFiles.map(f => `-i "${f}"`).join(" ");
 
+      // Build concat demuxer input for FFmpeg: image list as file
+      // Each image gets its own page in the PDF
       try {
-        execSync(`ffmpeg -y ${inputs} "${pdfPath}"`, { stdio: "pipe", timeout: 60000, shell: true });
-      } catch {}
+        const concatList = imgFiles.map(f => `file '${f}'\nduration 1`).join("\n");
+        writeFileSync(join(tmpDir, "images.txt"), concatList + "\n", "utf-8");
 
-      if (!existsSync(pdfPath) || readFileSync(pdfPath).length < 100) {
-        error = "FFmpeg PDF generation failed";
+        // Method 1: concat demuxer — best for multi-page PDF
+        execSync(
+          `ffmpeg -y -f concat -safe 0 -i images.txt -c:v mjpeg -q:v 3 -pix_fmt yuvj420p "${pdfPath}"`,
+          { cwd: tmpDir, stdio: "pipe", timeout: 60000 }
+        );
+      } catch (e1) {
+        console.error("PDF merge: concat method failed:", e1?.message);
+        // Method 2: use -i for each image
+        try {
+          const inputs = imgFiles.map(f => `-i "${f}"`).join(" ");
+          execSync(
+            `ffmpeg -y ${inputs} -c:v mjpeg -q:v 3 "${pdfPath}"`,
+            { cwd: tmpDir, stdio: "pipe", timeout: 60000 }
+          );
+        } catch (e2) {
+          console.error("PDF merge: multi-input method failed:", e2?.message);
+          // Method 3: pipe via image2pipe
+          try {
+            execSync(
+              `cat ${imgFiles.map(f => `"${f}"`).join(" ")} | ffmpeg -y -f image2pipe -framerate 1 -i - -c:v mjpeg -q:v 3 "${pdfPath}"`,
+              { cwd: tmpDir, stdio: "pipe", timeout: 60000, shell: true }
+            );
+          } catch (e3) {
+            console.error("PDF merge: image2pipe method failed:", e3?.message);
+          }
+        }
+      }
+
+      if (!existsSync(pdfPath) || readFileSync(pdfPath).length < 200) {
+        error = "FFmpeg PDF generation failed after all methods";
       } else {
         const pdfBuffer = readFileSync(pdfPath);
         const admin = getSupabase();
@@ -86,6 +119,7 @@ app.post("/api/pdf/merge", async (req, res) => {
     error = err?.message || "PDF merge error";
   } finally {
     if (tmpDir) try { execSync(`rm -rf "${tmpDir}"`); } catch {}
+    console.log("PDF merge result:", { ok: !error, pdf_url: pdfUrl, error, pages: pdfUrl ? images.length : 0 });
     res.json({ ok: !error, pdf_url: pdfUrl, error, pages: pdfUrl ? images.length : 0 });
   }
 });
