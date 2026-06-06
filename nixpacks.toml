@@ -1,0 +1,11 @@
+[phases.setup]
+nixPackages = ["nodejs_20", "ffmpeg", "fontconfig"]
+
+[phases.install]
+cmd = "npm ci --production=false"
+
+[phases.build]
+cmd = "npm run build"
+
+[start]
+cmd = "npm start"
