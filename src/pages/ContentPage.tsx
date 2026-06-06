@@ -70,45 +70,52 @@ export default function ContentPage() {
   const fetchData = async () => {
     if (!user) return;
     setLoading(true);
+    try {
+      const { data: biz } = await supabase
+        .from("businesses")
+        .select("id")
+        .eq("user_id", user.id)
+        .limit(1) as any;
 
-    const { data: biz } = await supabase
-      .from("businesses")
-      .select("id")
-      .eq("user_id", user.id)
-      .limit(1) as any;
+      if (!biz || biz.length === 0) {
+        setLoading(false);
+        return;
+      }
 
-    if (!biz || biz.length === 0) {
-      setLoading(false);
-      return;
-    }
+      const bizId = biz[0].id;
+      setBusinessId(bizId);
 
-    const bizId = biz[0].id;
-    setBusinessId(bizId);
+      const { data: accounts } = await supabase
+        .from("social_accounts")
+        .select("id")
+        .eq("business_id", bizId)
+        .limit(1) as any;
+      setHasConnectedPlatforms((accounts || []).length > 0);
 
-    // Check connected platforms
-    const { data: accounts } = await supabase
-      .from("social_accounts")
-      .select("id")
-      .eq("business_id", bizId)
-      .limit(1) as any;
-    setHasConnectedPlatforms((accounts || []).length > 0);
+      const { data: plansData } = await supabase
+        .from("content_plans")
+        .select("id, week_start, week_number, strategy_summary, status")
+        .eq("business_id", bizId)
+        .order("created_at", { ascending: false }) as any;
 
-    const { data: plansData } = await supabase
-      .from("content_plans")
-      .select("id, week_start, week_number, strategy_summary, status")
-      .eq("business_id", bizId)
-      .order("created_at", { ascending: false }) as any;
+      setPlans(plansData || []);
 
-    setPlans(plansData || []);
-
-    if (plansData && plansData.length > 0) {
-      const planIds = plansData.map((p: any) => p.id);
-      const { data: itemsData } = await supabase
-        .from("content_items")
-        .select("*")
-        .in("plan_id", planIds)
-        .order("day_number", { ascending: true }) as any;
-      setItems(itemsData || []);
+      if (plansData && plansData.length > 0) {
+        const planIds = plansData.map((p: any) => p.id);
+        const { data: itemsData } = await supabase
+          .from("content_items")
+          .select("*")
+          .in("plan_id", planIds)
+          .order("day_number", { ascending: true }) as any;
+        setItems(itemsData || []);
+      }
+    } catch (err) {
+      console.error("ContentPage fetchData error:", err);
+      toast({
+        title: "Failed to load content",
+        description: "Could not load your content. Please try refreshing the page.",
+        variant: "destructive",
+      });
     }
     setLoading(false);
   };

@@ -358,6 +358,7 @@ interface RunFullGenerationArgs {
   generationRequestId?: string | null;
   weekNumber: number;
   allowImage: boolean;
+  allowCarousel: boolean;
   allowVideo: boolean;
   textProvider: any;
   textProviderFallbacks?: any[];
@@ -372,7 +373,7 @@ interface RunFullGenerationArgs {
 async function runFullGeneration(args: RunFullGenerationArgs) {
   const {
     supabaseAdmin, supabaseUrl, supabaseKey, userId, business, businessId, generationRequestId,
-    weekNumber, allowImage, textProvider, textProviderFallbacks, imageProvider, lovableApiKey,
+    weekNumber, allowImage, allowCarousel, textProvider, textProviderFallbacks, imageProvider, lovableApiKey,
     brandContext, colorContext, sloganContext, creativeDirectionContext,
   } = args;
   const textProvidersChain: any[] = [textProvider, ...(textProviderFallbacks || [])].filter(Boolean);
@@ -488,15 +489,21 @@ Do NOT reuse the same caption across days even if platforms differ — each day 
     previousTopicsSummary = `\n\nPREVIOUSLY USED TOPICS (DO NOT REPEAT THESE — create completely new angles):\n${topicList}`;
   }
 
-  // When admin disables image generation, force every post to be text_only.
-  const formatGuidance = allowImage
-    ? `For EACH post, decide post_format from: "text_only" | "text_with_image" | "image_carousel".
+  // When admin disables image/carousel generation, force posts to simpler formats.
+  const formatGuidance = !allowImage
+    ? `IMPORTANT: image generation is currently DISABLED by the administrator.
+EVERY post MUST use post_format = "text_only", content_type = "Text Post",
+image_prompt = "" and visual_style = "". Do NOT suggest carousels or images.`
+    : !allowCarousel
+      ? `For EACH post, decide post_format from: "text_only" | "text_with_image".
+- A good weekly mix is: 3-4 text_with_image, 3-4 text_only
+- Do NOT use "image_carousel" — carousel generation is disabled.
+- text_only posts: image_prompt and visual_style MUST be empty strings
+- text_with_image: include a detailed image_prompt`
+      : `For EACH post, decide post_format from: "text_only" | "text_with_image" | "image_carousel".
 - A good weekly mix is: 2-3 text_with_image, 1-2 image_carousel, 2-3 text_only
 - text_only posts: image_prompt and visual_style MUST be empty strings
-- text_with_image and image_carousel: include a detailed image_prompt`
-    : `IMPORTANT: image generation is currently DISABLED by the administrator.
-EVERY post MUST use post_format = "text_only", content_type = "Text Post",
-image_prompt = "" and visual_style = "". Do NOT suggest carousels or images.`;
+- text_with_image and image_carousel: include a detailed image_prompt`;
 
   const brandColorsJson = business.brand_colors && business.brand_colors.length > 0
     ? JSON.stringify(business.brand_colors)
@@ -692,6 +699,7 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
   const validFormats = ["text_only", "text_with_image", "image_carousel"];
   for (const day of plan.days) {
     if (!allowImage) { day.post_format = "text_only"; }
+    if (!allowCarousel && day.post_format === "image_carousel") { day.post_format = "text_with_image"; }
     if (!validFormats.includes(day.post_format)) {
       day.post_format = day.image_prompt ? "text_with_image" : "text_only";
     }
@@ -956,18 +964,20 @@ serve(async (req) => {
     const weekNumber = (count || 0) + 1;
 
     // ---- Admin-controlled generation modes ------------------------------
-    // Read three feature flags managed in Admin → AI Control Center:
-    //   allow_text_generation   — must be enabled for any generation at all
-    //   allow_image_generation  — when off, force every post to text_only
-    //   allow_video_generation  — reserved for future video posts
+    // Read feature flags managed in Admin → AI Control Center:
+    //   allow_text_generation     — must be enabled for any generation at all
+    //   allow_image_generation    — when off, force every post to text_only
+    //   allow_carousel_generation — when off, no carousel/PDF multi-slide posts
+    //   allow_video_generation    — reserved for future video posts
     const { data: flagRows } = await supabaseAdmin
       .from("ai_feature_flags")
       .select("feature_key, enabled")
-      .in("feature_key", ["allow_text_generation", "allow_image_generation", "allow_video_generation"]);
+      .in("feature_key", ["allow_text_generation", "allow_image_generation", "allow_carousel_generation", "allow_video_generation"]);
     const flagMap: Record<string, boolean> = {};
     (flagRows || []).forEach((f: any) => { flagMap[f.feature_key] = !!f.enabled; });
     const allowText = flagMap["allow_text_generation"] !== false; // default true
     const allowImage = flagMap["allow_image_generation"] !== false; // default true
+    const allowCarousel = flagMap["allow_carousel_generation"] !== false; // default true
     const allowVideo = flagMap["allow_video_generation"] === true; // default false
 
     if (!allowText) {
@@ -995,6 +1005,7 @@ serve(async (req) => {
           generationRequestId: generation_request_id || null,
           weekNumber,
           allowImage,
+          allowCarousel,
           allowVideo,
           textProvider,
           textProviderFallbacks,

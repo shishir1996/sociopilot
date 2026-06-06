@@ -745,6 +745,7 @@ function FeatureFlagsPanel() {
       const required = [
         { feature_key: "allow_text_generation", enabled: true, plan_restriction: [] },
         { feature_key: "allow_image_generation", enabled: true, plan_restriction: [] },
+        { feature_key: "allow_carousel_generation", enabled: true, plan_restriction: [] },
         { feature_key: "allow_video_generation", enabled: false, plan_restriction: [] },
       ];
       const missing = required.filter(flag => !(rows || []).some((row: any) => row.feature_key === flag.feature_key));
@@ -769,10 +770,11 @@ function FeatureFlagsPanel() {
     }
   };
 
-  const setGenerationMode = async (mode: "text" | "image" | "video") => {
+  const setGenerationMode = async (mode: "text" | "image" | "carousel" | "video") => {
     const nextState: Record<string, boolean> = {
       allow_text_generation: true,
-      allow_image_generation: mode === "image" || mode === "video",
+      allow_image_generation: mode === "image" || mode === "carousel" || mode === "video",
+      allow_carousel_generation: mode === "carousel" || mode === "video",
       allow_video_generation: mode === "video",
     };
     try {
@@ -787,8 +789,8 @@ function FeatureFlagsPanel() {
   };
 
   const enabledMap = Object.fromEntries(flags.map((flag: any) => [flag.feature_key, !!flag.enabled]));
-  const activeMode = enabledMap.allow_video_generation ? "video" : enabledMap.allow_image_generation ? "image" : "text";
-  const generationFlags = flags.filter((flag: any) => ["allow_text_generation", "allow_image_generation", "allow_video_generation"].includes(flag.feature_key));
+  const activeMode = enabledMap.allow_video_generation ? "video" : enabledMap.allow_carousel_generation ? "carousel" : enabledMap.allow_image_generation ? "image" : "text";
+  const generationFlags = flags.filter((flag: any) => ["allow_text_generation", "allow_image_generation", "allow_carousel_generation", "allow_video_generation"].includes(flag.feature_key));
 
   return (
     <div className="space-y-4">
@@ -805,10 +807,11 @@ function FeatureFlagsPanel() {
           <p className="text-xs text-muted-foreground">
             Choose exactly what every user can generate. Text is always required; image and video are optional admin-controlled add-ons.
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
             <Button size="sm" variant={activeMode === "text" ? "default" : "outline"} onClick={() => setGenerationMode("text")}>Text only</Button>
             <Button size="sm" variant={activeMode === "image" ? "default" : "outline"} onClick={() => setGenerationMode("image")}>Text + Image</Button>
-            <Button size="sm" variant={activeMode === "video" ? "default" : "outline"} onClick={() => setGenerationMode("video")}>Text + Image + Video</Button>
+            <Button size="sm" variant={activeMode === "carousel" ? "default" : "outline"} onClick={() => setGenerationMode("carousel")}>+ Carousel/PDF</Button>
+            <Button size="sm" variant={activeMode === "video" ? "default" : "outline"} onClick={() => setGenerationMode("video")}>+ Video</Button>
           </div>
         </CardContent>
       </Card>
@@ -825,8 +828,9 @@ function FeatureFlagsPanel() {
                   <p className="text-xs text-muted-foreground">
                     {f.feature_key === "allow_text_generation" && "Master switch — when off, no users can generate any content."}
                     {f.feature_key === "allow_image_generation" && "When off, every generated post is text-only (no AI images)."}
-                    {f.feature_key === "allow_video_generation" && "Reserved for upcoming video post format."}
-                    {!["allow_text_generation","allow_image_generation","allow_video_generation"].includes(f.feature_key) && f.feature_key}
+                    {f.feature_key === "allow_carousel_generation" && "When on, posts can include multi-slide carousels (combined into PDF for LinkedIn document upload)."}
+                    {f.feature_key === "allow_video_generation" && "When on, users can create AI-generated video reels via the Video Studio."}
+                    {!["allow_text_generation","allow_image_generation","allow_carousel_generation","allow_video_generation"].includes(f.feature_key) && f.feature_key}
                   </p>
                 </div>
                 <Switch checked={f.enabled} onCheckedChange={() => toggle(f)} />
