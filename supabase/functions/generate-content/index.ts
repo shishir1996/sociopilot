@@ -493,17 +493,17 @@ Do NOT reuse the same caption across days even if platforms differ — each day 
   const formatGuidance = !allowImage
     ? `IMPORTANT: image generation is currently DISABLED by the administrator.
 EVERY post MUST use post_format = "text_only", content_type = "Text Post",
-image_prompt = "" and visual_style = "". Do NOT suggest carousels or images.`
-    : !allowCarousel
+image_prompt = "" and visual_style = "". Do NOT suggest carousels, images or videos.`
+    : !allowCarousel && !allowVideo
       ? `For EACH post, decide post_format from: "text_only" | "text_with_image".
 - A good weekly mix is: 3-4 text_with_image, 3-4 text_only
-- Do NOT use "image_carousel" — carousel generation is disabled.
+- Do NOT use "image_carousel" or "video" — those are disabled.
 - text_only posts: image_prompt and visual_style MUST be empty strings
 - text_with_image: include a detailed image_prompt`
-      : `For EACH post, decide post_format from: "text_only" | "text_with_image" | "image_carousel".
-- A good weekly mix is: 2-3 text_with_image, 1-2 image_carousel, 2-3 text_only
+      : `For EACH post, decide post_format from: "text_only" | "text_with_image" | "image_carousel"${allowVideo ? ' | "video"' : ""}.
+- A good weekly mix is:${allowVideo ? " 1 video," : ""} 2-3 text_with_image, 1-2 image_carousel, 2-3 text_only
 - text_only posts: image_prompt and visual_style MUST be empty strings
-- text_with_image and image_carousel: include a detailed image_prompt`;
+- text_with_image and image_carousel: include a detailed image_prompt${allowVideo ? '\n- video posts: write a compelling script in the "script" field (40-90 words for a 30s reel)' : ""}`;
 
   const brandColorsJson = business.brand_colors && business.brand_colors.length > 0
     ? JSON.stringify(business.brand_colors)
@@ -596,12 +596,12 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
                 type: "object",
                 properties: {
                   day_number: { type: "number" },
-                  post_format: { type: "string", enum: ["text_only", "text_with_image", "image_carousel"] },
+                  post_format: { type: "string", enum: ["text_only", "text_with_image", "image_carousel", "video"] },
                   content_theme: { type: "string" },
                   content_goal: { type: "string" },
                   primary_platform: { type: "string" },
                   secondary_platforms: { type: "array", items: { type: "string" } },
-                  content_type: { type: "string", enum: ["Text Post", "Image Post", "Carousel"] },
+                  content_type: { type: "string", enum: ["Text Post", "Image Post", "Carousel", "Video Post"] },
                   topic: { type: "string" },
                   hook: { type: "string" },
                   pain_point: { type: "string" },
@@ -613,6 +613,7 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
                   hashtags: { type: "array", items: { type: "string" } },
                   image_prompt: { type: "string" },
                   visual_style: { type: "string" },
+                  script: { type: "string" },
                   repurposing_suggestion: { type: "string" },
                 },
                 required: ["day_number", "post_format", "content_theme", "primary_platform", "content_type", "topic", "hook", "caption", "cta"],
@@ -696,15 +697,16 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
   if (!plan?.days?.length) { console.error("AI plan missing days"); throw new Error("__ai_empty__"); }
 
   // Normalize
-  const validFormats = ["text_only", "text_with_image", "image_carousel"];
+  const validFormats = ["text_only", "text_with_image", "image_carousel", ...(allowVideo ? ["video"] : [])];
   for (const day of plan.days) {
     if (!allowImage) { day.post_format = "text_only"; }
     if (!allowCarousel && day.post_format === "image_carousel") { day.post_format = "text_with_image"; }
+    if (!allowVideo && day.post_format === "video") { day.post_format = "text_with_image"; }
     if (!validFormats.includes(day.post_format)) {
       day.post_format = day.image_prompt ? "text_with_image" : "text_only";
     }
     if (day.post_format === "text_only") { day.image_prompt = ""; day.visual_style = ""; }
-    day.content_type = day.post_format === "text_only" ? "Text Post" : day.post_format === "image_carousel" ? "Carousel" : "Image Post";
+    day.content_type = day.post_format === "text_only" ? "Text Post" : day.post_format === "image_carousel" ? "Carousel" : day.post_format === "video" ? "Video Post" : "Image Post";
   }
 
   const weekStartDate = new Date();
@@ -804,6 +806,40 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
       });
       // Run inline (we're already in background) so images finish too.
       await generateImagesInBackground(itemsWithFormat, newPlan.id, supabaseUrl, supabaseKey, imageProvider, lovableApiKey);
+    }
+  }
+
+  if (allowVideo) {
+    const videoItems = (insertedItems || []).filter((it: any) => {
+      const dayData = plan.days.find((d: any) => d.day_number === it.day_number);
+      return dayData?.post_format === "video";
+    });
+    for (const item of videoItems) {
+      const dayData = plan.days.find((d: any) => d.day_number === item.day_number);
+      try {
+        const script = dayData?.script || `${item.hook}\n\n${item.core_message}\n\n${item.cta}`;
+        await supabaseAdmin.from("video_generation_jobs").insert({
+          business_id: businessId,
+          user_id: userId,
+          title: item.topic || `Video Day ${item.day_number}`,
+          script,
+          platform: item.primary_platform || "instagram",
+          script,
+          platform: item.primary_platform || "instagram",
+          video_ratio: "9:16",
+          duration_seconds: 30,
+          voice_type: "female_warm",
+          subtitle_style: "standard",
+          render_status: "pending",
+          render_progress: 0,
+          blueprint_json: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+        console.log(`Video job created for content item ${item.id}`);
+      } catch (ve) {
+        console.error(`Failed to create video job for item ${item.id}:`, ve);
+      }
     }
   }
 
