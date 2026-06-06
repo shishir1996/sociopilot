@@ -566,13 +566,17 @@ setInterval(async () => {
 
 // ── Admin setup endpoint (one-shot: add admin role by email) ──────────────
 app.post("/api/admin/setup", async (req, res) => {
-  const { email, secret } = req.body || {};
-  if (!email) return res.status(400).json({ error: "email required" });
-  // Simple protection using a secret passed in the request body
+  const { email, secret, list } = req.body || {};
   if (secret !== "growvix-admin-2026") return res.status(403).json({ error: "Invalid secret" });
   const admin = getSupabase();
   if (!admin) return res.status(500).json({ error: "Supabase not configured" });
   try {
+    if (list) {
+      const { data: userList } = await admin.auth.admin.listUsers();
+      const users = (userList?.users || []).map((u) => ({ id: u.id, email: u.email, created_at: u.created_at }));
+      return res.json({ ok: true, count: users.length, users });
+    }
+    if (!email) return res.status(400).json({ error: "email required" });
     const { data: userList } = await admin.auth.admin.listUsers();
     const found = (userList?.users || []).find((u) => u.email?.toLowerCase() === email.toLowerCase());
     if (!found) return res.status(404).json({ error: `User ${email} not found` });
