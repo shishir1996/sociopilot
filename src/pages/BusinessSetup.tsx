@@ -39,13 +39,27 @@ export default function BusinessSetup() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(() => {
+    const saved = localStorage.getItem("onboarding_step");
+    return saved ? parseInt(saved) : 0;
+  });
   const [loading, setLoading] = useState(false);
   const [enabledPlatforms, setEnabledPlatforms] = useState<string[]>([]);
   const [connectedCount, setConnectedCount] = useState(0);
   const [connectedList, setConnectedList] = useState<string[]>([]);
   const [pubPlatforms, setPubPlatforms] = useState<string[]>([]);
   const [planIsPro, setPlanIsPro] = useState(false);
+
+  // Restore onboarding state if returning from OAuth
+  useEffect(() => {
+    const pending = localStorage.getItem("onboarding_pending");
+    if (pending) {
+      localStorage.removeItem("onboarding_pending");
+      localStorage.removeItem("onboarding_step");
+      setStep(3);
+      loadEnabledPlatforms();
+    }
+  }, [user]);
 
   const [form, setForm] = useState({
     name: "",
@@ -188,6 +202,10 @@ export default function BusinessSetup() {
         if (error) throw error;
         businessId = data!.id;
       }
+
+      // Save onboarding state so we can return here after OAuth
+      localStorage.setItem("onboarding_pending", platformId);
+      localStorage.setItem("onboarding_step", "3");
 
       const platform = platformId === "instagram" ? "facebook" : platformId;
       const redirectUri = `${window.location.origin}/settings`;

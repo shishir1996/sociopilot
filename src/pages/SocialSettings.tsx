@@ -184,21 +184,29 @@ export default function SocialSettings() {
       toast({ title: "✅ Connected!", description: `${platform} connected as ${data?.account_name}` });
       if (bid || businessId) await fetchConnected(bid || businessId);
 
-      // Onboarding hand-off: if user has no active subscription / trial yet, show
-      // a brief animation then push them to plan selection BEFORE the dashboard.
-      try {
-        const { data: subRow } = await supabase
-          .from("subscriptions")
-          .select("status, is_trial, has_ever_subscribed")
-          .eq("user_id", user!.id)
-          .maybeSingle();
-        const needsPlan =
-          !subRow || (subRow.status !== "active" && !subRow.is_trial);
-        if (needsPlan) {
-          setOnboardingHandoff(true);
-          setTimeout(() => navigate("/pricing"), 3000);
-        }
-      } catch {}
+      // Onboarding return: check if we came from the onboarding flow
+      const onboardingPending = localStorage.getItem("onboarding_pending");
+      if (onboardingPending) {
+        localStorage.removeItem("onboarding_pending");
+        localStorage.removeItem("onboarding_step");
+        setOnboardingHandoff(true);
+        setTimeout(() => navigate("/setup"), 2000);
+      } else {
+        // Normal settings-page connection — check if user needs a plan
+        try {
+          const { data: subRow } = await supabase
+            .from("subscriptions")
+            .select("status, is_trial, has_ever_subscribed")
+            .eq("user_id", user!.id)
+            .maybeSingle();
+          const needsPlan =
+            !subRow || (subRow.status !== "active" && !subRow.is_trial);
+          if (needsPlan) {
+            setOnboardingHandoff(true);
+            setTimeout(() => navigate("/pricing"), 3000);
+          }
+        } catch {}
+      }
     } catch (err: any) {
       toast({ title: "Failed", description: err.message, variant: "destructive" });
     }
@@ -237,8 +245,8 @@ export default function SocialSettings() {
               <Check className="h-8 w-8 text-primary absolute inset-0 m-auto" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-foreground mb-1">Account connected 🎉</h2>
-              <p className="text-sm text-muted-foreground">Setting up your workspace — let's pick your plan next…</p>
+              <h2 className="text-2xl font-bold text-foreground mb-1">Connected ✓</h2>
+              <p className="text-sm text-muted-foreground">Returning to complete your setup…</p>
             </div>
           </div>
         </div>
