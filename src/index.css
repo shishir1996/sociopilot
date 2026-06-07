@@ -245,6 +245,245 @@
     animation: float-slow 8s ease-in-out infinite;
   }
 
+  /* ---- 3D Card Effects ---- */
+  .card-3d {
+    perspective: 1000px;
+  }
+  .card-3d-inner {
+    transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    transform-style: preserve-3d;
+  }
+  .card-3d:hover .card-3d-inner {
+    transform: rotateY(-3deg) rotateX(3deg) translateZ(6px);
+  }
+  .card-3d-static {
+    transform-style: preserve-3d;
+  }
+  .card-3d-float {
+    transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .card-3d-float:hover {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.25), 0 0 30px -5px rgba(99, 102, 241, 0.15);
+  }
+
+  /* ---- Animated Gradient Border ---- */
+  .gradient-border {
+    position: relative;
+    isolation: isolate;
+  }
+  .gradient-border::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: linear-gradient(135deg, #6366f1, #a855f7, #ec4899, #6366f1);
+    background-size: 300% 300%;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: border-rotate 4s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @keyframes border-rotate {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+
+  /* ---- Mesh Gradient Backgrounds ---- */
+  .mesh-gradient-1 {
+    background:
+      radial-gradient(ellipse 80% 50% at 0% 0%, hsla(265, 80%, 60%, 0.15) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 100% 100%, hsla(221, 83%, 53%, 0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 50% at 50% 50%, hsla(330, 80%, 55%, 0.08) 0%, transparent 50%);
+  }
+  .mesh-gradient-2 {
+    background:
+      radial-gradient(ellipse 70% 40% at 0% 100%, hsla(160, 84%, 39%, 0.1) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 50% at 100% 0%, hsla(263, 70%, 58%, 0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 50% at 50% 50%, hsla(221, 83%, 53%, 0.06) 0%, transparent 50%);
+  }
+  .mesh-gradient-dark {
+    background:
+      radial-gradient(ellipse 80% 40% at 0% 20%, hsla(265, 80%, 60%, 0.08) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 100% 80%, hsla(221, 83%, 53%, 0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 40% at 50% 0%, hsla(330, 80%, 55%, 0.04) 0%, transparent 50%);
+  }
+
+  /* ---- Animated Stat Pulse ---- */
+  .stat-glow {
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-glow::after {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    background: conic-gradient(from 0deg, transparent, hsla(var(--primary) / 0.3), transparent, hsla(var(--accent) / 0.3), transparent);
+    opacity: 0;
+    transition: opacity 0.6s ease;
+    pointer-events: none;
+    z-index: -1;
+  }
+  .stat-glow:hover::after {
+    opacity: 1;
+    animation: spin-glow 3s linear infinite;
+  }
+  @keyframes spin-glow {
+    to { transform: rotate(360deg); }
+  }
+
+  /* ---- Shimmer Loading ---- */
+  .shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+  .shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, hsla(0 0% 100% / 0.08), transparent);
+    transform: translateX(-100%);
+    animation: shimmer 2.5s infinite;
+  }
+  @keyframes shimmer {
+    to { transform: translateX(100%); }
+  }
+
+  /* ---- Floating Orbs ---- */
+  .orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(60px);
+    opacity: 0.4;
+    pointer-events: none;
+  }
+  .orb-1 {
+    width: 300px;
+    height: 300px;
+    background: hsla(265, 80%, 60%, 0.3);
+    animation: orb-float-1 12s ease-in-out infinite;
+  }
+  .orb-2 {
+    width: 200px;
+    height: 200px;
+    background: hsla(221, 83%, 53%, 0.25);
+    animation: orb-float-2 10s ease-in-out infinite;
+  }
+  .orb-3 {
+    width: 250px;
+    height: 250px;
+    background: hsla(330, 80%, 55%, 0.2);
+    animation: orb-float-3 14s ease-in-out infinite;
+  }
+  @keyframes orb-float-1 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(40px, -30px) scale(1.05); }
+    66% { transform: translate(-20px, 20px) scale(0.95); }
+  }
+  @keyframes orb-float-2 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(-30px, 20px) scale(0.95); }
+    66% { transform: translate(30px, -20px) scale(1.05); }
+  }
+  @keyframes orb-float-3 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(20px, 30px) scale(1.05); }
+    66% { transform: translate(-30px, -20px) scale(0.95); }
+  }
+
+  /* ---- Number Counter Animation ---- */
+  .num-counter {
+    display: inline-block;
+    transition: all 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* ---- Glass morphism premium ---- */
+  .glass-premium {
+    background: hsl(var(--background) / 0.5);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid hsl(var(--border) / 0.4);
+  }
+
+  /* ---- Gradient Text Animations ---- */
+  .gradient-text-anim {
+    background: linear-gradient(135deg, #6366f1, #a855f7, #ec4899, #f59e0b, #6366f1);
+    background-size: 300% 300%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: gradient-shift 6s ease-in-out infinite;
+  }
+  .gradient-text-blue {
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6, #6366f1);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .gradient-text-warm {
+    background: linear-gradient(135deg, #f59e0b, #ef4444, #ec4899);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .gradient-text-green {
+    background: linear-gradient(135deg, #10b981, #06b6d4, #3b82f6);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  @keyframes gradient-shift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+
+  /* ---- Card stacked depth ---- */
+  .card-stack-1 { z-index: 1; }
+  .card-stack-2 { z-index: 2; }
+  .card-stack-3 { z-index: 3; }
+
+  /* ---- Entrance stagger animations ---- */
+  .stagger-enter > * {
+    opacity: 0;
+    transform: translateY(20px);
+    animation: stagger-fade-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+  .stagger-enter > *:nth-child(1) { animation-delay: 0.05s; }
+  .stagger-enter > *:nth-child(2) { animation-delay: 0.1s; }
+  .stagger-enter > *:nth-child(3) { animation-delay: 0.15s; }
+  .stagger-enter > *:nth-child(4) { animation-delay: 0.2s; }
+  .stagger-enter > *:nth-child(5) { animation-delay: 0.25s; }
+  .stagger-enter > *:nth-child(6) { animation-delay: 0.3s; }
+  .stagger-enter > *:nth-child(7) { animation-delay: 0.35s; }
+  .stagger-enter > *:nth-child(8) { animation-delay: 0.4s; }
+  @keyframes stagger-fade-in {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ---- Counter Number Animation ---- */
+  @keyframes count-up {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ---- Scale pulse for badges ---- */
+  .badge-pulse {
+    animation: badge-pulse 2s ease-in-out infinite;
+  }
+  @keyframes badge-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 hsla(var(--primary) / 0.4); }
+    50% { box-shadow: 0 0 0 8px hsla(var(--primary) / 0); }
+  }
+
+  .dark .mesh-gradient-1,
+  .dark .mesh-gradient-2 {
+    opacity: 0.6;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .reveal, .reveal-scale, .reveal-left {
       opacity: 1 !important;
@@ -252,5 +491,12 @@
       transition: none !important;
     }
     .animate-float-slow { animation: none; }
+    .card-3d:hover .card-3d-inner { transform: none; }
+    .card-3d-float:hover { transform: none; }
+    .orb { animation: none !important; }
+    .stagger-enter > * { animation: none !important; opacity: 1 !important; transform: none !important; }
+    .gradient-text-anim { animation: none; }
+    .stat-glow::after { display: none; }
+    .gradient-border::before { animation: none; }
   }
 }
