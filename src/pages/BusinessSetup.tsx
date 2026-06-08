@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -108,10 +108,11 @@ function clampStep(v: number) {
 export default function BusinessSetup() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const [step, setStep] = useState(() => {
-    const saved = localStorage.getItem("onboarding_step");
-    return saved ? clampStep(parseInt(saved, 10)) : 0;
+    const urlStep = searchParams.get("step");
+    return urlStep ? clampStep(parseInt(urlStep, 10)) : 0;
   });
   const [loading, setLoading] = useState(false);
   const [enabledPlatforms, setEnabledPlatforms] = useState<string[]>([]);
@@ -122,7 +123,7 @@ export default function BusinessSetup() {
   const [planIsPro, setPlanIsPro] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState("free_trial");
 
-  // Load platform data whenever user becomes available (OAuth return + page refresh)
+  // Load platform data whenever user is available
   const loadEnabledPlatforms = async () => {
     if (!user) return;
     try {
@@ -156,12 +157,6 @@ export default function BusinessSetup() {
 
   useEffect(() => {
     if (!user) return;
-    const pending = localStorage.getItem("onboarding_pending");
-    if (pending) {
-      localStorage.removeItem("onboarding_pending");
-      localStorage.removeItem("onboarding_step");
-      setStep(3);
-    }
     loadEnabledPlatforms().catch(console.error);
   }, [user]);
 
@@ -315,9 +310,6 @@ export default function BusinessSetup() {
         if (error) throw error;
         businessId = data!.id;
       }
-
-      localStorage.setItem("onboarding_pending", platformId);
-      localStorage.setItem("onboarding_step", "3");
 
       const platform = platformId === "instagram" ? "facebook" : platformId;
       const redirectUri = `${window.location.origin}/settings`;

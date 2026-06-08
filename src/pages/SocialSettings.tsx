@@ -42,18 +42,20 @@ interface ConnectedAccount {
   pages?: LinkedInPage[];
 }
 
+type OauthStatus = "processing" | "saving" | "redirecting" | null;
+
 export default function SocialSettings() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const navTimer = useRef<ReturnType<typeof setTimeout>>();
   const [businessId, setBusinessId] = useState<string>("");
+  const [oauthStatus, setOauthStatus] = useState<OauthStatus>(null);
   const [connected, setConnected] = useState<ConnectedAccount[]>([]);
   const [enabledPlatforms, setEnabledPlatforms] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState<string | null>(null);
   const [limitDialogOpen, setLimitDialogOpen] = useState(false);
-  const [onboardingHandoff, setOnboardingHandoff] = useState(false);
   const planLimits = usePlanLimits(businessId);
 
   const platformLimit = planLimits.platformLimit;
@@ -69,13 +71,16 @@ export default function SocialSettings() {
     const code = params.get("code");
     const state = params.get("state");
     if (code && state) {
+      setOauthStatus("processing");
       try {
         const stateData = JSON.parse(atob(state));
         if (stateData.platform) {
           exchangeToken(stateData.platform, code, state, stateData.business_id);
           window.history.replaceState({}, "", window.location.pathname);
         }
-      } catch {}
+      } catch {
+        setOauthStatus(null);
+      }
     }
   }, []);
 
@@ -171,6 +176,7 @@ export default function SocialSettings() {
 
   const exchangeToken = async (platform: string, code: string, state: string, bid?: string) => {
     setConnecting(platform);
+    setOauthStatus("processing");
     try {
       const redirectUri = `${window.location.origin}/settings`;
       const { data, error } = await supabase.functions.invoke("social-oauth", {
@@ -186,33 +192,27 @@ export default function SocialSettings() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       toast({ title: "✅ Connected!", description: `${platform} connected as ${data?.account_name}` });
+      setOauthStatus("saving");
       if (bid || businessId) await fetchConnected(bid || businessId);
 
-      // Onboarding return: check if we came from the onboarding flow
-      const onboardingPending = localStorage.getItem("onboarding_pending");
-      if (onboardingPending) {
-        // NB: do NOT clear localStorage flags here — BusinessSetup reads them
-        // on mount to resume the correct onboarding step.
-        setOnboardingHandoff(true);
-        navTimer.current = setTimeout(() => navigate("/setup"), 2000);
+      // Detect user state: no business → onboarding, has business → active
+      const { data: existingBiz } = await supabase
+        .from("businesses")
+        .select("id")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+
+      if (!existingBiz) {
+        // User is in onboarding — redirect to continue
+        setOauthStatus("redirecting");
+        navTimer.current = setTimeout(() => navigate("/setup?step=4"), 1500);
       } else {
-        // Normal settings-page connection — check if user needs a plan
-        try {
-          const { data: subRow } = await supabase
-            .from("subscriptions")
-            .select("status, is_trial, has_ever_subscribed")
-            .eq("user_id", user!.id)
-            .maybeSingle();
-          const needsPlan =
-            !subRow || (subRow.status !== "active" && !subRow.is_trial);
-          if (needsPlan) {
-            setOnboardingHandoff(true);
-            navTimer.current = setTimeout(() => navigate("/pricing"), 3000);
-          }
-        } catch {}
+        // Active user — done, clear overlay
+        setOauthStatus(null);
       }
     } catch (err: any) {
       toast({ title: "Failed", description: err.message, variant: "destructive" });
+      setOauthStatus(null);
     }
     setConnecting(null);
   };
@@ -241,16 +241,24 @@ export default function SocialSettings() {
 
   return (
     <div className="min-h-screen bg-background">
-      {onboardingHandoff && (
+      {oauthStatus && (
         <div className="fixed inset-0 z-[100] grid place-items-center bg-background/95 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="flex flex-col items-center gap-5 text-center px-6">
             <div className="relative">
-              <div className="h-20 w-20 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
-              <Check className="h-8 w-8 text-primary absolute inset-0 m-auto" />
+              <div className="h-16 w-16 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+              {oauthStatus === "redirecting" && <Check className="h-7 w-7 text-emerald-400 absolute inset-0 m-auto" />}
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-foreground mb-1">Connected ✓</h2>
-              <p className="text-sm text-muted-foreground">Returning to complete your setup…</p>
+              <h3 className="text-xl font-bold text-foreground mb-1">
+                {oauthStatus === "processing" && "Processing Connection..."}
+                {oauthStatus === "saving" && "Saving Account..."}
+                {oauthStatus === "redirecting" && "Connected ✓"}
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                {oauthStatus === "processing" && "Securely connecting your account..."}
+                {oauthStatus === "saving" && "Storing your connection details..."}
+                {oauthStatus === "redirecting" && "Taking you to continue setup..."}
+              </p>
             </div>
           </div>
         </div>
