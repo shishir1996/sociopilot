@@ -92,7 +92,7 @@ export default function SetupConnect() {
       )}
 
       {connectedAccounts
-        .filter((a: any) => a.platform === "linkedin" && a.pages?.length > 0)
+        .filter((a: any) => a.platform === "linkedin" && Array.isArray(a.pages) && a.pages.length > 0)
         .map((acc: any) => (
           <div key={acc.id} className="rounded-xl bg-gradient-to-r from-sky-500/5 to-blue-500/5 border border-sky-500/20 p-4 space-y-2">
             <div className="flex items-center gap-2 text-sm text-foreground/80 font-medium">

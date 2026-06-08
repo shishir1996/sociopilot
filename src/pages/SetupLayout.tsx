@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { Outlet, useNavigate, useParams, useLocation } from "react-router-dom";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { OnboardingProvider, useOnboarding } from "@/contexts/OnboardingContext";
 import { CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight, Loader2, Sparkles, Check, Building2, Target, Palette, Share2, Zap, Send } from "lucide-react";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 const STEP_ROUTES = ["business", "goals", "products", "connect", "plan", "publish"];
 const TOTAL_STEPS = STEP_ROUTES.length;
@@ -197,8 +198,10 @@ function SetupContent() {
 
 export default function SetupLayout() {
   return (
-    <OnboardingProvider>
-      <SetupContent />
-    </OnboardingProvider>
+    <ErrorBoundary>
+      <OnboardingProvider>
+        <SetupContent />
+      </OnboardingProvider>
+    </ErrorBoundary>
   );
 }
