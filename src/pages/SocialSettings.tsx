@@ -187,8 +187,8 @@ export default function SocialSettings() {
       // Onboarding return: check if we came from the onboarding flow
       const onboardingPending = localStorage.getItem("onboarding_pending");
       if (onboardingPending) {
-        localStorage.removeItem("onboarding_pending");
-        localStorage.removeItem("onboarding_step");
+        // NB: do NOT clear localStorage flags here — BusinessSetup reads them
+        // on mount to resume the correct onboarding step.
         setOnboardingHandoff(true);
         setTimeout(() => navigate("/setup"), 2000);
       } else {
