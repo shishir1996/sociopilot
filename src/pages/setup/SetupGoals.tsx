@@ -1,4 +1,4 @@
-import { Target } from "lucide-react";
+
 import { Label } from "@/components/ui/label";
 import { useOnboarding } from "@/contexts/OnboardingContext";
 
@@ -12,7 +12,7 @@ export default function SetupGoals() {
     <div className="space-y-6 stagger-enter">
       <div className="text-center">
         <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/20 to-cyan-600/20 flex items-center justify-center mx-auto mb-3 gradient-border">
-          <Target className="h-7 w-7 text-blue-400" />
+          <span className="text-2xl text-blue-400">🎯</span>
         </div>
         <h3 className="text-xl font-bold text-foreground">Goals & Brand Tone</h3>
         <p className="text-sm text-muted-foreground mt-1">Define your marketing objectives</p>

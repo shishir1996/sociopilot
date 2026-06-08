@@ -1,10 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { OnboardingProvider, useOnboarding } from "@/contexts/OnboardingContext";
 import { CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ArrowRight, Loader2, Sparkles, Check, Building2, Target, Palette, Share2, Zap, Send } from "lucide-react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
 const STEP_ROUTES = ["business", "goals", "products", "connect", "plan", "publish"];
@@ -19,14 +17,8 @@ function pathFromStep(step: number) {
   return STEP_ROUTES[Math.min(step, TOTAL_STEPS - 1)];
 }
 
-const stepLabels = [
-  { icon: Building2, label: "Business" },
-  { icon: Target, label: "Goals & Tone" },
-  { icon: Palette, label: "Product Info" },
-  { icon: Share2, label: "Connect" },
-  { icon: Zap, label: "Choose Plan" },
-  { icon: Send, label: "Publishing" },
-];
+const STEP_ICONS = ["🏢", "🎯", "🎨", "🔗", "⚡", "📤"];
+const stepLabels = ["Business", "Goals & Tone", "Product Info", "Connect", "Choose Plan", "Publishing"];
 
 function FloatingParticles({ count = 15 }: { count?: number }) {
   const particles = Array.from({ length: count }, (_, i) => ({
@@ -97,7 +89,7 @@ function SetupContent() {
       <div className="relative z-10 w-full max-w-xl">
         <div className="text-center mb-6">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-premium border-purple-500/20 text-xs font-medium text-purple-300 mb-4 shadow-lg shadow-purple-500/5">
-            <Sparkles className="h-3.5 w-3.5" />
+            <span>✨</span>
             Step {currentStep + 1} of {TOTAL_STEPS}
           </div>
           <h1 className="text-3xl font-extrabold text-foreground tracking-tight">
@@ -111,8 +103,7 @@ function SetupContent() {
         </div>
 
         <div className="flex items-center justify-between mb-6 px-1">
-          {stepLabels.map((s, i) => {
-            const Icon = s.icon;
+          {stepLabels.map((label, i) => {
             const isComplete = i < currentStep;
             const isActive = i === currentStep;
             return (
@@ -126,12 +117,12 @@ function SetupContent() {
                       : "bg-white/5 text-muted-foreground/40 border border-white/10"
                   }`}
                 >
-                  {isComplete ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
+                  {isComplete ? <span className="text-green-300">✓</span> : <span>{STEP_ICONS[i]}</span>}
                 </div>
                 <span className={`text-[10px] font-medium transition-colors duration-300 ${
                   isComplete || isActive ? "text-purple-400" : "text-muted-foreground/40"
                 }`}>
-                  {s.label}
+                  {label}
                 </span>
               </div>
             );
@@ -158,7 +149,7 @@ function SetupContent() {
                   disabled={currentStep === 0}
                   className="gap-2 border-white/10 bg-white/5 hover:bg-white/10 text-foreground/70 hover:text-foreground transition-all"
                 >
-                  <ArrowLeft className="h-4 w-4" /> Back
+                  <span>◀</span> Back
                 </Button>
 
                 {currentStep < TOTAL_STEPS - 1 ? (
@@ -167,7 +158,7 @@ function SetupContent() {
                     disabled={!canProceed()}
                     className="gap-2 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all duration-300 btn-shine"
                   >
-                    Next <ArrowRight className="h-4 w-4" />
+                    Next <span>▶</span>
                   </Button>
                 ) : (
                   <Button
@@ -176,9 +167,9 @@ function SetupContent() {
                     className="gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all duration-300 btn-shine"
                   >
                     {loading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>⏳</span>
                     ) : (
-                      <Sparkles className="h-4 w-4" />
+                      <span>✨</span>
                     )}
                     {loading ? "Creating..." : "Finish Setup"}
                   </Button>

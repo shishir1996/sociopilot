@@ -1,4 +1,4 @@
-import { Building2, Globe } from "lucide-react";
+
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useOnboarding } from "@/contexts/OnboardingContext";
@@ -22,7 +22,7 @@ export default function SetupBusiness() {
     <div className="space-y-5 stagger-enter">
       <div className="text-center">
         <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500/20 to-violet-600/20 flex items-center justify-center mx-auto mb-3 gradient-border">
-          <Building2 className="h-7 w-7 text-purple-400" />
+          <span className="text-2xl text-purple-400">🏢</span>
         </div>
         <h3 className="text-xl font-bold text-foreground">Business Details</h3>
         <p className="text-sm text-muted-foreground mt-1">Tell us about your company</p>
@@ -30,7 +30,7 @@ export default function SetupBusiness() {
       <div className="space-y-2">
         <Label className="text-sm font-medium text-foreground/80">Business Name *</Label>
         <div className="relative group">
-          <Building2 size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 group-focus-within:text-purple-400 transition-colors" />
+          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 group-focus-within:text-purple-400 transition-colors text-base">🏢</span>
           <Input
             value={form.name}
             onChange={(e) => updateField("name", e.target.value)}

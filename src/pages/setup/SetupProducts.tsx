@@ -1,4 +1,4 @@
-import { Palette, Globe } from "lucide-react";
+
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,7 +11,7 @@ export default function SetupProducts() {
     <div className="space-y-5 stagger-enter">
       <div className="text-center">
         <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-600/20 flex items-center justify-center mx-auto mb-3 gradient-border">
-          <Palette className="h-7 w-7 text-amber-400" />
+          <span className="text-2xl text-amber-400">🎨</span>
         </div>
         <h3 className="text-xl font-bold text-foreground">Product & Service Info</h3>
         <p className="text-sm text-muted-foreground mt-1">Help us understand what you offer</p>
@@ -39,7 +39,7 @@ export default function SetupProducts() {
       <div className="space-y-2">
         <Label className="text-sm font-medium text-foreground/80">Location (optional)</Label>
         <div className="relative group">
-          <Globe size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 group-focus-within:text-purple-400 transition-colors" />
+          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 group-focus-within:text-purple-400 transition-colors text-base">🌍</span>
           <Input
             value={form.location}
             onChange={(e) => updateField("location", e.target.value)}

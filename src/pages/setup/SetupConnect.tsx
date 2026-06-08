@@ -1,9 +1,5 @@
 import { useEffect } from "react";
 import { useOnboarding } from "@/contexts/OnboardingContext";
-import {
-  Share2, ArrowRight, Lock, Check, CheckCircle2,
-  Shield,
-} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const SOCIAL_PLATFORMS = [
@@ -28,7 +24,7 @@ export default function SetupConnect() {
     <div className="space-y-6 stagger-enter">
       <div className="text-center">
         <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-500/20 to-blue-600/20 flex items-center justify-center mx-auto mb-3 gradient-border">
-          <Share2 className="h-7 w-7 text-sky-400" />
+          <span className="text-2xl text-sky-400">🔗</span>
         </div>
         <h3 className="text-xl font-bold text-foreground">Connect Social Platforms</h3>
         <p className="text-sm text-muted-foreground mt-1">
@@ -63,19 +59,19 @@ export default function SetupConnect() {
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
                   alreadyConnected ? "bg-emerald-500/20 text-emerald-400" : "text-foreground/70"
                 }`}>
-                  {alreadyConnected ? <CheckCircle2 className="h-5 w-5" /> : <span className="text-lg">{platform.icon}</span>}
+                  {alreadyConnected ? <span className="text-emerald-400 text-lg">✓</span> : <span className="text-lg">{platform.icon}</span>}
                 </div>
                 <span className="text-sm font-medium">
                   {alreadyConnected ? `${platform.label} Connected` : `Connect ${platform.label}`}
                 </span>
                 {isAvailable && !alreadyConnected && (
-                  <ArrowRight className="h-4 w-4 ml-auto opacity-40 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                  <span className="ml-auto opacity-40 group-hover:opacity-100 group-hover:translate-x-1 transition-all text-xs">▶</span>
                 )}
                 {!isAvailable && !alreadyConnected && (
-                  <Lock className="h-4 w-4 ml-auto opacity-40" />
+                  <span className="ml-auto opacity-40 text-xs">🔒</span>
                 )}
                 {alreadyConnected && (
-                  <Check className="h-4 w-4 ml-auto text-emerald-400" />
+                  <span className="ml-auto text-emerald-400 text-xs">✓</span>
                 )}
               </div>
             </button>
@@ -85,7 +81,7 @@ export default function SetupConnect() {
 
       {connectedCount > 0 && (
         <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/20 px-4 py-3 text-sm text-emerald-400/90 flex items-center gap-2">
-          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          <span className="text-emerald-400 shrink-0">✓</span>
           {connectedCount} platform{connectedCount !== 1 ? "s" : ""} connected
         </div>
       )}
@@ -139,7 +135,7 @@ export default function SetupConnect() {
       )}
 
       <p className="text-xs text-center text-muted-foreground/60 flex items-center justify-center gap-1.5">
-        <Shield className="h-3.5 w-3.5" />
+        <span className="text-xs">🛡️</span>
         Secure OAuth — no passwords stored
       </p>
     </div>
