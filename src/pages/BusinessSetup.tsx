@@ -111,6 +111,7 @@ export default function BusinessSetup() {
   const [enabledPlatforms, setEnabledPlatforms] = useState<string[]>([]);
   const [connectedCount, setConnectedCount] = useState(0);
   const [connectedList, setConnectedList] = useState<string[]>([]);
+  const [connectedAccounts, setConnectedAccounts] = useState<any[]>([]);
   const [pubPlatforms, setPubPlatforms] = useState<string[]>([]);
   const [planIsPro, setPlanIsPro] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState("free_trial");
@@ -167,15 +168,36 @@ export default function BusinessSetup() {
       if (biz) {
         const { data: accts, count } = await supabase
           .from("social_accounts")
-          .select("platform", { count: "exact" })
+          .select("id, platform, pages, account_name, account_id", { count: "exact" })
           .eq("user_id", user.id)
           .eq("business_id", biz.id) as any;
         setConnectedCount(count || 0);
         setConnectedList((accts || []).map((a: any) => a.platform));
+        setConnectedAccounts(accts || []);
       }
       const { data: sub } = await supabase
         .from("subscriptions").select("plan_name").eq("user_id", user.id).maybeSingle() as any;
       setPlanIsPro((sub?.plan_name || "").toLowerCase() === "pro");
+    }
+  };
+
+  const toggleLinkedInPage = async (accountId: string, urn: string, enabled: boolean) => {
+    const nextAccounts = connectedAccounts.map((acc) => {
+      if (acc.id !== accountId) return acc;
+      const nextPages = (acc.pages || []).map((p: any) =>
+        p.urn === urn ? { ...p, enabled } : p
+      );
+      return { ...acc, pages: nextPages };
+    });
+    setConnectedAccounts(nextAccounts);
+    try {
+      const account = nextAccounts.find((a) => a.id === accountId);
+      await supabase.functions.invoke("social-oauth", {
+        body: { action: "update_linkedin_pages", social_account_id: accountId, pages: account?.pages || [] },
+      });
+    } catch (err: any) {
+      toast({ title: "Save failed", description: err.message, variant: "destructive" });
+      loadEnabledPlatforms();
     }
   };
 
@@ -518,6 +540,50 @@ export default function BusinessSetup() {
           {connectedCount} platform{connectedCount !== 1 ? "s" : ""} connected
         </div>
       )}
+
+      {/* LinkedIn page selector — pick which pages to publish to */}
+      {connectedAccounts
+        .filter((a) => a.platform === "linkedin" && a.pages?.length > 0)
+        .map((acc) => (
+          <div key={acc.id} className="rounded-xl bg-gradient-to-r from-sky-500/5 to-blue-500/5 border border-sky-500/20 p-4 space-y-2">
+            <div className="flex items-center gap-2 text-sm text-foreground/80 font-medium">
+              <Linkedin className="h-4 w-4 text-sky-400" />
+              Publish destinations for LinkedIn
+            </div>
+            <p className="text-[11px] text-muted-foreground/60">
+              Choose where your content will be published:
+            </p>
+            <div className="space-y-1.5">
+              {acc.pages.map((pg: any) => (
+                <div
+                  key={pg.urn}
+                  className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-background/40 border border-border/40"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-sm">{pg.type === "organization" ? "🏢" : "👤"}</span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium truncate text-foreground/80">{pg.name}</p>
+                      <p className="text-[10px] text-muted-foreground/50 capitalize">{pg.type}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toggleLinkedInPage(acc.id, pg.urn, !pg.enabled)}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+                      pg.enabled !== false ? "bg-emerald-500" : "bg-white/10"
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-lg ring-0 transition-transform duration-200 ${
+                        pg.enabled !== false ? "translate-x-4" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
 
       {enabledPlatforms.length === 0 && (
         <div className="rounded-xl bg-gradient-to-r from-amber-500/10 to-orange-500/5 border border-amber-500/20 px-4 py-3 text-xs text-foreground/70">
