@@ -1,15 +1,15 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useOnboarding } from "@/contexts/OnboardingContext";
 import {
   Share2, ArrowRight, Lock, Check, CheckCircle2,
-  Facebook, Instagram, Linkedin, Shield, Loader2, Sparkles,
+  Shield,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const SOCIAL_PLATFORMS = [
-  { id: "linkedin", label: "LinkedIn", icon: Linkedin, color: "from-sky-500/20 to-blue-600/20 border-sky-500/30 hover:border-sky-400/50" },
-  { id: "instagram", label: "Instagram", icon: Instagram, color: "from-pink-500/20 to-rose-600/20 border-pink-500/30 hover:border-pink-400/50" },
-  { id: "facebook", label: "Facebook", icon: Facebook, color: "from-blue-500/20 to-indigo-600/20 border-blue-500/30 hover:border-blue-400/50" },
+  { id: "linkedin", label: "LinkedIn", icon: "💼", color: "from-sky-500/20 to-blue-600/20 border-sky-500/30 hover:border-sky-400/50" },
+  { id: "instagram", label: "Instagram", icon: "📸", color: "from-pink-500/20 to-rose-600/20 border-pink-500/30 hover:border-pink-400/50" },
+  { id: "facebook", label: "Facebook", icon: "📘", color: "from-blue-500/20 to-indigo-600/20 border-blue-500/30 hover:border-blue-400/50" },
 ];
 
 export default function SetupConnect() {
@@ -38,7 +38,6 @@ export default function SetupConnect() {
 
       <div className="space-y-3">
         {SOCIAL_PLATFORMS.map((platform) => {
-          const Icon = platform.icon;
           const oauthKey = platform.id === "instagram" ? "facebook" : platform.id;
           const isAvailable = enabledPlatforms.includes(oauthKey);
           const alreadyConnected = connectedList.includes(platform.id) || connectedList.includes(oauthKey);
@@ -64,7 +63,7 @@ export default function SetupConnect() {
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
                   alreadyConnected ? "bg-emerald-500/20 text-emerald-400" : "text-foreground/70"
                 }`}>
-                  {alreadyConnected ? <CheckCircle2 className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
+                  {alreadyConnected ? <CheckCircle2 className="h-5 w-5" /> : <span className="text-lg">{platform.icon}</span>}
                 </div>
                 <span className="text-sm font-medium">
                   {alreadyConnected ? `${platform.label} Connected` : `Connect ${platform.label}`}
@@ -96,7 +95,7 @@ export default function SetupConnect() {
         .map((acc: any) => (
           <div key={acc.id} className="rounded-xl bg-gradient-to-r from-sky-500/5 to-blue-500/5 border border-sky-500/20 p-4 space-y-2">
             <div className="flex items-center gap-2 text-sm text-foreground/80 font-medium">
-              <Linkedin className="h-4 w-4 text-sky-400" />
+              <span className="text-base">💼</span>
               Publish destinations for LinkedIn
             </div>
             <p className="text-[11px] text-muted-foreground/60">
