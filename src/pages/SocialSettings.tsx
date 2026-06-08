@@ -62,7 +62,16 @@ export default function SocialSettings() {
   const reachedLimit = planLimits.platformsConnected >= platformLimit;
 
   useEffect(() => {
-    if (user) init();
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      console.error("Settings init timeout");
+      setLoading(false);
+    }, 10000);
+    init().finally(() => clearTimeout(timer));
+    return () => clearTimeout(timer);
   }, [user]);
 
   // Handle OAuth callback from redirect
@@ -88,17 +97,21 @@ export default function SocialSettings() {
   useEffect(() => () => { if (navTimer.current) clearTimeout(navTimer.current); }, []);
 
   const init = async () => {
-    const { data: bizData } = await supabase
-      .from("businesses")
-      .select("id")
-      .eq("user_id", user!.id)
-      .limit(1) as any;
-    const businesses = bizData;
+    try {
+      const { data: bizData } = await supabase
+        .from("businesses")
+        .select("id")
+        .eq("user_id", user!.id)
+        .limit(1) as any;
+      const businesses = bizData;
 
-    if (businesses && businesses.length > 0) {
-      const bid = businesses[0].id;
-      setBusinessId(bid);
-      await Promise.all([fetchConnected(bid), fetchEnabledPlatforms()]);
+      if (businesses && businesses.length > 0) {
+        const bid = businesses[0].id;
+        setBusinessId(bid);
+        await Promise.all([fetchConnected(bid), fetchEnabledPlatforms()]);
+      }
+    } catch (e) {
+      console.error("Settings init error:", e);
     }
     setLoading(false);
   };
@@ -195,14 +208,23 @@ export default function SocialSettings() {
       setOauthStatus("saving");
       if (bid || businessId) await fetchConnected(bid || businessId);
 
-      // Detect user state: no business → onboarding, has business → active
-      const { data: existingBiz } = await supabase
-        .from("businesses")
-        .select("id")
+      // Detect user state: check user_profiles or fallback to businesses
+      const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("onboarding_completed")
         .eq("user_id", user!.id)
         .maybeSingle();
 
-      if (!existingBiz) {
+      const onboarding = profile
+        ? !profile.onboarding_completed
+        : (await supabase
+            .from("businesses")
+            .select("id")
+            .eq("user_id", user!.id)
+            .limit(1)
+            .maybeSingle()).data === null;
+
+      if (onboarding) {
         // User is in onboarding — redirect to continue
         setOauthStatus("redirecting");
         navTimer.current = setTimeout(() => navigate("/setup?step=4"), 1500);

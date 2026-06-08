@@ -28,58 +28,68 @@ export function usePlanLimits(businessId?: string | null): PlanLimits {
     if (!user) return;
     setLoading(true);
 
-    const { data: sub } = await supabase
-      .from("subscriptions")
-      .select("plan_name, status")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    const plan = (sub?.plan_name as string) || "free_trial";
-    setPlanName(plan);
-
-    const { data: limits } = await supabase
-      .from("ai_plan_limits")
-      .select("product_limit, platform_limit")
-      .eq("plan_name", plan)
-      .maybeSingle() as any;
-
-    setProductLimit(limits?.product_limit ?? 1);
-    setPlatformLimit(limits?.platform_limit ?? 1);
-
-    let bid = businessId;
-    if (!bid) {
-      const { data: biz } = await supabase
-        .from("businesses")
-        .select("id")
+    try {
+      const { data: sub } = await supabase
+        .from("subscriptions")
+        .select("plan_name, status")
         .eq("user_id", user.id)
-        .limit(1) as any;
-      bid = biz?.[0]?.id || null;
-    }
+        .maybeSingle();
 
-    if (bid) {
-      const [{ count: prodCount }, { count: platCount }] = await Promise.all([
-        supabase
-          .from("brand_assets")
-          .select("id", { count: "exact", head: true })
-          .eq("business_id", bid)
-          .in("asset_type", ["product_image", "service_image"]),
-        supabase
-          .from("social_accounts")
-          .select("id", { count: "exact", head: true })
-          .eq("business_id", bid),
-      ]);
-      setProductsUsed(prodCount || 0);
-      setPlatformsConnected(platCount || 0);
-    } else {
-      setProductsUsed(0);
-      setPlatformsConnected(0);
-    }
+      const plan = (sub?.plan_name as string) || "free_trial";
+      setPlanName(plan);
 
+      const { data: limits } = await supabase
+        .from("ai_plan_limits")
+        .select("product_limit, platform_limit")
+        .eq("plan_name", plan)
+        .maybeSingle() as any;
+
+      setProductLimit(limits?.product_limit ?? 1);
+      setPlatformLimit(limits?.platform_limit ?? 1);
+
+      let bid = businessId;
+      if (!bid) {
+        const { data: biz } = await supabase
+          .from("businesses")
+          .select("id")
+          .eq("user_id", user.id)
+          .limit(1) as any;
+        bid = biz?.[0]?.id || null;
+      }
+
+      if (bid) {
+        const [{ count: prodCount }, { count: platCount }] = await Promise.all([
+          supabase
+            .from("brand_assets")
+            .select("id", { count: "exact", head: true })
+            .eq("business_id", bid)
+            .in("asset_type", ["product_image", "service_image"]),
+          supabase
+            .from("social_accounts")
+            .select("id", { count: "exact", head: true })
+            .eq("business_id", bid),
+        ]);
+        setProductsUsed(prodCount || 0);
+        setPlatformsConnected(platCount || 0);
+      } else {
+        setProductsUsed(0);
+        setPlatformsConnected(0);
+      }
+    } catch (e) {
+      console.error("usePlanLimits error:", e);
+    }
     setLoading(false);
   }, [user, businessId]);
 
   useEffect(() => {
-    load();
+    const timer = setTimeout(() => {
+      if (loading) {
+        console.error("usePlanLimits timeout");
+        setLoading(false);
+      }
+    }, 10000);
+    load().finally(() => clearTimeout(timer));
+    return () => clearTimeout(timer);
   }, [load]);
 
   return {
