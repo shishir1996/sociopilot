@@ -144,7 +144,7 @@ export default function Dashboard() {
             </div>
             <h2 className="text-xl font-bold gradient-text-blue">Set Up Your Business</h2>
             <p className="text-sm text-muted-foreground">Tell us about your business so we can create the perfect content strategy.</p>
-            <Button onClick={() => navigate("/setup")} className="w-full gradient-primary border-0 btn-shine">
+            <Button onClick={() => navigate("/setup/business")} className="w-full gradient-primary border-0 btn-shine">
               Get Started <Sparkles className="ml-2 h-4 w-4" />
             </Button>
           </CardContent>

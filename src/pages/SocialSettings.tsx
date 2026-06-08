@@ -227,7 +227,7 @@ export default function SocialSettings() {
       if (onboarding) {
         // User is in onboarding — redirect to continue
         setOauthStatus("redirecting");
-        navTimer.current = setTimeout(() => navigate("/setup?step=4"), 1500);
+        navTimer.current = setTimeout(() => navigate("/setup/connect"), 1500);
       } else {
         // Active user — done, clear overlay
         setOauthStatus(null);

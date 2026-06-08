@@ -39,7 +39,7 @@ export default function Index() {
         }
 
         if (needsOnboarding) {
-          navigate("/setup", { replace: true });
+          navigate("/setup/business", { replace: true });
           return;
         }
       } catch {

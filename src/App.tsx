@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,7 +7,13 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
-import BusinessSetup from "./pages/BusinessSetup";
+import SetupLayout from "./pages/SetupLayout";
+import SetupBusiness from "./pages/setup/SetupBusiness";
+import SetupGoals from "./pages/setup/SetupGoals";
+import SetupProducts from "./pages/setup/SetupProducts";
+import SetupConnect from "./pages/setup/SetupConnect";
+import SetupPlan from "./pages/setup/SetupPlan";
+import SetupPublish from "./pages/setup/SetupPublish";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminLoginPage from "./pages/AdminLoginPage";
 import AdminAnalytics from "./pages/AdminAnalytics";
@@ -55,7 +61,15 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/setup" element={<BusinessSetup key="setup" />} />
+            <Route path="/setup" element={<SetupLayout />}>
+              <Route index element={<Navigate to="business" replace />} />
+              <Route path="business" element={<SetupBusiness />} />
+              <Route path="goals" element={<SetupGoals />} />
+              <Route path="products" element={<SetupProducts />} />
+              <Route path="connect" element={<SetupConnect />} />
+              <Route path="plan" element={<SetupPlan />} />
+              <Route path="publish" element={<SetupPublish />} />
+            </Route>
             <Route path="/settings" element={<SocialSettings />} />
             <Route path="/account" element={<AccountSettings />} />
             <Route path="/brand-assets" element={<BrandAssets />} />
