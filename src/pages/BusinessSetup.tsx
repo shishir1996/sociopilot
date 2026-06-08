@@ -561,29 +561,28 @@ export default function BusinessSetup() {
             <div className="space-y-1.5">
               {acc.pages.map((pg: any) => (
                 <div
-                  key={pg.urn}
-                  className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-background/40 border border-border/40"
+                  key={pg.urn || pg.id}
+                  onClick={() => toggleLinkedInPage(acc.id, pg.urn, pg.enabled !== true)}
+                  className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-background/40 border border-border/40 cursor-pointer hover:bg-muted/30 transition-colors"
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-sm">{pg.type === "organization" ? "🏢" : "👤"}</span>
                     <div className="min-w-0">
-                      <p className="text-xs font-medium truncate text-foreground/80">{pg.name}</p>
-                      <p className="text-[10px] text-muted-foreground/50 capitalize">{pg.type}</p>
+                      <p className="text-xs font-medium truncate text-foreground/80">{pg.name || "Unknown"}</p>
+                      <p className="text-[10px] text-muted-foreground/50 capitalize">{pg.type || "page"}</p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => toggleLinkedInPage(acc.id, pg.urn, !pg.enabled)}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
-                      pg.enabled !== false ? "bg-emerald-500" : "bg-white/10"
+                  <div
+                    className={`relative h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 pointer-events-none ${
+                      pg.enabled === true ? "bg-emerald-500" : "bg-white/10"
                     }`}
                   >
                     <span
-                      className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-lg ring-0 transition-transform duration-200 ${
-                        pg.enabled !== false ? "translate-x-4" : "translate-x-0"
+                      className={`block h-4 w-4 rounded-full bg-white shadow-lg ring-0 transition-transform duration-200 ${
+                        pg.enabled === true ? "translate-x-4" : "translate-x-0"
                       }`}
                     />
-                  </button>
+                  </div>
                 </div>
               ))}
             </div>
