@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -46,6 +46,7 @@ export default function SocialSettings() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const navTimer = useRef<ReturnType<typeof setTimeout>>();
   const [businessId, setBusinessId] = useState<string>("");
   const [connected, setConnected] = useState<ConnectedAccount[]>([]);
   const [enabledPlatforms, setEnabledPlatforms] = useState<string[]>([]);
@@ -77,6 +78,9 @@ export default function SocialSettings() {
       } catch {}
     }
   }, []);
+
+  // Clear navigation timeouts on unmount
+  useEffect(() => () => { if (navTimer.current) clearTimeout(navTimer.current); }, []);
 
   const init = async () => {
     const { data: bizData } = await supabase
@@ -190,7 +194,7 @@ export default function SocialSettings() {
         // NB: do NOT clear localStorage flags here — BusinessSetup reads them
         // on mount to resume the correct onboarding step.
         setOnboardingHandoff(true);
-        setTimeout(() => navigate("/setup"), 2000);
+        navTimer.current = setTimeout(() => navigate("/setup"), 2000);
       } else {
         // Normal settings-page connection — check if user needs a plan
         try {
@@ -203,7 +207,7 @@ export default function SocialSettings() {
             !subRow || (subRow.status !== "active" && !subRow.is_trial);
           if (needsPlan) {
             setOnboardingHandoff(true);
-            setTimeout(() => navigate("/pricing"), 3000);
+            navTimer.current = setTimeout(() => navigate("/pricing"), 3000);
           }
         } catch {}
       }

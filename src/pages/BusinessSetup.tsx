@@ -99,13 +99,19 @@ function FloatingParticles({ count = 15 }: { count?: number }) {
   );
 }
 
+const TOTAL_STEPS = 6;
+
+function clampStep(v: number) {
+  return Number.isFinite(v) && v >= 0 && v < TOTAL_STEPS ? v : 0;
+}
+
 export default function BusinessSetup() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [step, setStep] = useState(() => {
     const saved = localStorage.getItem("onboarding_step");
-    return saved ? parseInt(saved) : 0;
+    return saved ? clampStep(parseInt(saved, 10)) : 0;
   });
   const [loading, setLoading] = useState(false);
   const [enabledPlatforms, setEnabledPlatforms] = useState<string[]>([]);
@@ -115,22 +121,49 @@ export default function BusinessSetup() {
   const [pubPlatforms, setPubPlatforms] = useState<string[]>([]);
   const [planIsPro, setPlanIsPro] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState("free_trial");
-  const [curStep, setCurStep] = useState(0);
 
-  // Restore onboarding state if returning from OAuth
+  // Load platform data whenever user becomes available (OAuth return + page refresh)
+  const loadEnabledPlatforms = async () => {
+    if (!user) return;
+    try {
+      const { data } = await supabase.functions.invoke("social-oauth", {
+        body: { action: "check_platforms" },
+      });
+      setEnabledPlatforms(data?.platforms || []);
+    } catch {
+      setEnabledPlatforms([]);
+    }
+    try {
+      const { data: biz } = await supabase
+        .from("businesses").select("id").eq("user_id", user.id).maybeSingle();
+      if (biz) {
+        const { data: accts, count } = await supabase
+          .from("social_accounts")
+          .select("id, platform, pages, account_name, account_id", { count: "exact" })
+          .eq("user_id", user.id)
+          .eq("business_id", biz.id) as any;
+        setConnectedCount(count || 0);
+        setConnectedList((accts || []).map((a: any) => a.platform));
+        setConnectedAccounts(accts || []);
+      }
+      const { data: sub } = await supabase
+        .from("subscriptions").select("plan_name").eq("user_id", user.id).maybeSingle() as any;
+      setPlanIsPro((sub?.plan_name || "").toLowerCase() === "pro");
+    } catch {
+      // Silently handled — data stays as-is
+    }
+  };
+
   useEffect(() => {
+    if (!user) return;
     const pending = localStorage.getItem("onboarding_pending");
     if (pending) {
       localStorage.removeItem("onboarding_pending");
       localStorage.removeItem("onboarding_step");
       setStep(3);
-      loadEnabledPlatforms();
     }
+    loadEnabledPlatforms();
   }, [user]);
-
-  useEffect(() => {
-    setCurStep(step);
-  }, [step]);
 
   const [form, setForm] = useState({
     name: "",
@@ -151,34 +184,6 @@ export default function BusinessSetup() {
       ...p,
       goals: p.goals.includes(goal) ? p.goals.filter((g) => g !== goal) : [...p.goals, goal],
     }));
-  };
-
-  const loadEnabledPlatforms = async () => {
-    try {
-      const { data } = await supabase.functions.invoke("social-oauth", {
-        body: { action: "check_platforms" },
-      });
-      setEnabledPlatforms(data?.platforms || []);
-    } catch {
-      setEnabledPlatforms([]);
-    }
-    if (user) {
-      const { data: biz } = await supabase
-        .from("businesses").select("id").eq("user_id", user.id).maybeSingle();
-      if (biz) {
-        const { data: accts, count } = await supabase
-          .from("social_accounts")
-          .select("id, platform, pages, account_name, account_id", { count: "exact" })
-          .eq("user_id", user.id)
-          .eq("business_id", biz.id) as any;
-        setConnectedCount(count || 0);
-        setConnectedList((accts || []).map((a: any) => a.platform));
-        setConnectedAccounts(accts || []);
-      }
-      const { data: sub } = await supabase
-        .from("subscriptions").select("plan_name").eq("user_id", user.id).maybeSingle() as any;
-      setPlanIsPro((sub?.plan_name || "").toLowerCase() === "pro");
-    }
   };
 
   const toggleLinkedInPage = async (accountId: string, urn: string, enabled: boolean) => {
@@ -730,6 +735,14 @@ export default function BusinessSetup() {
       )}
     </div>,
   ];
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black">
+        <Loader2 className="h-8 w-8 animate-spin text-purple-400" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">

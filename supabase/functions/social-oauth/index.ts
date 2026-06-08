@@ -215,6 +215,22 @@ Deno.serve(async (req) => {
       case "get_oauth_url": {
         const { platform, redirect_uri, business_id } = body;
 
+        // Validate business_id ownership
+        if (business_id) {
+          const { data: biz } = await supabaseAdmin
+            .from("businesses")
+            .select("id")
+            .eq("id", business_id)
+            .eq("user_id", user.id)
+            .maybeSingle();
+          if (!biz) {
+            return new Response(JSON.stringify({ error: "Invalid business_id" }), {
+              status: 403,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+        }
+
         // Get admin credentials (Instagram shares Facebook credentials)
         const { data: config } = await supabaseAdmin
           .from("ai_provider_settings")
@@ -240,7 +256,16 @@ Deno.serve(async (req) => {
         }
 
         const clientId = creds.app_id || creds.client_id || creds.api_key || "";
-        const state = btoa(JSON.stringify({ user_id: user.id, platform, business_id, redirect_uri }));
+        const rawState = { user_id: user.id, platform, business_id, redirect_uri };
+        const state = btoa(JSON.stringify(rawState));
+
+        // Store state hash in oauth_state table for CSRF validation
+        await supabaseAdmin.from("oauth_state").insert({
+          user_id: user.id,
+          platform,
+          business_id: business_id || null,
+          state_hash: state,
+        });
 
         let authUrl: string;
         if (platform === "x_twitter") {
@@ -304,6 +329,49 @@ Deno.serve(async (req) => {
 
       case "exchange_token": {
         const { platform, code, redirect_uri, state: stateStr, business_id } = body;
+
+        // Validate state parameter against oauth_state table (CSRF protection)
+        if (stateStr) {
+          const { data: storedState } = await supabaseAdmin
+            .from("oauth_state")
+            .select("id, user_id, business_id")
+            .eq("state_hash", stateStr)
+            .is("consumed_at", null)
+            .maybeSingle();
+
+          if (!storedState) {
+            return new Response(JSON.stringify({ error: "Invalid or expired state parameter" }), {
+              status: 403,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+
+          // Mark state as consumed (one-time use)
+          await supabaseAdmin
+            .from("oauth_state")
+            .update({ consumed_at: new Date().toISOString() })
+            .eq("id", storedState.id);
+        }
+
+        // Validate business_id ownership
+        const effectiveBizId = business_id || (stateStr ? (() => {
+          try { return JSON.parse(atob(stateStr)).business_id; } catch { return null; }
+        })() : null);
+
+        if (effectiveBizId) {
+          const { data: biz } = await supabaseAdmin
+            .from("businesses")
+            .select("id")
+            .eq("id", effectiveBizId)
+            .eq("user_id", user.id)
+            .maybeSingle();
+          if (!biz) {
+            return new Response(JSON.stringify({ error: "Invalid business_id" }), {
+              status: 403,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+        }
 
         // Get admin credentials (Instagram shares Facebook credentials)
         const { data: config } = await supabaseAdmin
