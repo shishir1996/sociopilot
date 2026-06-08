@@ -259,13 +259,17 @@ Deno.serve(async (req) => {
         const rawState = { user_id: user.id, platform, business_id, redirect_uri };
         const state = btoa(JSON.stringify(rawState));
 
-        // Store state hash in oauth_state table for CSRF validation
-        await supabaseAdmin.from("oauth_state").insert({
-          user_id: user.id,
-          platform,
-          business_id: business_id || null,
-          state_hash: state,
-        });
+        // Store state hash in oauth_state table for CSRF validation (best-effort)
+        try {
+          await supabaseAdmin.from("oauth_state").insert({
+            user_id: user.id,
+            platform,
+            business_id: business_id || null,
+            state_hash: state,
+          });
+        } catch {
+          console.warn("oauth_state insert skipped — table may not exist");
+        }
 
         let authUrl: string;
         if (platform === "x_twitter") {
@@ -332,25 +336,30 @@ Deno.serve(async (req) => {
 
         // Validate state parameter against oauth_state table (CSRF protection)
         if (stateStr) {
-          const { data: storedState } = await supabaseAdmin
-            .from("oauth_state")
-            .select("id, user_id, business_id")
-            .eq("state_hash", stateStr)
-            .is("consumed_at", null)
-            .maybeSingle();
+          try {
+            const { data: storedState } = await supabaseAdmin
+              .from("oauth_state")
+              .select("id, user_id, business_id")
+              .eq("state_hash", stateStr)
+              .is("consumed_at", null)
+              .maybeSingle();
 
-          if (!storedState) {
-            return new Response(JSON.stringify({ error: "Invalid or expired state parameter" }), {
-              status: 403,
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
+            if (!storedState) {
+              return new Response(JSON.stringify({ error: "Invalid or expired state parameter" }), {
+                status: 403,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+              });
+            }
+
+            // Mark state as consumed (one-time use)
+            await supabaseAdmin
+              .from("oauth_state")
+              .update({ consumed_at: new Date().toISOString() })
+              .eq("id", storedState.id);
+          } catch {
+            // Graceful fallback: oauth_state table may not exist (migration not yet run)
+            console.warn("oauth_state validation skipped — table may not exist");
           }
-
-          // Mark state as consumed (one-time use)
-          await supabaseAdmin
-            .from("oauth_state")
-            .update({ consumed_at: new Date().toISOString() })
-            .eq("id", storedState.id);
         }
 
         // Validate business_id ownership

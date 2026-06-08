@@ -55,7 +55,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/setup" element={<BusinessSetup />} />
+            <Route path="/setup" element={<BusinessSetup key="setup" />} />
             <Route path="/settings" element={<SocialSettings />} />
             <Route path="/account" element={<AccountSettings />} />
             <Route path="/brand-assets" element={<BrandAssets />} />

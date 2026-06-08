@@ -106,7 +106,7 @@ function clampStep(v: number) {
 }
 
 export default function BusinessSetup() {
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [step, setStep] = useState(() => {
@@ -162,7 +162,7 @@ export default function BusinessSetup() {
       localStorage.removeItem("onboarding_step");
       setStep(3);
     }
-    loadEnabledPlatforms();
+    loadEnabledPlatforms().catch(console.error);
   }, [user]);
 
   const [form, setForm] = useState({
@@ -734,14 +734,6 @@ export default function BusinessSetup() {
       )}
     </div>,
   ];
-
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-black">
-        <Loader2 className="h-8 w-8 animate-spin text-purple-400" />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
