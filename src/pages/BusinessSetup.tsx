@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, ArrowRight, Building2, Target, Palette, Share2,
   Loader2, Check, Sparkles, Facebook, Instagram, Linkedin, Lock, Send,
-  Crown, Zap,
+  Crown, Zap, Globe, CheckCircle2, Shield,
 } from "lucide-react";
 
 const INDUSTRIES = [
@@ -31,19 +31,21 @@ const TIMEZONES = [
 ];
 
 const SOCIAL_PLATFORMS = [
-  { id: "linkedin", label: "LinkedIn", icon: Linkedin, color: "bg-sky-500/10 text-sky-600 border-sky-200 hover:bg-sky-500/20" },
-  { id: "instagram", label: "Instagram", icon: Instagram, color: "bg-pink-500/10 text-pink-600 border-pink-200 hover:bg-pink-500/20" },
-  { id: "facebook", label: "Facebook", icon: Facebook, color: "bg-blue-500/10 text-blue-600 border-blue-200 hover:bg-blue-500/20" },
+  { id: "linkedin", label: "LinkedIn", icon: Linkedin, color: "from-sky-500/20 to-blue-600/20 border-sky-500/30 hover:border-sky-400/50" },
+  { id: "instagram", label: "Instagram", icon: Instagram, color: "from-pink-500/20 to-rose-600/20 border-pink-500/30 hover:border-pink-400/50" },
+  { id: "facebook", label: "Facebook", icon: Facebook, color: "from-blue-500/20 to-indigo-600/20 border-blue-500/30 hover:border-blue-400/50" },
 ];
 
 const PLANS = [
   {
     id: "free_trial",
     name: "Free Trial",
-    desc: "Try everything for 7 days",
+    desc: "7 days — no card required",
     icon: Zap,
-    features: ["7 posts/week", "1 platform/day", "1 weekly generation", "Basic AI", "Email support"],
-    color: "border-gray-300 dark:border-gray-600",
+    features: ["7 posts/week", "1 platform/day", "Weekly auto-generation", "Basic AI", "Email support"],
+    gradient: "from-emerald-500/20 to-teal-600/20",
+    border: "border-emerald-500/30",
+    iconBg: "bg-emerald-500/20 text-emerald-400",
   },
   {
     id: "basic",
@@ -51,7 +53,9 @@ const PLANS = [
     desc: "For individual creators",
     icon: Sparkles,
     features: ["7 posts/week", "1 platform/day", "Weekly auto-generation", "2 regenerations/week", "Standard images", "Email support"],
-    color: "border-blue-400 dark:border-blue-600",
+    gradient: "from-blue-500/20 to-cyan-600/20",
+    border: "border-blue-500/30",
+    iconBg: "bg-blue-500/20 text-blue-400",
   },
   {
     id: "pro",
@@ -59,9 +63,41 @@ const PLANS = [
     desc: "For growing businesses",
     icon: Crown,
     features: ["Up to 4 posts/day", "Multi-platform posting", "Weekly auto-generation", "20 regenerations/month", "Advanced tone control", "Custom prompts", "Premium images", "Priority support"],
-    color: "border-purple-400 dark:border-purple-500",
+    gradient: "from-purple-500/20 to-violet-600/20",
+    border: "border-purple-500/30",
+    iconBg: "bg-purple-500/20 text-purple-400",
   },
 ];
+
+/* ─── Floating Particles ─── */
+function FloatingParticles({ count = 15 }: { count?: number }) {
+  const particles = Array.from({ length: count }, (_, i) => ({
+    left: `${10 + ((i * 37) % 80)}%`,
+    top: `${5 + ((i * 53) % 85)}%`,
+    size: 1.5 + (i % 3),
+    delay: i * 0.7,
+    duration: 6 + (i % 6),
+    drift: (i % 20) - 10,
+  }));
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
+      {particles.map((p, i) => (
+        <div
+          key={i}
+          className="absolute rounded-full bg-purple-400/20"
+          style={{
+            left: p.left,
+            top: p.top,
+            width: p.size,
+            height: p.size,
+            animation: `orb-float-${(i % 3) + 1} ${p.duration}s ease-in-out ${p.delay}s infinite`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
 
 export default function BusinessSetup() {
   const { user } = useAuth();
@@ -78,6 +114,7 @@ export default function BusinessSetup() {
   const [pubPlatforms, setPubPlatforms] = useState<string[]>([]);
   const [planIsPro, setPlanIsPro] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState("free_trial");
+  const [curStep, setCurStep] = useState(0);
 
   // Restore onboarding state if returning from OAuth
   useEffect(() => {
@@ -89,6 +126,10 @@ export default function BusinessSetup() {
       loadEnabledPlatforms();
     }
   }, [user]);
+
+  useEffect(() => {
+    setCurStep(step);
+  }, [step]);
 
   const [form, setForm] = useState({
     name: "",
@@ -111,7 +152,6 @@ export default function BusinessSetup() {
     }));
   };
 
-  // Load admin-enabled platforms when reaching the connect step
   const loadEnabledPlatforms = async () => {
     try {
       const { data } = await supabase.functions.invoke("social-oauth", {
@@ -121,7 +161,6 @@ export default function BusinessSetup() {
     } catch {
       setEnabledPlatforms([]);
     }
-    // Also count platforms the user already connected (e.g. returning from OAuth)
     if (user) {
       const { data: biz } = await supabase
         .from("businesses").select("id").eq("user_id", user.id).maybeSingle();
@@ -147,7 +186,6 @@ export default function BusinessSetup() {
       });
       if (error) throw error;
       if (data?.short_url) {
-        // Payment required (not trial-eligible) → redirect to Account Settings
         navigate(`/account?plan=${plan}&from=onboarding`, { replace: true });
       }
       return data;
@@ -163,14 +201,16 @@ export default function BusinessSetup() {
       return;
     }
     if (!form.name.trim()) {
-      toast({ title: "Business name required", description: "Please go back and enter your business name.", variant: "destructive" });
+      toast({
+        title: "Business name required",
+        description: "Please go back and enter your business name.",
+        variant: "destructive",
+      });
       setStep(0);
       return;
     }
     setLoading(true);
-    console.log("[Onboarding] Submitting business setup", { user_id: user.id, name: form.name });
     try {
-      // Check if business already exists (idempotent)
       const { data: existing } = await supabase
         .from("businesses")
         .select("id")
@@ -208,23 +248,19 @@ export default function BusinessSetup() {
         if (error) throw error;
       }
 
-      // Create subscription for selected plan
       if (selectedPlan !== "free_trial") {
         await createSubscription(selectedPlan);
       }
 
-      console.log("[Onboarding] Saved successfully → navigating to /");
       toast({ title: "You're all set!", description: "Head to your dashboard to generate your first content." });
       navigate("/", { replace: true });
     } catch (error: any) {
-      console.error("[Onboarding] Save failed:", error);
       toast({ title: "Setup failed", description: error.message || "Please try again.", variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
 
-  // Save business first, then trigger OAuth connect
   const handleConnectPlatform = async (platformId: string) => {
     if (!user) return;
     if (!enabledPlatforms.includes(platformId === "instagram" ? "facebook" : platformId)) {
@@ -237,7 +273,6 @@ export default function BusinessSetup() {
     }
     setLoading(true);
     try {
-      // Persist business first so user_id + business_id exist
       let businessId: string | null = null;
       const { data: existing } = await supabase
         .from("businesses").select("id").eq("user_id", user.id).maybeSingle();
@@ -254,7 +289,6 @@ export default function BusinessSetup() {
         businessId = data!.id;
       }
 
-      // Save onboarding state so we can return here after OAuth
       localStorage.setItem("onboarding_pending", platformId);
       localStorage.setItem("onboarding_step", "3");
 
@@ -290,40 +324,401 @@ export default function BusinessSetup() {
     return true;
   };
 
+  const stepContent = [
+    /* Step 0 */
+    <div key="s0" className="space-y-5 stagger-enter">
+      <div className="text-center">
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500/20 to-violet-600/20 flex items-center justify-center mx-auto mb-3 gradient-border">
+          <Building2 className="h-7 w-7 text-purple-400" />
+        </div>
+        <h3 className="text-xl font-bold text-foreground">Business Details</h3>
+        <p className="text-sm text-muted-foreground mt-1">Tell us about your company</p>
+      </div>
+      <div className="space-y-2">
+        <Label className="text-sm font-medium text-foreground/80">Business Name *</Label>
+        <div className="relative group">
+          <Building2 size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 group-focus-within:text-purple-400 transition-colors" />
+          <Input
+            value={form.name}
+            onChange={(e) => updateField("name", e.target.value)}
+            placeholder="e.g. Acme Corp"
+            className="h-11 pl-10 bg-background/50 border-border/50 focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 transition-all"
+          />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label className="text-sm font-medium text-foreground/80">Industry</Label>
+        <select
+          value={form.industry}
+          onChange={(e) => updateField("industry", e.target.value)}
+          className="flex h-11 w-full rounded-xl border border-border/50 bg-background/50 px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/20 focus-visible:border-purple-500/50 transition-all"
+        >
+          <option value="">Select your industry</option>
+          {INDUSTRIES.map((ind) => (
+            <option key={ind} value={ind}>{ind}</option>
+          ))}
+        </select>
+      </div>
+      <div className="space-y-2">
+        <Label className="text-sm font-medium text-foreground/80">Target Audience</Label>
+        <Input
+          value={form.target_audience}
+          onChange={(e) => updateField("target_audience", e.target.value)}
+          placeholder="e.g. Small business owners, 25-45"
+          className="h-11 bg-background/50 border-border/50 focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 transition-all"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label className="text-sm font-medium text-foreground/80">Timezone *</Label>
+        <select
+          value={form.timezone}
+          onChange={(e) => updateField("timezone", e.target.value)}
+          className="flex h-11 w-full rounded-xl border border-border/50 bg-background/50 px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/20 focus-visible:border-purple-500/50 transition-all"
+        >
+          {TIMEZONES.map((tz) => (
+            <option key={tz} value={tz}>{tz.replace(/_/g, " ")}</option>
+          ))}
+        </select>
+      </div>
+    </div>,
+
+    /* Step 1 */
+    <div key="s1" className="space-y-6 stagger-enter">
+      <div className="text-center">
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/20 to-cyan-600/20 flex items-center justify-center mx-auto mb-3 gradient-border">
+          <Target className="h-7 w-7 text-blue-400" />
+        </div>
+        <h3 className="text-xl font-bold text-foreground">Goals & Brand Tone</h3>
+        <p className="text-sm text-muted-foreground mt-1">Define your marketing objectives</p>
+      </div>
+      <div className="space-y-2">
+        <Label className="text-sm font-medium text-foreground/80">What are your goals?</Label>
+        <div className="flex flex-wrap gap-2">
+          {GOALS.map((g) => (
+            <ChipToggle key={g} label={g} active={form.goals.includes(g)} onClick={() => toggleGoal(g)} />
+          ))}
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label className="text-sm font-medium text-foreground/80">Brand Tone</Label>
+        <div className="flex flex-wrap gap-2">
+          {TONES.map((t) => (
+            <ChipToggle key={t} label={t} active={form.brand_tone === t} onClick={() => updateField("brand_tone", form.brand_tone === t ? "" : t)} />
+          ))}
+        </div>
+      </div>
+    </div>,
+
+    /* Step 2 */
+    <div key="s2" className="space-y-5 stagger-enter">
+      <div className="text-center">
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-600/20 flex items-center justify-center mx-auto mb-3 gradient-border">
+          <Palette className="h-7 w-7 text-amber-400" />
+        </div>
+        <h3 className="text-xl font-bold text-foreground">Product & Service Info</h3>
+        <p className="text-sm text-muted-foreground mt-1">Help us understand what you offer</p>
+      </div>
+      <div className="space-y-2">
+        <Label className="text-sm font-medium text-foreground/80">What do you offer?</Label>
+        <Textarea
+          value={form.products_services}
+          onChange={(e) => updateField("products_services", e.target.value)}
+          placeholder="Describe your products or services..."
+          rows={3}
+          className="bg-background/50 border-border/50 focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 transition-all"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label className="text-sm font-medium text-foreground/80">Key Features / USP</Label>
+        <Textarea
+          value={form.main_offers}
+          onChange={(e) => updateField("main_offers", e.target.value)}
+          placeholder="What makes you unique?"
+          rows={2}
+          className="bg-background/50 border-border/50 focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 transition-all"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label className="text-sm font-medium text-foreground/80">Location (optional)</Label>
+        <div className="relative group">
+          <Globe size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 group-focus-within:text-purple-400 transition-colors" />
+          <Input
+            value={form.location}
+            onChange={(e) => updateField("location", e.target.value)}
+            placeholder="City, region, or global"
+            className="h-11 pl-10 bg-background/50 border-border/50 focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 transition-all"
+          />
+        </div>
+      </div>
+    </div>,
+
+    /* Step 3 */
+    <div key="s3" className="space-y-6 stagger-enter">
+      <div className="text-center">
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-500/20 to-blue-600/20 flex items-center justify-center mx-auto mb-3 gradient-border">
+          <Share2 className="h-7 w-7 text-sky-400" />
+        </div>
+        <h3 className="text-xl font-bold text-foreground">Connect Social Platforms</h3>
+        <p className="text-sm text-muted-foreground mt-1">
+          Publish content directly. You can skip and connect later.
+        </p>
+      </div>
+
+      <div className="space-y-3">
+        {SOCIAL_PLATFORMS.map((platform) => {
+          const Icon = platform.icon;
+          const oauthKey = platform.id === "instagram" ? "facebook" : platform.id;
+          const isAvailable = enabledPlatforms.includes(oauthKey);
+          const alreadyConnected = connectedList.includes(platform.id) || connectedList.includes(oauthKey);
+          return (
+            <button
+              key={platform.id}
+              onClick={() => isAvailable
+                ? handleConnectPlatform(platform.id)
+                : toast({
+                    title: "Not available yet",
+                    description: "Connect it later from your dashboard's Accounts page.",
+                  })}
+              disabled={loading || alreadyConnected}
+              className={`w-full relative group overflow-hidden rounded-xl border transition-all duration-300 card-3d-float ${
+                alreadyConnected
+                  ? "bg-gradient-to-r from-emerald-500/10 to-emerald-600/5 border-emerald-500/30 opacity-80"
+                  : isAvailable
+                    ? `bg-gradient-to-r ${platform.color}`
+                    : "bg-background/30 border-dashed border-border/50 opacity-60"
+              }`}
+            >
+              <div className="flex items-center gap-3 px-4 py-3.5">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                  alreadyConnected ? "bg-emerald-500/20 text-emerald-400" : "text-foreground/70"
+                }`}>
+                  {alreadyConnected ? <CheckCircle2 className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
+                </div>
+                <span className="text-sm font-medium">
+                  {alreadyConnected ? `${platform.label} Connected` : `Connect ${platform.label}`}
+                </span>
+                {isAvailable && !alreadyConnected && (
+                  <ArrowRight className="h-4 w-4 ml-auto opacity-40 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                )}
+                {!isAvailable && !alreadyConnected && (
+                  <Lock className="h-4 w-4 ml-auto opacity-40" />
+                )}
+                {alreadyConnected && (
+                  <Check className="h-4 w-4 ml-auto text-emerald-400" />
+                )}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {connectedCount > 0 && (
+        <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/20 px-4 py-3 text-sm text-emerald-400/90 flex items-center gap-2">
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          {connectedCount} platform{connectedCount !== 1 ? "s" : ""} connected
+        </div>
+      )}
+
+      {enabledPlatforms.length === 0 && (
+        <div className="rounded-xl bg-gradient-to-r from-amber-500/10 to-orange-500/5 border border-amber-500/20 px-4 py-3 text-xs text-foreground/70">
+          No platforms are enabled yet. You can <strong className="text-amber-400">Skip & Finish</strong> and connect later from your dashboard → <strong className="text-amber-400">Accounts</strong>.
+        </div>
+      )}
+
+      <p className="text-xs text-center text-muted-foreground/60 flex items-center justify-center gap-1.5">
+        <Shield className="h-3.5 w-3.5" />
+        Secure OAuth — no passwords stored
+      </p>
+    </div>,
+
+    /* Step 4 */
+    <div key="s4" className="space-y-5 stagger-enter">
+      <div className="text-center">
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500/20 to-violet-600/20 flex items-center justify-center mx-auto mb-3 gradient-border">
+          <Crown className="h-7 w-7 text-purple-400" />
+        </div>
+        <h3 className="text-xl font-bold text-foreground">Choose Your Plan</h3>
+        <p className="text-sm text-muted-foreground mt-1">Start free for 7 days — no credit card needed</p>
+      </div>
+
+      <div className="grid gap-3">
+        {PLANS.map((plan) => {
+          const Icon = plan.icon;
+          const isSelected = selectedPlan === plan.id;
+          return (
+            <button
+              key={plan.id}
+              type="button"
+              onClick={() => setSelectedPlan(plan.id)}
+              className={`relative text-left rounded-xl border-2 p-4 transition-all duration-300 card-3d-float ${
+                isSelected
+                  ? `bg-gradient-to-r ${plan.gradient} ${plan.border} shadow-lg`
+                  : "border-border/40 bg-background/30 hover:border-foreground/20 hover:bg-accent/20"
+              }`}
+            >
+              {isSelected && (
+                <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-lg">
+                  <Check className="h-3.5 w-3.5 text-white" />
+                </div>
+              )}
+              <div className="flex items-start gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${plan.iconBg} ${
+                  isSelected ? "shadow-md" : ""
+                }`}>
+                  <Icon className="h-5 w-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-foreground">{plan.name}</span>
+                    {plan.id === "pro" && (
+                      <span className="px-1.5 py-0.5 rounded-full bg-gradient-to-r from-purple-500/20 to-violet-500/20 text-[10px] font-semibold text-purple-400 border border-purple-500/30">
+                        Popular
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground/70 mt-0.5">{plan.desc}</p>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+                    {plan.features.map((f) => (
+                      <span key={f} className="text-[11px] text-muted-foreground/60 flex items-center gap-1">
+                        <Check className="h-3 w-3 text-emerald-500" /> {f}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {selectedPlan !== "free_trial" && (
+        <div className="rounded-xl bg-gradient-to-r from-purple-500/10 to-violet-500/5 border border-purple-500/20 px-4 py-3 text-sm text-foreground/80 flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-purple-400 shrink-0" />
+          You're eligible for a <strong className="text-purple-400 mx-1">7-day free trial</strong> of the {selectedPlan === "basic" ? "Basic" : "Pro"} plan.
+        </div>
+      )}
+    </div>,
+
+    /* Step 5 */
+    <div key="s5" className="space-y-5 stagger-enter">
+      <div className="text-center">
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-600/20 flex items-center justify-center mx-auto mb-3 gradient-border">
+          <Send className="h-7 w-7 text-emerald-400" />
+        </div>
+        <h3 className="text-xl font-bold text-foreground">Publishing Setup</h3>
+        <p className="text-sm text-muted-foreground mt-1">
+          {(planIsPro || selectedPlan === "pro")
+            ? "Choose one or more platforms for automated publishing."
+            : "Choose a platform. Upgrade to Pro for multi-platform."}
+        </p>
+      </div>
+
+      {connectedList.length === 0 ? (
+        <div className="rounded-xl bg-gradient-to-r from-amber-500/10 to-orange-500/5 border border-amber-500/20 px-5 py-6 text-center">
+          <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center mx-auto mb-3">
+            <Share2 className="h-6 w-6 text-amber-400" />
+          </div>
+          <p className="text-sm text-foreground/80 font-medium mb-1">No platforms connected yet</p>
+          <p className="text-xs text-muted-foreground/60">Go back to Connect step and link at least one platform.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-2">
+          {connectedList.map((p) => {
+            const selected = pubPlatforms.includes(p);
+            return (
+              <button
+                key={p}
+                type="button"
+                onClick={() => {
+                  if (planIsPro || selectedPlan === "pro") {
+                    setPubPlatforms((prev) =>
+                      prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]
+                    );
+                  } else {
+                    setPubPlatforms([p]);
+                  }
+                }}
+                className={`relative flex items-center justify-between px-4 py-3.5 rounded-xl border-2 transition-all duration-300 card-3d-float ${
+                  selected
+                    ? "border-emerald-500/50 bg-gradient-to-r from-emerald-500/10 to-teal-500/5 shadow-md"
+                    : "border-border/40 bg-background/30 hover:border-foreground/20 hover:bg-accent/20"
+                }`}
+              >
+                <span className="capitalize font-medium text-foreground/90">{p}</span>
+                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                  selected ? "border-emerald-500 bg-emerald-500" : "border-border/50"
+                }`}>
+                  {selected && <Check className="h-3.5 w-3.5 text-white" />}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {!(planIsPro || selectedPlan === "pro") && connectedList.length > 0 && (
+        <div className="rounded-xl bg-gradient-to-r from-blue-500/5 to-cyan-500/5 border border-blue-500/20 px-4 py-2.5 text-xs text-muted-foreground/70 flex items-center gap-2">
+          <Zap className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+          On Free/Basic, the selected platform is used for all scheduled posts.
+        </div>
+      )}
+    </div>,
+  ];
+
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-background to-primary/5">
-      <div className="w-full max-w-xl">
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background layers */}
+      <div className="fixed inset-0 mesh-gradient-dark" />
+      <div className="fixed inset-0 bg-grid opacity-[0.03]" />
+      <div className="fixed inset-0 bg-gradient-to-b from-purple-500/3 via-transparent to-blue-500/3" />
+
+      {/* Floating Orbs */}
+      <div className="fixed top-[15%] left-[10%] orb orb-1" />
+      <div className="fixed bottom-[20%] right-[15%] orb orb-2" />
+      <div className="fixed top-[50%] right-[25%] orb orb-3" />
+
+      <FloatingParticles count={20} />
+
+      <div className="relative z-10 w-full max-w-xl">
         {/* Header */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium mb-3">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-premium border-purple-500/20 text-xs font-medium text-purple-300 mb-4 shadow-lg shadow-purple-500/5">
             <Sparkles className="h-3.5 w-3.5" />
             Step {step + 1} of {TOTAL_STEPS}
           </div>
-          <h1 className="text-2xl font-bold text-foreground">Set up your business</h1>
-          <p className="text-sm text-muted-foreground mt-1">Takes less than 2 minutes</p>
+          <h1 className="text-3xl font-extrabold text-foreground tracking-tight">
+            <span className="gradient-text">Set up your business</span>
+          </h1>
+          <p className="text-sm text-muted-foreground/70 mt-1.5">Takes less than 2 minutes</p>
         </div>
 
         {/* Progress Bar */}
-        <Progress value={progress} className="h-2 mb-6" />
+        <div className="relative mb-6">
+          <Progress value={progress} className="h-2 bg-white/5 [&>div]:bg-gradient-to-r [&>div]:from-purple-500 [&>div]:to-violet-500" />
+        </div>
 
         {/* Step Indicators */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-6 px-1">
           {stepLabels.map((s, i) => {
             const Icon = s.icon;
+            const isComplete = i < step;
+            const isActive = i === step;
             return (
-              <div key={i} className="flex flex-col items-center gap-1">
+              <div key={i} className="flex flex-col items-center gap-1.5">
                 <div
-                  className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-medium transition-all ${
-                    i < step
-                      ? "bg-primary text-primary-foreground"
-                      : i === step
-                      ? "bg-primary text-primary-foreground ring-4 ring-primary/20"
-                      : "bg-muted text-muted-foreground"
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-medium transition-all duration-500 ${
+                    isComplete
+                      ? "bg-gradient-to-br from-purple-500 to-violet-600 text-white shadow-lg shadow-purple-500/30"
+                      : isActive
+                      ? "bg-gradient-to-br from-purple-500/20 to-violet-600/20 text-purple-400 border border-purple-500/40 shadow-lg shadow-purple-500/10"
+                      : "bg-white/5 text-muted-foreground/40 border border-white/10"
                   }`}
                 >
-                  {i < step ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
+                  {isComplete ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
                 </div>
-                <span className={`text-[10px] font-medium ${i <= step ? "text-primary" : "text-muted-foreground"}`}>
+                <span className={`text-[10px] font-medium transition-colors duration-300 ${
+                  isComplete || isActive ? "text-purple-400" : "text-muted-foreground/40"
+                }`}>
                   {s.label}
                 </span>
               </div>
@@ -331,328 +726,69 @@ export default function BusinessSetup() {
           })}
         </div>
 
-        {/* Card Content */}
-        <Card className="shadow-elevated border-border animate-fade-in">
-          <CardContent className="pt-6">
-            {/* Step 0: Business Details */}
-            {step === 0 && (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Business Name *</Label>
-                  <Input
-                    value={form.name}
-                    onChange={(e) => updateField("name", e.target.value)}
-                    placeholder="e.g. Acme Corp"
-                    className="h-11"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Industry</Label>
-                  <select
-                    value={form.industry}
-                    onChange={(e) => updateField("industry", e.target.value)}
-                    className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <option value="">Select your industry</option>
-                    {INDUSTRIES.map((ind) => (
-                      <option key={ind} value={ind}>{ind}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Target Audience</Label>
-                  <Input
-                    value={form.target_audience}
-                    onChange={(e) => updateField("target_audience", e.target.value)}
-                    placeholder="e.g. Small business owners, 25-45"
-                    className="h-11"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Timezone *</Label>
-                  <select
-                    value={form.timezone}
-                    onChange={(e) => updateField("timezone", e.target.value)}
-                    className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    {TIMEZONES.map((tz) => (
-                      <option key={tz} value={tz}>{tz.replace(/_/g, " ")}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            )}
-
-            {/* Step 1: Goals & Tone */}
-            {step === 1 && (
-              <div className="space-y-5">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">What are your goals?</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {GOALS.map((g) => (
-                      <ChipToggle key={g} label={g} active={form.goals.includes(g)} onClick={() => toggleGoal(g)} />
-                    ))}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Brand Tone</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {TONES.map((t) => (
-                      <ChipToggle key={t} label={t} active={form.brand_tone === t} onClick={() => updateField("brand_tone", form.brand_tone === t ? "" : t)} />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Step 2: Product / Service Info */}
-            {step === 2 && (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">What do you offer?</Label>
-                  <Textarea
-                    value={form.products_services}
-                    onChange={(e) => updateField("products_services", e.target.value)}
-                    placeholder="Describe your products or services..."
-                    rows={3}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Key Features / USP</Label>
-                  <Textarea
-                    value={form.main_offers}
-                    onChange={(e) => updateField("main_offers", e.target.value)}
-                    placeholder="What makes you unique?"
-                    rows={2}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Location (optional)</Label>
-                  <Input
-                    value={form.location}
-                    onChange={(e) => updateField("location", e.target.value)}
-                    placeholder="City, region, or global"
-                    className="h-11"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Step 3: Social Connection (Optional) */}
-            {step === 3 && (
-              <div className="space-y-5">
-                <div className="text-center">
-                  <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                    <Share2 className="h-7 w-7 text-primary" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-foreground">Connect your social accounts</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Publish content directly to your platforms. You can skip this and connect later.
-                  </p>
-                </div>
-
-                <div className="space-y-3">
-                  {SOCIAL_PLATFORMS.map((platform) => {
-                    const Icon = platform.icon;
-                    const oauthKey = platform.id === "instagram" ? "facebook" : platform.id;
-                    const isAvailable = enabledPlatforms.includes(oauthKey);
-                    return (
-                      <button
-                        key={platform.id}
-                        onClick={() => isAvailable
-                          ? handleConnectPlatform(platform.id)
-                          : toast({
-                              title: "Not available yet",
-                              description: "This platform isn't enabled yet. You can skip and finish — connect it later from your dashboard's Accounts page.",
-                            })}
-                        disabled={loading}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${
-                          isAvailable ? platform.color : "border-dashed border-border opacity-60 cursor-not-allowed"
-                        }`}
-                      >
-                        <Icon className="h-5 w-5" />
-                        <span className="text-sm font-medium">Connect {platform.label}</span>
-                        {isAvailable
-                          ? <ArrowRight className="h-4 w-4 ml-auto opacity-50" />
-                          : <Lock className="h-4 w-4 ml-auto opacity-50" />}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {enabledPlatforms.length === 0 && (
-                  <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-foreground">
-                    No platforms are enabled yet. You can <strong>Skip & Finish</strong> and connect them later from your dashboard → <strong>Accounts</strong>.
-                  </div>
-                )}
-
-                <p className="text-xs text-center text-muted-foreground">
-                  🔒 We use secure OAuth — no passwords stored
-                </p>
-              </div>
-            )}
-
-            {/* Step 4: Choose Your Plan */}
-            {step === 4 && (
-              <div className="space-y-5">
-                <div className="text-center">
-                  <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                    <Crown className="h-7 w-7 text-primary" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-foreground">Choose Your Plan</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Start free for 7 days. No credit card required.
-                  </p>
-                </div>
-
-                <div className="grid gap-3">
-                  {PLANS.map((plan) => {
-                    const Icon = plan.icon;
-                    const isSelected = selectedPlan === plan.id;
-                    return (
-                      <button
-                        key={plan.id}
-                        type="button"
-                        onClick={() => setSelectedPlan(plan.id)}
-                        className={`w-full text-left rounded-xl border-2 p-4 transition-all ${
-                          isSelected
-                            ? "border-primary bg-primary/5 shadow-sm"
-                            : "border-border hover:border-primary/40 hover:bg-accent/30"
-                        }`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                            isSelected
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted text-muted-foreground"
-                          }`}>
-                            <Icon className="h-5 w-5" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-foreground">{plan.name}</span>
-                              {isSelected && <Check className="h-4 w-4 text-primary" />}
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-0.5">{plan.desc}</p>
-                            <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-2">
-                              {plan.features.map((f) => (
-                                <span key={f} className="text-[11px] text-muted-foreground flex items-center gap-1">
-                                  <Check className="h-3 w-3 text-emerald-500" /> {f}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {selectedPlan !== "free_trial" && (
-                  <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 text-xs text-foreground">
-                    You're eligible for a <strong>7-day free trial</strong> of the {selectedPlan === "basic" ? "Basic" : "Pro"} plan.
-                    No payment needed now. Your trial starts when you finish setup.
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Step 5: Publishing Platform Selection */}
-            {step === 5 && (
-              <div className="space-y-4">
-                <div className="text-center">
-                  <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                    <Send className="h-7 w-7 text-primary" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-foreground">Publishing Platform Selection</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {planIsPro || selectedPlan === "pro"
-                      ? "Choose one or more platforms for automated publishing."
-                      : "Choose ONE platform for automated publishing. Upgrade to Pro to publish to multiple."}
-                  </p>
-                </div>
-
-                {connectedList.length === 0 ? (
-                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-foreground">
-                    Connect at least one platform in the previous step first.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 gap-2">
-                    {connectedList.map((p) => {
-                      const selected = pubPlatforms.includes(p);
-                      return (
-                        <button
-                          key={p}
-                          type="button"
-                          onClick={() => {
-                            if (planIsPro || selectedPlan === "pro") {
-                              setPubPlatforms((prev) =>
-                                prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]
-                              );
-                            } else {
-                              setPubPlatforms([p]);
-                            }
-                          }}
-                          className={`flex items-center justify-between px-4 py-3 rounded-xl border text-sm transition-all ${
-                            selected ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/40"
-                          }`}
-                        >
-                          <span className="capitalize font-medium">{p}</span>
-                          {selected && <Check className="h-4 w-4" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {!(planIsPro || selectedPlan === "pro") && (
-                  <p className="text-xs text-center text-muted-foreground">
-                    On Free/Basic, the same platform is auto-assigned to every scheduled day.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Navigation */}
-            <div className="flex justify-between mt-8 pt-4 border-t border-border">
-              <Button
-                variant="outline"
-                onClick={() => setStep((p) => p - 1)}
-                disabled={step === 0}
-                className="gap-2"
+        {/* Main Card */}
+        <div className="gradient-border rounded-2xl">
+          <div className="glass-premium rounded-2xl backdrop-blur-2xl relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-500 via-violet-500 to-indigo-500" />
+            <CardContent className="p-6 md:p-8">
+              {/* Step content with transition */}
+              <div
+                key={step}
+                style={{
+                  animation: "stagger-fade-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards",
+                }}
               >
-                <ArrowLeft className="h-4 w-4" /> Back
-              </Button>
+                {stepContent[step]}
+              </div>
 
-              {step < TOTAL_STEPS - 1 ? (
+              {/* Navigation */}
+              <div className="flex justify-between mt-8 pt-5 border-t border-white/5">
                 <Button
-                  onClick={() => {
-                    const next = step + 1;
-                    setStep(next);
-                    if (next === 3) loadEnabledPlatforms();
-                    if (next === 5) loadEnabledPlatforms();
-                  }}
-                  disabled={!canProceed()}
-                  className="gap-2"
+                  variant="outline"
+                  onClick={() => setStep((p) => p - 1)}
+                  disabled={step === 0}
+                  className="gap-2 border-white/10 bg-white/5 hover:bg-white/10 text-foreground/70 hover:text-foreground transition-all"
                 >
-                  Next <ArrowRight className="h-4 w-4" />
+                  <ArrowLeft className="h-4 w-4" /> Back
                 </Button>
-              ) : (
-                <div className="flex gap-2">
+
+                {step < TOTAL_STEPS - 1 ? (
+                  <Button
+                    onClick={() => {
+                      const next = step + 1;
+                      setStep(next);
+                      if (next === 3) loadEnabledPlatforms();
+                      if (next === 5) loadEnabledPlatforms();
+                    }}
+                    disabled={!canProceed()}
+                    className="gap-2 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all duration-300 btn-shine"
+                  >
+                    Next <ArrowRight className="h-4 w-4" />
+                  </Button>
+                ) : (
                   <Button
                     onClick={handleSubmit}
                     disabled={loading || pubPlatforms.length === 0}
-                    className="gap-2"
+                    className="gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all duration-300 btn-shine"
                     title={pubPlatforms.length === 0 ? "Pick at least one publishing platform" : undefined}
                   >
-                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    {loading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4" />
+                    )}
                     {loading ? "Creating..." : "Finish Setup"}
                   </Button>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                )}
+              </div>
+            </CardContent>
+          </div>
+        </div>
+
+        {/* Footer note */}
+        <p className="text-center text-xs text-muted-foreground/40 mt-6">
+          Your data is encrypted and secure
+        </p>
       </div>
     </div>
   );
@@ -663,10 +799,10 @@ function ChipToggle({ label, active, onClick }: { label: string; active: boolean
     <button
       type="button"
       onClick={onClick}
-      className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${
+      className={`px-3.5 py-1.5 rounded-full text-sm font-medium transition-all duration-200 border ${
         active
-          ? "bg-primary text-primary-foreground border-primary"
-          : "bg-muted text-muted-foreground border-transparent hover:bg-secondary"
+          ? "bg-purple-500/20 text-purple-300 border-purple-500/40 shadow-sm"
+          : "bg-white/5 text-muted-foreground/60 border-white/10 hover:bg-white/10 hover:text-foreground/80"
       }`}
     >
       {label}
