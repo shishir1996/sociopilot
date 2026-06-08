@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, ArrowRight, Building2, Target, Palette, Share2,
   Loader2, Check, Sparkles, Facebook, Instagram, Linkedin, Lock, Send,
+  Crown, Zap,
 } from "lucide-react";
 
 const INDUSTRIES = [
@@ -35,6 +36,33 @@ const SOCIAL_PLATFORMS = [
   { id: "facebook", label: "Facebook", icon: Facebook, color: "bg-blue-500/10 text-blue-600 border-blue-200 hover:bg-blue-500/20" },
 ];
 
+const PLANS = [
+  {
+    id: "free_trial",
+    name: "Free Trial",
+    desc: "Try everything for 7 days",
+    icon: Zap,
+    features: ["7 posts/week", "1 platform/day", "1 weekly generation", "Basic AI", "Email support"],
+    color: "border-gray-300 dark:border-gray-600",
+  },
+  {
+    id: "basic",
+    name: "Basic",
+    desc: "For individual creators",
+    icon: Sparkles,
+    features: ["7 posts/week", "1 platform/day", "Weekly auto-generation", "2 regenerations/week", "Standard images", "Email support"],
+    color: "border-blue-400 dark:border-blue-600",
+  },
+  {
+    id: "pro",
+    name: "Pro",
+    desc: "For growing businesses",
+    icon: Crown,
+    features: ["Up to 4 posts/day", "Multi-platform posting", "Weekly auto-generation", "20 regenerations/month", "Advanced tone control", "Custom prompts", "Premium images", "Priority support"],
+    color: "border-purple-400 dark:border-purple-500",
+  },
+];
+
 export default function BusinessSetup() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -49,6 +77,7 @@ export default function BusinessSetup() {
   const [connectedList, setConnectedList] = useState<string[]>([]);
   const [pubPlatforms, setPubPlatforms] = useState<string[]>([]);
   const [planIsPro, setPlanIsPro] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState("free_trial");
 
   // Restore onboarding state if returning from OAuth
   useEffect(() => {
@@ -111,6 +140,22 @@ export default function BusinessSetup() {
     }
   };
 
+  const createSubscription = async (plan: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke("razorpay-create-subscription", {
+        body: { plan_name: plan, billing_period: "monthly", region: "global" },
+      });
+      if (error) throw error;
+      if (data?.short_url) {
+        // Payment required (not trial-eligible) → redirect to Account Settings
+        navigate(`/account?plan=${plan}&from=onboarding`, { replace: true });
+      }
+      return data;
+    } catch (err: any) {
+      console.error("[Onboarding] Subscription creation failed:", err);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!user) {
       console.warn("[Onboarding] No user, redirecting to /auth");
@@ -162,8 +207,14 @@ export default function BusinessSetup() {
         } as any);
         if (error) throw error;
       }
+
+      // Create subscription for selected plan
+      if (selectedPlan !== "free_trial") {
+        await createSubscription(selectedPlan);
+      }
+
       console.log("[Onboarding] Saved successfully → navigating to /");
-      toast({ title: "🎉 You're all set!", description: "Head to your dashboard to generate your first content." });
+      toast({ title: "You're all set!", description: "Head to your dashboard to generate your first content." });
       navigate("/", { replace: true });
     } catch (error: any) {
       console.error("[Onboarding] Save failed:", error);
@@ -221,7 +272,7 @@ export default function BusinessSetup() {
     }
   };
 
-  const TOTAL_STEPS = 5;
+  const TOTAL_STEPS = 6;
   const progress = ((step + 1) / TOTAL_STEPS) * 100;
 
   const stepLabels = [
@@ -229,12 +280,13 @@ export default function BusinessSetup() {
     { icon: Target, label: "Goals & Tone" },
     { icon: Palette, label: "Product Info" },
     { icon: Share2, label: "Connect" },
+    { icon: Zap, label: "Choose Plan" },
     { icon: Send, label: "Publishing" },
   ];
 
   const canProceed = () => {
     if (step === 0) return form.name.trim() !== "";
-    if (step === 4) return pubPlatforms.length > 0;
+    if (step === 5) return pubPlatforms.length > 0;
     return true;
   };
 
@@ -440,8 +492,73 @@ export default function BusinessSetup() {
               </div>
             )}
 
-            {/* Step 4: Publishing Platform Selection */}
+            {/* Step 4: Choose Your Plan */}
             {step === 4 && (
+              <div className="space-y-5">
+                <div className="text-center">
+                  <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                    <Crown className="h-7 w-7 text-primary" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-foreground">Choose Your Plan</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Start free for 7 days. No credit card required.
+                  </p>
+                </div>
+
+                <div className="grid gap-3">
+                  {PLANS.map((plan) => {
+                    const Icon = plan.icon;
+                    const isSelected = selectedPlan === plan.id;
+                    return (
+                      <button
+                        key={plan.id}
+                        type="button"
+                        onClick={() => setSelectedPlan(plan.id)}
+                        className={`w-full text-left rounded-xl border-2 p-4 transition-all ${
+                          isSelected
+                            ? "border-primary bg-primary/5 shadow-sm"
+                            : "border-border hover:border-primary/40 hover:bg-accent/30"
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+                            isSelected
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-muted text-muted-foreground"
+                          }`}>
+                            <Icon className="h-5 w-5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-foreground">{plan.name}</span>
+                              {isSelected && <Check className="h-4 w-4 text-primary" />}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">{plan.desc}</p>
+                            <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-2">
+                              {plan.features.map((f) => (
+                                <span key={f} className="text-[11px] text-muted-foreground flex items-center gap-1">
+                                  <Check className="h-3 w-3 text-emerald-500" /> {f}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {selectedPlan !== "free_trial" && (
+                  <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 text-xs text-foreground">
+                    You're eligible for a <strong>7-day free trial</strong> of the {selectedPlan === "basic" ? "Basic" : "Pro"} plan.
+                    No payment needed now. Your trial starts when you finish setup.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Step 5: Publishing Platform Selection */}
+            {step === 5 && (
               <div className="space-y-4">
                 <div className="text-center">
                   <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
@@ -449,7 +566,7 @@ export default function BusinessSetup() {
                   </div>
                   <h3 className="text-lg font-semibold text-foreground">Publishing Platform Selection</h3>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {planIsPro
+                    {planIsPro || selectedPlan === "pro"
                       ? "Choose one or more platforms for automated publishing."
                       : "Choose ONE platform for automated publishing. Upgrade to Pro to publish to multiple."}
                   </p>
@@ -468,7 +585,7 @@ export default function BusinessSetup() {
                           key={p}
                           type="button"
                           onClick={() => {
-                            if (planIsPro) {
+                            if (planIsPro || selectedPlan === "pro") {
                               setPubPlatforms((prev) =>
                                 prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]
                               );
@@ -488,7 +605,7 @@ export default function BusinessSetup() {
                   </div>
                 )}
 
-                {!planIsPro && (
+                {!(planIsPro || selectedPlan === "pro") && (
                   <p className="text-xs text-center text-muted-foreground">
                     On Free/Basic, the same platform is auto-assigned to every scheduled day.
                   </p>
@@ -513,7 +630,7 @@ export default function BusinessSetup() {
                     const next = step + 1;
                     setStep(next);
                     if (next === 3) loadEnabledPlatforms();
-                    if (next === 4) loadEnabledPlatforms();
+                    if (next === 5) loadEnabledPlatforms();
                   }}
                   disabled={!canProceed()}
                   className="gap-2"
