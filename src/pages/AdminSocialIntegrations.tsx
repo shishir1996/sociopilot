@@ -174,10 +174,16 @@ export default function AdminSocialIntegrations() {
     setLoading(false);
   };
 
+  const getAdminHeaders = () => {
+    const hardcodedAdmin = localStorage.getItem("growvix_admin") === "true";
+    return hardcodedAdmin ? { "x-admin-key": "growvix-admin-2024" } : {};
+  };
+
   const loadSettings = async () => {
     try {
       const { data } = await supabase.functions.invoke("social-oauth", {
         body: { action: "get_admin_settings" },
+        headers: getAdminHeaders(),
       });
       if (data?.settings) {
         setPlatforms((prev) => {
@@ -240,6 +246,7 @@ export default function AdminSocialIntegrations() {
           enabled: state.enabled,
           credentials: state.values,
         },
+        headers: getAdminHeaders(),
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
