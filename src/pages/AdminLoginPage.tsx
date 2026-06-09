@@ -33,7 +33,7 @@ export default function AdminLoginPage() {
     // Hardcoded admin credentials
     if (email === "shishir.mandal@outlook.com" && password === "newmacos") {
       localStorage.setItem("growvix_admin", "true");
-      navigate("/admin");
+      window.location.href = "/admin";
       return;
     }
 
@@ -41,15 +41,14 @@ export default function AdminLoginPage() {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       localStorage.setItem("growvix_admin", "true");
-      navigate("/admin");
+      window.location.href = "/admin";
     } catch (error: any) {
+      setLoading(false);
       toast({
         title: "Login failed",
         description: error?.message || "Invalid credentials",
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
   };
 

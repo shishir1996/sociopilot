@@ -39,7 +39,7 @@ export function AdminSidebar({ brand = "Admin", icon: Icon = Shield }: AdminSide
   const handleSignOut = async () => {
     localStorage.removeItem("growvix_admin");
     await signOut();
-    navigate("/admin");
+    window.location.href = "/admin";
   };
 
   return (

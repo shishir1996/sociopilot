@@ -78,7 +78,7 @@ export default function AdminDashboard() {
   const handleSignOut = async () => {
     localStorage.removeItem("growvix_admin");
     await signOut();
-    navigate("/admin");
+    window.location.href = "/admin";
   };
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
