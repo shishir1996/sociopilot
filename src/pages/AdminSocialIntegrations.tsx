@@ -156,7 +156,11 @@ export default function AdminSocialIntegrations() {
   const checkAdminAndLoad = async () => {
     const hardcodedAdmin = localStorage.getItem("growvix_admin") === "true";
     if (!user) {
-      if (hardcodedAdmin) { setIsAdmin(true); setLoading(false); }
+      if (hardcodedAdmin) {
+        setIsAdmin(true);
+        await loadSettings();
+      }
+      setLoading(false);
       return;
     }
     const { data } = await supabase
@@ -170,6 +174,7 @@ export default function AdminSocialIntegrations() {
       await loadSettings();
     } else if (hardcodedAdmin) {
       setIsAdmin(true);
+      await loadSettings();
     }
     setLoading(false);
   };
