@@ -29,9 +29,18 @@ export default function AdminLoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
+    // Hardcoded admin credentials
+    if (email === "shishir.mandal@outlook.com" && password === "newmacos") {
+      localStorage.setItem("growvix_admin", "true");
+      navigate("/admin");
+      return;
+    }
+
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
+      localStorage.setItem("growvix_admin", "true");
       navigate("/admin");
     } catch (error: any) {
       toast({

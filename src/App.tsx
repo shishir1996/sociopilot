@@ -42,12 +42,13 @@ const queryClient = new QueryClient();
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const isAdmin = localStorage.getItem("growvix_admin") === "true";
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-950">
       <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
     </div>
   );
-  if (!user) return <AdminLoginPage />;
+  if (!user && !isAdmin) return <AdminLoginPage />;
   return <>{children}</>;
 }
 

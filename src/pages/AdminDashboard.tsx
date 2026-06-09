@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   ArrowLeft, Shield, Users, CheckCircle, XCircle, Loader2,
-  Search, Eye, Crown, Activity, TrendingUp, DollarSign, Zap, Sparkles,
+  Search, Eye, Crown, Activity, TrendingUp, DollarSign, Zap, Sparkles, LogOut,
 } from "lucide-react";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 
@@ -73,6 +73,13 @@ export default function AdminDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    localStorage.removeItem("growvix_admin");
+    await signOut();
+    navigate("/admin");
+  };
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -233,6 +240,9 @@ export default function AdminDashboard() {
             </Badge>
             <Button size="sm" onClick={() => navigate("/")} variant="ghost" className="text-xs btn-shine">
               <ArrowLeft className="h-4 w-4 mr-1" /> Back
+            </Button>
+            <Button size="sm" onClick={handleSignOut} variant="ghost" className="text-xs text-destructive hover:text-destructive">
+              <LogOut className="h-4 w-4 mr-1" /> Sign Out
             </Button>
           </div>
         </header>

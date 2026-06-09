@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Shield, BarChart3, Cpu, Settings, CreditCard, Video,
-  ChevronLeft, ChevronRight, ArrowLeft, Users, Sparkles, Plug, Zap,
+  ChevronLeft, ChevronRight, ArrowLeft, Users, Sparkles, Plug, Zap, LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,7 +33,14 @@ interface AdminSidebarProps {
 export function AdminSidebar({ brand = "Admin", icon: Icon = Shield }: AdminSidebarProps) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const { signOut } = useAuth();
   const [open, setOpen] = useState(true);
+
+  const handleSignOut = async () => {
+    localStorage.removeItem("growvix_admin");
+    await signOut();
+    navigate("/admin");
+  };
 
   return (
     <aside
@@ -84,6 +92,11 @@ export function AdminSidebar({ brand = "Admin", icon: Icon = Shield }: AdminSide
           className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-muted-foreground/40 hover:text-muted-foreground/60 hover:bg-white/5 transition-colors">
           <ArrowLeft className="h-3.5 w-3.5" />
           {open && <span>Back to App</span>}
+        </button>
+        <button onClick={handleSignOut}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-red-400/40 hover:text-red-400/60 hover:bg-red-500/5 transition-colors">
+          <LogOut className="h-3.5 w-3.5" />
+          {open && <span>Sign Out</span>}
         </button>
         <button onClick={() => setOpen(!open)}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-muted-foreground/40 hover:text-muted-foreground/60 hover:bg-white/5 transition-colors">
