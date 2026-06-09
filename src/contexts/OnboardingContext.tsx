@@ -156,6 +156,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       }
 
       const platform = platformId === "instagram" ? "facebook" : platformId;
+      localStorage.setItem("oauth_return_to", "/setup/connect");
       const redirectUri = `${window.location.origin}/settings`;
       const { data, error } = await supabase.functions.invoke("social-oauth", {
         body: { action: "get_oauth_url", platform, redirect_uri: redirectUri, business_id: businessId },

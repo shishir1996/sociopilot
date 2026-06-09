@@ -208,26 +208,12 @@ export default function SocialSettings() {
       setOauthStatus("saving");
       if (bid || businessId) await fetchConnected(bid || businessId);
 
-      // Detect user state: check user_profiles or fallback to businesses
-      const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("onboarding_completed")
-        .eq("user_id", user!.id)
-        .maybeSingle();
-
-      const onboarding = profile
-        ? !profile.onboarding_completed
-        : (await supabase
-            .from("businesses")
-            .select("id")
-            .eq("user_id", user!.id)
-            .limit(1)
-            .maybeSingle()).data === null;
-
-      if (onboarding) {
-        // User is in onboarding — redirect to continue
+      // Check if user came from onboarding OAuth flow
+      const returnTo = localStorage.getItem("oauth_return_to");
+      if (returnTo) {
+        localStorage.removeItem("oauth_return_to");
         setOauthStatus("redirecting");
-        navTimer.current = setTimeout(() => navigate("/setup/connect"), 1500);
+        navTimer.current = setTimeout(() => navigate(returnTo), 1500);
       } else {
         // Active user — done, clear overlay
         setOauthStatus(null);

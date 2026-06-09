@@ -52,6 +52,17 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function AuthRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+    </div>
+  );
+  if (!user) return <Navigate to="/auth" replace />;
+  return <>{children}</>;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -62,7 +73,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/setup" element={<SetupLayout />}>
+            <Route path="/setup" element={<AuthRoute><SetupLayout /></AuthRoute>}>
               <Route index element={<Navigate to="business" replace />} />
               <Route path="business" element={<SetupBusiness />} />
               <Route path="goals" element={<SetupGoals />} />
@@ -71,15 +82,15 @@ const App = () => (
               <Route path="plan" element={<SetupPlan />} />
               <Route path="publish" element={<SetupPublish />} />
             </Route>
-            <Route path="/settings" element={<SocialSettings />} />
-            <Route path="/account" element={<AccountSettings />} />
-            <Route path="/brand-assets" element={<BrandAssets />} />
-            <Route path="/content" element={<ContentPage />} />
-            <Route path="/schedule" element={<ScheduleSettings />} />
-            <Route path="/ai-studio" element={<AIStudio />} />
-            <Route path="/ai-video" element={<AIVideoStudio />} />
+            <Route path="/settings" element={<AuthRoute><SocialSettings /></AuthRoute>} />
+            <Route path="/account" element={<AuthRoute><AccountSettings /></AuthRoute>} />
+            <Route path="/brand-assets" element={<AuthRoute><BrandAssets /></AuthRoute>} />
+            <Route path="/content" element={<AuthRoute><ContentPage /></AuthRoute>} />
+            <Route path="/schedule" element={<AuthRoute><ScheduleSettings /></AuthRoute>} />
+            <Route path="/ai-studio" element={<AuthRoute><AIStudio /></AuthRoute>} />
+            <Route path="/ai-video" element={<AuthRoute><AIVideoStudio /></AuthRoute>} />
             <Route path="/pricing" element={<Pricing />} />
-            <Route path="/google-business" element={<GoogleMyBusiness />} />
+            <Route path="/google-business" element={<AuthRoute><GoogleMyBusiness /></AuthRoute>} />
             <Route path="/about" element={<AboutUs />} />
             <Route path="/terms" element={<TermsConditions />} />
             <Route path="/refund-policy" element={<RefundPolicy />} />
