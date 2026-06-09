@@ -90,6 +90,7 @@ Deno.serve(async (req) => {
 
     const authHeader = req.headers.get("Authorization");
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    let user: any = null;
 
     // Check admin for admin actions
     const isAdminAction = ["get_admin_settings", "save_admin_settings"].includes(action);
@@ -100,18 +101,20 @@ Deno.serve(async (req) => {
       const expectedKey = Deno.env.get("ADMIN_SECRET_KEY") || "growvix-admin-2024";
       if (adminKey === expectedKey) {
         // Hardcoded admin — skip Supabase auth, use service role for DB operations
+        user = { id: "hardcoded-admin", email: "admin@growvix.com" };
       } else {
         // Regular admin — verify via Supabase JWT
         const supabaseUser = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
           global: { headers: { Authorization: authHeader || "" } },
         });
-        const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
-        if (userError || !user) {
+        const { data: { user: authUser }, error: userError } = await supabaseUser.auth.getUser();
+        if (userError || !authUser) {
           return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
+        user = authUser;
         const { data: roles } = await supabaseAdmin
           .from("user_roles")
           .select("role")
@@ -136,8 +139,7 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      // Make authUser available as `user` for downstream actions
-      var user = authUser;
+      user = authUser;
     }
 
     switch (action) {
