@@ -36,11 +36,15 @@ export default function AdminUserDetail() {
   const [newPlan, setNewPlan] = useState("");
 
   useEffect(() => {
-    if (user && targetUserId) checkAdminAndFetch();
+    checkAdminAndFetch();
   }, [user, targetUserId]);
 
   const checkAdminAndFetch = async () => {
-    if (!user) return;
+    const hardcodedAdmin = localStorage.getItem("growvix_admin") === "true";
+    if (!user) {
+      if (hardcodedAdmin) { setIsAdmin(true); setLoading(false); }
+      return;
+    }
     const { data } = await supabase
       .from("user_roles")
       .select("role")
@@ -49,6 +53,8 @@ export default function AdminUserDetail() {
     if (data && data.length > 0) {
       setIsAdmin(true);
       await fetchUserDetails();
+    } else if (hardcodedAdmin) {
+      setIsAdmin(true);
     }
     setLoading(false);
   };

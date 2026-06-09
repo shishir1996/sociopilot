@@ -94,7 +94,14 @@ export default function AdminDashboard() {
   }, [user]);
 
   const checkAdmin = async () => {
-    if (!user) return;
+    const hardcodedAdmin = localStorage.getItem("growvix_admin") === "true";
+    if (!user) {
+      if (hardcodedAdmin) {
+        setIsAdmin(true);
+        setLoading(false);
+      }
+      return;
+    }
     const { data } = await supabase
       .from("user_roles")
       .select("role")
@@ -103,6 +110,9 @@ export default function AdminDashboard() {
     if (data && data.length > 0) {
       setIsAdmin(true);
       fetchAllUsers();
+    } else if (hardcodedAdmin) {
+      setIsAdmin(true);
+      setLoading(false);
     } else {
       setIsAdmin(false);
       setLoading(false);

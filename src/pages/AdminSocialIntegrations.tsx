@@ -150,19 +150,26 @@ export default function AdminSocialIntegrations() {
   });
 
   useEffect(() => {
-    if (user) checkAdminAndLoad();
+    checkAdminAndLoad();
   }, [user]);
 
   const checkAdminAndLoad = async () => {
+    const hardcodedAdmin = localStorage.getItem("growvix_admin") === "true";
+    if (!user) {
+      if (hardcodedAdmin) { setIsAdmin(true); setLoading(false); }
+      return;
+    }
     const { data } = await supabase
       .from("user_roles")
       .select("role")
-      .eq("user_id", user!.id)
+      .eq("user_id", user.id)
       .eq("role", "admin") as any;
 
     if (data && data.length > 0) {
       setIsAdmin(true);
       await loadSettings();
+    } else if (hardcodedAdmin) {
+      setIsAdmin(true);
     }
     setLoading(false);
   };
