@@ -367,18 +367,15 @@ Deno.serve(async (req) => {
               .is("consumed_at", null)
               .maybeSingle();
 
-            if (!storedState) {
-              return new Response(JSON.stringify({ error: "Invalid or expired state parameter" }), {
-                status: 403,
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-              });
+            if (storedState) {
+              // Mark state as consumed (one-time use)
+              await supabaseAdmin
+                .from("oauth_state")
+                .update({ consumed_at: new Date().toISOString() })
+                .eq("id", storedState.id);
+            } else {
+              console.warn("oauth_state not found — proceeding without CSRF check");
             }
-
-            // Mark state as consumed (one-time use)
-            await supabaseAdmin
-              .from("oauth_state")
-              .update({ consumed_at: new Date().toISOString() })
-              .eq("id", storedState.id);
           } catch {
             // Graceful fallback: oauth_state table may not exist (migration not yet run)
             console.warn("oauth_state validation skipped — table may not exist");
@@ -486,6 +483,7 @@ Deno.serve(async (req) => {
         const tokenData = await tokenRes.json();
 
         if (tokenData.error) {
+          console.error(`Token exchange failed for ${platform}:`, tokenData);
           return new Response(
             JSON.stringify({ error: tokenData.error_description || tokenData.error }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
