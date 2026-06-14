@@ -66,19 +66,11 @@ export default function SocialSettings() {
       setLoading(false);
       return;
     }
-    const timer = setTimeout(() => {
-      console.error("Settings init timeout");
-      setLoading(false);
-    }, 10000);
-    init().finally(() => clearTimeout(timer));
-    return () => clearTimeout(timer);
-  }, [user]);
-
-  // Handle OAuth callback from redirect
-  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
     const state = params.get("state");
+
+    // If this is an OAuth callback, process it immediately (before init)
     if (code && state) {
       setOauthStatus("processing");
       try {
@@ -86,12 +78,21 @@ export default function SocialSettings() {
         if (stateData.platform) {
           exchangeToken(stateData.platform, code, state, stateData.business_id);
           window.history.replaceState({}, "", window.location.pathname);
+          return; // Skip init — exchangeToken handles everything
         }
       } catch {
         setOauthStatus(null);
       }
     }
-  }, []);
+
+    // Normal page load — init as usual
+    const timer = setTimeout(() => {
+      console.error("Settings init timeout");
+      setLoading(false);
+    }, 10000);
+    init().finally(() => clearTimeout(timer));
+    return () => clearTimeout(timer);
+  }, [user]);
 
   // Clear navigation timeouts on unmount
   useEffect(() => () => { if (navTimer.current) clearTimeout(navTimer.current); }, []);
