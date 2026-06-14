@@ -1,6 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Crown, Lock, Package, Globe } from "lucide-react";
+// Icons use emoji to avoid React error #31 with lucide-react in production build
 import { useNavigate } from "react-router-dom";
 
 interface LimitReachedDialogProps {
@@ -14,7 +14,7 @@ interface LimitReachedDialogProps {
 
 export function LimitReachedDialog({ open, onClose, type, current, limit, planName }: LimitReachedDialogProps) {
   const navigate = useNavigate();
-  const Icon = type === "product" ? Package : Globe;
+  const Icon = type === "product" ? "📦" : "🌐";
   const label = type === "product" ? "Products" : "Platforms";
 
   return (
@@ -22,7 +22,7 @@ export function LimitReachedDialog({ open, onClose, type, current, limit, planNa
       <DialogContent className="sm:max-w-md">
         <DialogHeader className="text-center items-center">
           <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-2">
-            <Lock className="h-7 w-7 text-primary" />
+            <span className="text-primary text-2xl">🔒</span>
           </div>
           <DialogTitle className="text-xl">Plan Limit Reached</DialogTitle>
           <DialogDescription className="text-center">
@@ -33,7 +33,7 @@ export function LimitReachedDialog({ open, onClose, type, current, limit, planNa
         <div className="rounded-xl bg-muted/40 border border-border p-4 my-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Icon className="h-4 w-4 text-primary" />
+              <span className="text-primary">{Icon}</span>
               <span className="text-sm font-medium text-foreground">{label} used</span>
             </div>
             <span className="text-sm font-bold text-foreground">
@@ -53,7 +53,7 @@ export function LimitReachedDialog({ open, onClose, type, current, limit, planNa
               navigate("/pricing");
             }}
           >
-            <Crown className="h-4 w-4 mr-2" /> View Upgrade Options
+            👑 View Upgrade Options
           </Button>
           <Button variant="ghost" onClick={onClose}>
             Maybe later

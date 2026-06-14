@@ -4,7 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { Loader2 } from "lucide-react";
+// Icons use emoji to avoid React error #31 with lucide-react in production build
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import SetupLayout from "./pages/SetupLayout";
@@ -45,7 +45,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   const isAdmin = localStorage.getItem("growvix_admin") === "true";
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-950">
-      <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+      <span className="w-8 h-8 animate-spin text-purple-500 inline-block text-2xl">⏳</span>
     </div>
   );
   if (!user && !isAdmin) return <AdminLoginPage />;
@@ -56,7 +56,7 @@ function AuthRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-background">
-      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <span className="w-8 h-8 animate-spin text-primary inline-block text-2xl">⏳</span>
     </div>
   );
   if (!user) return <Navigate to="/auth" replace />;

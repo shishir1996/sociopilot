@@ -373,7 +373,7 @@ interface RunFullGenerationArgs {
 async function runFullGeneration(args: RunFullGenerationArgs) {
   const {
     supabaseAdmin, supabaseUrl, supabaseKey, userId, business, businessId, generationRequestId,
-    weekNumber, allowImage, allowCarousel, textProvider, textProviderFallbacks, imageProvider, lovableApiKey,
+    weekNumber, allowImage, allowCarousel, allowVideo, textProvider, textProviderFallbacks, imageProvider, lovableApiKey,
     brandContext, colorContext, sloganContext, creativeDirectionContext,
   } = args;
   const textProvidersChain: any[] = [textProvider, ...(textProviderFallbacks || [])].filter(Boolean);
@@ -575,118 +575,46 @@ Match each day's primary_platform to the assignment above exactly. Write the cap
 Active platforms this week: ${platformsForUser.join(", ")}
 This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 === 2 ? "engagement" : weekNumber % 4 === 3 ? "trust building" : "sales conversion"}.`;
 
-  const contentPlanRequest: any = {
+  const jsonRequest: any = {
     model: textProvider.model_name || "openrouter/auto",
     messages: [
-      { role: "system", content: systemPrompt + "\n\nReturn ONLY the raw JSON object via the create_content_plan tool." },
+      { role: "system", content: `${systemPrompt}\n\nReturn ONLY valid JSON. Shape: {"strategy_summary":"...","days":[...]}. No markdown, no code fences, no extra text.` },
       { role: "user", content: userPrompt },
     ],
-    tools: [{
-      type: "function",
-      function: {
-        name: "create_content_plan",
-        description: "Create a 7-day content plan",
-        parameters: {
-          type: "object",
-          properties: {
-            strategy_summary: { type: "string" },
-            days: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  day_number: { type: "number" },
-                  post_format: { type: "string", enum: ["text_only", "text_with_image", "image_carousel", "video"] },
-                  content_theme: { type: "string" },
-                  content_goal: { type: "string" },
-                  primary_platform: { type: "string" },
-                  secondary_platforms: { type: "array", items: { type: "string" } },
-                  content_type: { type: "string", enum: ["Text Post", "Image Post", "Carousel", "Video Post"] },
-                  topic: { type: "string" },
-                  hook: { type: "string" },
-                  pain_point: { type: "string" },
-                  core_message: { type: "string" },
-                  cta: { type: "string" },
-                  posting_time: { type: "string" },
-                  why_it_matters: { type: "string" },
-                  caption: { type: "string" },
-                  hashtags: { type: "array", items: { type: "string" } },
-                  image_prompt: { type: "string" },
-                  visual_style: { type: "string" },
-                  script: { type: "string" },
-                  repurposing_suggestion: { type: "string" },
-                },
-                required: ["day_number", "post_format", "content_theme", "primary_platform", "content_type", "topic", "hook", "caption", "cta"],
-              },
-            },
-          },
-          required: ["strategy_summary", "days"],
-        },
-      },
-    }],
-    tool_choice: { type: "function", function: { name: "create_content_plan" } },
-  };
-
-  const plainJsonRequest: any = {
-    model: textProvider.model_name || "openrouter/auto",
-    messages: [
-      { role: "system", content: `${systemPrompt}\n\nReturn STRICT JSON only with this shape: {"strategy_summary":"...","days":[...]}. Do not use markdown.` },
-      { role: "user", content: userPrompt },
-    ],
-    response_format: { type: "json_object" },
     temperature: Number(textProvider.temperature ?? 0.7),
     max_tokens: Number(textProvider.max_tokens ?? 4096),
   };
 
   let aiResponse: Response;
   try {
-    const out = await callTextWithFailover(supabaseAdmin, textProvidersChain, contentPlanRequest);
+    const out = await callTextWithFailover(supabaseAdmin, textProvidersChain, jsonRequest);
     aiResponse = out.res;
   } catch (e) {
-    console.error("All text providers failed (tool-call mode):", e);
+    console.error("All text providers failed:", e);
     throw new Error("__ai_unavailable__");
   }
 
   const aiData = await aiResponse.json();
-  const choice = aiData.choices?.[0]?.message;
-  const toolCall = choice?.tool_calls?.[0];
-  let rawJson: string | undefined;
-  if (toolCall?.function?.arguments) {
-    rawJson = toolCall.function.arguments;
-  } else if (typeof choice?.content === "string" && choice.content.trim().length > 0) {
-    rawJson = choice.content.trim();
-    const fenceMatch = rawJson.match(/```(?:json)?\s*([\s\S]*?)```/i);
-    if (fenceMatch) rawJson = fenceMatch[1].trim();
-    const firstBrace = rawJson.indexOf("{");
-    const lastBrace = rawJson.lastIndexOf("}");
-    if (firstBrace !== -1 && lastBrace > firstBrace) rawJson = rawJson.slice(firstBrace, lastBrace + 1);
-  }
-  if (!rawJson) {
-    console.warn("Tool-call response was empty; retrying with plain JSON mode across providers.");
-    let fallbackResponse: Response;
-    try {
-      const out = await callTextWithFailover(supabaseAdmin, textProvidersChain, plainJsonRequest);
-      fallbackResponse = out.res;
-    } catch (e) {
-      console.error("All text providers failed (plain JSON mode):", e);
-      throw new Error("__ai_unavailable__");
-    }
-    const fallbackData = await fallbackResponse.json();
-    rawJson = fallbackData.choices?.[0]?.message?.content?.trim();
-    const fenceMatch = rawJson?.match(/```(?:json)?\s*([\s\S]*?)```/i);
-    if (fenceMatch) rawJson = fenceMatch[1].trim();
-    const firstBrace = rawJson?.indexOf("{") ?? -1;
-    const lastBrace = rawJson?.lastIndexOf("}") ?? -1;
-    if (rawJson && firstBrace !== -1 && lastBrace > firstBrace) rawJson = rawJson.slice(firstBrace, lastBrace + 1);
-  }
-  if (!rawJson) {
-    console.error("AI response had no parsable content");
-    throw new Error("__ai_empty__");
-  }
+  const msg = aiData.choices?.[0]?.message || {};
+  
+  let raw = (msg.content || msg.reasoning || "").trim();
 
-  let plan: any;
-  try { plan = JSON.parse(rawJson); }
-  catch { console.error("Failed to parse AI response"); throw new Error("__ai_invalid__"); }
+  // Strip code fences immediately
+  raw = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+
+  // Find first { and last }, slice, parse
+  let plan: any = null;
+  const firstBrace = raw.indexOf("{");
+  const lastBrace = raw.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    const jsonPart = raw.slice(firstBrace, lastBrace + 1);
+    try { plan = JSON.parse(jsonPart); } catch (_) {}
+  }
+  
+  if (!plan || !plan?.days?.length) {
+    console.error("Failed to extract plan. Raw start:", raw.slice(0, 200));
+    throw new Error("__ai_invalid__");
+  }
 
   if (!Array.isArray(plan?.days)) {
     for (const k of ["plan", "content_plan", "result", "data", "output"]) {
@@ -695,6 +623,49 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
   }
   if (Array.isArray(plan)) plan = { strategy_summary: `Week ${weekNumber} content plan`, days: plan };
   if (!plan?.days?.length) { console.error("AI plan missing days"); throw new Error("__ai_empty__"); }
+
+  // Normalize day object field names (model may use various conventions)
+  const fieldAliases: Record<string, string[]> = {
+    topic: ["title", "headline", "subject", "post_title", "heading"],
+    content_theme: ["theme", "weekly_theme", "day_theme"],
+    content_goal: ["goal", "objective", "purpose"],
+    primary_platform: ["platform", "main_platform", "channel"],
+    hook: ["attention_grabber", "opening", "intro_hook"],
+    pain_point: ["painpoint", "target_audience_pain_point", "pain"],
+    core_message: ["key_message", "main_message", "keymessage"],
+    cta: ["call_to_action", "cta_text", "calltoaction"],
+    posting_time: ["time", "schedule_time", "post_time"],
+    caption: ["text", "body", "post_body", "message", "post_text", "post_caption", "caption_text"],
+    hashtags: ["tags", "tag_list", "hashtag_list"],
+    image_prompt: ["img_prompt", "image_description", "img_description", "visual_prompt"],
+    visual_style: ["visual_tone", "image_style", "design_style"],
+    repurposing_suggestion: ["repurpose", "repurposing", "reuse_suggestion"],
+    post_format: ["format", "content_format", "post_type", "type"],
+  };
+  for (const day of plan.days) {
+    for (const [target, aliases] of Object.entries(fieldAliases)) {
+      for (const alias of aliases) {
+        if (day[alias] !== undefined && day[target] === undefined) {
+          day[target] = day[alias];
+          delete day[alias];
+        }
+      }
+    }
+    // Derive topic/content_theme from caption if still missing
+    if ((!day.topic || !day.content_theme) && day.caption) {
+      const firstSentence = (day.caption.match(/[^.!?]+[.!?]+/) || [day.caption])[0]?.trim() || "";
+      if (!day.topic) day.topic = firstSentence.slice(0, 80);
+      if (!day.content_theme) day.content_theme = firstSentence.slice(0, 60);
+    }
+    if ((!day.hashtags || day.hashtags.length === 0) && day.caption) {
+      const tags = day.caption.match(/#\w+/g) || [];
+      day.hashtags = [...new Set(tags)];
+    }
+    if (!day.hook && day.caption) {
+      const parts = day.caption.split(/[.?!]/);
+      day.hook = (parts[0] || day.caption).trim().slice(0, 120);
+    }
+  }
 
   // Normalize
   const validFormats = ["text_only", "text_with_image", "image_carousel", ...(allowVideo ? ["video"] : [])];
@@ -727,16 +698,16 @@ This week focus: ${weekNumber % 4 === 1 ? "brand awareness" : weekNumber % 4 ===
     .single();
   if (planError || !newPlan) { console.error("Plan insert error:", planError); throw new Error("Content plan could not be saved."); }
 
-  const items = plan.days.map((day: any) => ({
+  const items = plan.days.map((day: any, idx: number) => ({
     plan_id: newPlan.id,
     user_id: userId,
-    day_number: day.day_number,
-    content_theme: day.content_theme,
+    day_number: day.day_number || (idx + 1),
+    content_theme: day.content_theme || "",
     content_goal: day.content_goal || "",
     primary_platform: day.primary_platform || "",
     secondary_platforms: day.secondary_platforms || [],
-    content_type: day.content_type,
-    topic: day.topic,
+    content_type: day.content_type || "Text Post",
+    topic: day.topic || "",
     hook: day.hook || "",
     pain_point: day.pain_point || "",
     core_message: day.core_message || "",
@@ -1060,12 +1031,12 @@ serve(async (req) => {
             .eq("id", generation_request_id)
             .eq("user_id", user.id);
         }
-        // Always notify the user with a generic, non-technical message.
+        const errMsg = bgErr instanceof Error ? bgErr.message : String(bgErr);
         try {
           await supabaseAdmin.from("notifications").insert({
             user_id: user.id,
             title: "Generation could not complete",
-            message: "Something went wrong while generating your content. Please try again in a minute.",
+            message: `Something went wrong. (${errMsg})`,
             type: "error",
             action_url: "/ai-studio",
           });

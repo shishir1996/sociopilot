@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Loader2, Check, RefreshCw, Trash2, ExternalLink, AlertCircle, Lock, Crown } from "lucide-react";
+// Icons use emoji to avoid React error #31 with lucide-react in production build
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { LimitReachedDialog } from "@/components/upgrade/LimitReachedDialog";
 import { Badge } from "@/components/ui/badge";
@@ -275,7 +275,7 @@ export default function SocialSettings() {
       <header className="border-b border-border bg-card">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
-            <ArrowLeft className="h-4 w-4" />
+            ←
           </Button>
           <h1 className="text-xl font-heading font-bold text-foreground">Connected Accounts</h1>
         </div>
@@ -294,7 +294,7 @@ export default function SocialSettings() {
           </div>
           {!planLimits.isPro && (
             <Button size="sm" variant="outline" onClick={() => navigate("/pricing")} className="text-xs">
-              <Crown className="h-3.5 w-3.5 mr-1" /> Upgrade
+              👑 Upgrade
             </Button>
           )}
         </div>
@@ -320,7 +320,7 @@ export default function SocialSettings() {
                       <div>
                         <p className="text-sm font-semibold flex items-center gap-1.5">
                           {p?.label}
-                          {expired && <AlertCircle className="h-3.5 w-3.5 text-destructive" />}
+                          {expired && <span className="h-3.5 w-3.5 text-destructive inline-block">⚠️</span>}
                         </p>
                         <p className="text-xs text-muted-foreground">{acc.account_name || acc.account_id}</p>
                       </div>
@@ -334,16 +334,16 @@ export default function SocialSettings() {
                           disabled={connecting === acc.platform}
                           className="text-xs gap-1"
                         >
-                          {connecting === acc.platform ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                          {connecting === acc.platform ? <span className="inline-block animate-spin">⏳</span> : <span className="inline-block">🔄</span>}
                           Reconnect
                         </Button>
                       ) : (
                         <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
-                          <Check className="h-3.5 w-3.5" /> Connected
+                          ✅ Connected
                         </span>
                       )}
                       <Button variant="ghost" size="sm" onClick={() => handleDisconnect(acc.id)} className="h-8 w-8 p-0">
-                        <Trash2 className="h-4 w-4 text-destructive" />
+                        <span className="text-destructive">🗑️</span>
                       </Button>
                     </div>
                   </div>
@@ -406,13 +406,13 @@ export default function SocialSettings() {
                     {connecting === platform.value ? "Redirecting..." : `Connect ${platform.label}`}
                   </span>
                   {connecting === platform.value ? (
-                    <Loader2 className="h-4 w-4 ml-auto animate-spin text-primary" />
+                    <span className="ml-auto inline-block animate-spin text-primary">⏳</span>
                   ) : lockedByPlan ? (
                     <Badge variant="outline" className="ml-auto text-[10px] gap-1">
-                      <Lock className="h-3 w-3" /> Upgrade
+                      🔒 Upgrade
                     </Badge>
                   ) : available ? (
-                    <ExternalLink className="h-4 w-4 ml-auto text-muted-foreground" />
+                    <span className="ml-auto text-muted-foreground">🔗</span>
                   ) : (
                     <span className="ml-auto text-[10px] text-muted-foreground">Not available</span>
                   )}
