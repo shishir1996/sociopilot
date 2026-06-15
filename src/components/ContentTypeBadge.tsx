@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { Image, Layers, Type } from "lucide-react";
+import { Image, Layers, Type } from "@/lib/icons";
 
 const typeConfig: Record<string, { icon: React.ElementType; className: string; label: string }> = {
   "text post": { icon: Type, className: "bg-secondary text-secondary-foreground", label: "Text Post" },

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Shield, CreditCard, Loader2, Plus, Trash2, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Shield, CreditCard, Loader2, Plus, Trash2, Eye, EyeOff } from "@/lib/icons";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,

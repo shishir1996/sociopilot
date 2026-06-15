@@ -4,7 +4,7 @@ import {
   Sparkles, Zap, Globe, MessageSquare, Palette, BarChart3, Antenna,
   ArrowRight, Check, Star, ChevronRight, Play,
   Facebook, Instagram, Linkedin, Twitter
-} from "lucide-react";
+} from "@/lib/icons";
 import PricingSection from "@/components/landing/PricingSection";
 import { LegalFooter } from "@/components/legal/LegalPageLayout";
 import { useScrollReveal, useScrollPosition } from "@/hooks/useScrollReveal";

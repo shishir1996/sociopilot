@@ -8,8 +8,8 @@ import { ContentDetailModal } from "./ContentDetailModal";
 import {
   Clock, Lightbulb, MessageSquare, Target, Send, CalendarClock,
   ChevronDown, ChevronUp, Copy, Hash, Check, Trash2, Expand,
-  Image as ImageIcon,
-} from "lucide-react";
+  ImageIcon,
+} from "@/lib/icons";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";

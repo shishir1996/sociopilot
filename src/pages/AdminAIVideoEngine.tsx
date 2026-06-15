@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Loader2, KeyRound, Video } from "lucide-react";
+import { Loader2, KeyRound, Video } from "@/lib/icons";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 
 const TOGGLES: { key: string; label: string; desc: string }[] = [

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Check, Crown, X, ArrowLeft, Sparkles } from "lucide-react";
+import { Check, Crown, X, ArrowLeft, Sparkles } from "@/lib/icons";
 import { useGeoPricing } from "@/hooks/useGeoPricing";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";

@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   Shield, BarChart3, Cpu, Settings, CreditCard, Video,
   ChevronLeft, ChevronRight, ArrowLeft, Users, Sparkles, Plug, Zap, LogOut,
-} from "lucide-react";
+} from "@/lib/icons";
 import { cn } from "@/lib/utils";
 
 type NavItem = { icon: any; label: string; route: string };

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Trash2, User, Crown, CreditCard, Loader2, Calendar, XCircle, RotateCcw } from "lucide-react";
+import { ArrowLeft, Trash2, User, Crown, CreditCard, Loader2, Calendar, XCircle, RotateCcw } from "@/lib/icons";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,

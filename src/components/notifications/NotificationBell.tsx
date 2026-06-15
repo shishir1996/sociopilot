@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
-import { Bell, Check, Clock, Crown, AlertTriangle, Sparkles } from "lucide-react";
+import { Bell, Check, Clock, Crown, AlertTriangle, Sparkles } from "@/lib/icons";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface Notification {

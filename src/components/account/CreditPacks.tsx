@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Package } from "lucide-react";
+import { Loader2, Package } from "@/lib/icons";
 import { useGeoPricing } from "@/hooks/useGeoPricing";
 
 declare global {

@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Copy, Save, Sparkles, Hash, Calendar } from "lucide-react";
+import { Loader2, Copy, Save, Sparkles, Hash, Calendar } from "@/lib/icons";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";

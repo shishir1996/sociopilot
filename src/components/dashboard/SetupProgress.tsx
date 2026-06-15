@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Circle, ArrowRight, X } from "lucide-react";
+import { CheckCircle2, Circle, ArrowRight, X } from "@/lib/icons";
 
 type Task = {
   key: string;

@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Shield, Loader2, Eye, EyeOff, Save, Facebook, Linkedin, Music2, MessageCircle, Image as ImageIcon, AtSign, Ghost, BookOpen, Plug } from "lucide-react";
+import { ArrowLeft, Shield, Loader2, Eye, EyeOff, Save, Facebook, Linkedin, Music2, MessageCircle, ImageIcon, AtSign, Ghost, BookOpen, Plug } from "@/lib/icons";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 
 interface PlatformConfig {

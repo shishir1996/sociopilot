@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Package, Globe, Crown } from "lucide-react";
+import { Package, Globe, Crown } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { usePlanLimits } from "@/hooks/usePlanLimits";

@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Crown, Lock, Zap, X } from "lucide-react";
+import { Crown, Lock, Zap, X } from "@/lib/icons";
 
 interface UpgradePromptProps {
   type: "trial_limit" | "trial_generated" | "trial_expiring" | "trial_expired" | "basic_limit" | "pro_feature";

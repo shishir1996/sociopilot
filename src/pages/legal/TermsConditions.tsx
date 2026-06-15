@@ -1,4 +1,4 @@
-import { FileText } from "lucide-react";
+import { FileText } from "@/lib/icons";
 import LegalPageLayout from "@/components/legal/LegalPageLayout";
 
 export default function TermsConditions() {

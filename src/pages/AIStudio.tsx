@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   ArrowLeft, Sparkles, Loader2, Lock, Crown,
   CheckCircle2, ChevronRight, ChevronLeft, Zap
-} from "lucide-react";
+} from "@/lib/icons";
 import { useToast } from "@/hooks/use-toast";
 import { ContentCard } from "@/components/ContentCard";
 import { UpgradePrompt } from "@/components/upgrade/UpgradePrompt";

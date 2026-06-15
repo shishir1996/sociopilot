@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   X, ChevronLeft, ChevronRight, Copy, Check, Hash, ExternalLink,
   Download, ArrowLeft, Loader2, FileText,
-} from "lucide-react";
+} from "@/lib/icons";
 
 interface CarouselSlide {
   prompt?: string;

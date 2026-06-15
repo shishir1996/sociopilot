@@ -1,6 +1,6 @@
 import { ReactNode, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Antenna, ArrowRight, ChevronRight } from "lucide-react";
+import { Antenna, ArrowRight, ChevronRight } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 
 interface LegalPageLayoutProps {

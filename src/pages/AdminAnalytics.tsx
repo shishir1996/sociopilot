@@ -10,7 +10,7 @@ import {
   ArrowLeft, Shield, TrendingUp, TrendingDown, Users, DollarSign,
   BarChart3, Activity, Crown, Loader2, CreditCard, UserMinus, UserPlus,
   Sparkles, Globe, Zap, Wallet,
-} from "lucide-react";
+} from "@/lib/icons";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 
 function AnimatedMetric({ label, value, change, trend, icon: Icon, color }: {

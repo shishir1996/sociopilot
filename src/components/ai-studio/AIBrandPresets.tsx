@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Save, Trash2, Star, Palette } from "lucide-react";
+import { Plus, Save, Trash2, Star, Palette } from "@/lib/icons";
 
 interface BrandPreset {
   id: string;

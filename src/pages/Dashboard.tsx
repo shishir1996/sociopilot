@@ -8,7 +8,7 @@ import {
   LogOut, Building2, Sparkles, Settings, UserCog,
   Zap, BarChart3, LayoutDashboard, Calendar, Globe, ImageIcon, Crown, ChevronDown, Lightbulb, TrendingUp,
   Menu, X, Instagram, Facebook, Linkedin, Twitter,
-} from "lucide-react";
+} from "@/lib/icons";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";

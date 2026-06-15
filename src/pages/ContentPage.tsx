@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
   Sparkles, Loader2, Filter, ArrowLeft, CalendarDays
-} from "lucide-react";
+} from "@/lib/icons";
 import { useToast } from "@/hooks/use-toast";
 
 interface ContentItem {

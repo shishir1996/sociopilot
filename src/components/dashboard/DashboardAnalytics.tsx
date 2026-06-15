@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, TrendingUp, Calendar, CheckCircle, Clock, AlertCircle, Sparkles } from "lucide-react";
+import { BarChart3, TrendingUp, Calendar, CheckCircle, Clock, AlertCircle, Sparkles } from "@/lib/icons";
 
 interface AnalyticsData {
   totalPosts: number;

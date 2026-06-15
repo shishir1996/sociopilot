@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { Film, Loader2, Sparkles, Download, Play, ExternalLink } from "lucide-react";
+import { Film, Loader2, Sparkles, Download, Play, ExternalLink } from "@/lib/icons";
 
 export default function AIVideoStudio() {
   const { user, loading: authLoading } = useAuth();

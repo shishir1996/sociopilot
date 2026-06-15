@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Crown, Check, Lock, Zap, Sparkles } from "lucide-react";
+import { Crown, Check, Lock, Zap, Sparkles } from "@/lib/icons";
 import { useGeoPricing } from "@/hooks/useGeoPricing";
 
 interface UpgradeModalProps {

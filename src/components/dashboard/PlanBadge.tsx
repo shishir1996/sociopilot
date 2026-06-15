@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import { Crown, Zap, Star } from "lucide-react";
+import { Crown, Zap, Star } from "@/lib/icons";
 
 interface PlanBadgeProps {
   planName: string;

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Check, Crown, Sparkles, X } from "lucide-react";
+import { Check, Crown, Sparkles, X } from "@/lib/icons";
 import { useGeoPricing } from "@/hooks/useGeoPricing";
 
 const PLANS = [

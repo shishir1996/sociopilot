@@ -1,4 +1,4 @@
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "@/lib/icons";
 import LegalPageLayout from "@/components/legal/LegalPageLayout";
 
 export default function PrivacyPolicy() {

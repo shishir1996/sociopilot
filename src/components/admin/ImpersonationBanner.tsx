@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Shield, X } from "lucide-react";
+import { Shield, X } from "@/lib/icons";
 
 export function ImpersonationBanner() {
   const navigate = useNavigate();

@@ -13,7 +13,7 @@ import { PlanBadge } from "@/components/dashboard/PlanBadge";
 import {
   ArrowLeft, Shield, Loader2, UserCog, Calendar, BarChart3,
   Crown, LogIn, RotateCcw, Ban, Pencil, Save
-} from "lucide-react";
+} from "@/lib/icons";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 
 export default function AdminUserDetail() {

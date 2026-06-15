@@ -19,7 +19,7 @@ import {
 import {
   ArrowLeft, Shield, Users, CheckCircle, XCircle, Loader2,
   Search, Eye, Crown, Activity, TrendingUp, DollarSign, Zap, Sparkles, LogOut,
-} from "lucide-react";
+} from "@/lib/icons";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 
 interface UserProfile {

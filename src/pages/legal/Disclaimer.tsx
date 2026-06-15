@@ -1,4 +1,4 @@
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle } from "@/lib/icons";
 import LegalPageLayout from "@/components/legal/LegalPageLayout";
 
 export default function Disclaimer() {

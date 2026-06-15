@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Lock, Crown, Upload, Trash2, Loader2, Image as ImageIcon, Video, Sparkles, Palette } from "lucide-react";
+import { Lock, Crown, Upload, Trash2, Loader2, ImageIcon, Video, Sparkles, Palette } from "@/lib/icons";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 

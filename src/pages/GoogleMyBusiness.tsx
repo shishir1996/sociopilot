@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft, MapPin, Loader2, Sparkles, RefreshCw, ExternalLink, Crown, Save, Star,
   TrendingUp, Eye, Phone, MessageSquare, Search, Clock, History, Target, CheckCircle2, BarChart3
-} from "lucide-react";
+} from "@/lib/icons";
 
 interface GMBReview {
   id: string;
