@@ -1,6 +1,6 @@
 import { Component, type ReactNode, type ErrorInfo } from "react";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle } from "lucide-react";
+// AlertTriangle replaced with emoji to avoid lucide-react React error #31
 
 interface Props {
   children: ReactNode;
@@ -28,7 +28,7 @@ export default class ErrorBoundary extends Component<Props, State> {
         this.props.fallback || (
           <div className="min-h-screen flex items-center justify-center bg-background p-4">
             <div className="max-w-md text-center space-y-4">
-              <AlertTriangle className="h-12 w-12 text-destructive mx-auto" />
+              <span className="h-12 w-12 text-destructive mx-auto inline-block text-5xl">⚠️</span>
               <h2 className="text-lg font-bold text-foreground">Something went wrong</h2>
               <p className="text-sm text-muted-foreground">
                 {this.state.error.message}

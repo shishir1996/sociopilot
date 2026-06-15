@@ -243,7 +243,7 @@ export default function SocialSettings() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="h-8 w-8 animate-spin text-primary inline-block text-3xl">⏳</span>
       </div>
     );
   }
@@ -255,7 +255,7 @@ export default function SocialSettings() {
           <div className="flex flex-col items-center gap-5 text-center px-6">
             <div className="relative">
               <div className="h-16 w-16 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
-              {oauthStatus === "redirecting" && <Check className="h-7 w-7 text-emerald-400 absolute inset-0 m-auto" />}
+              {oauthStatus === "redirecting" && <span className="h-7 w-7 text-emerald-400 absolute inset-0 m-auto inline-block text-2xl">✅</span>}
             </div>
             <div>
               <h3 className="text-xl font-bold text-foreground mb-1">

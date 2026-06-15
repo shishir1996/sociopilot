@@ -1,7 +1,7 @@
 import * as React from "react";
 import * as ToastPrimitives from "@radix-ui/react-toast";
 import { cva, type VariantProps } from "class-variance-authority";
-import { X } from "lucide-react";
+// X icon replaced with character to avoid lucide-react React error #31
 
 import { cn } from "@/lib/utils";
 
@@ -73,7 +73,7 @@ const ToastClose = React.forwardRef<
     toast-close=""
     {...props}
   >
-    <X className="h-4 w-4" />
+    <span className="h-4 w-4 inline-flex items-center justify-center text-lg leading-none">×</span>
   </ToastPrimitives.Close>
 ));
 ToastClose.displayName = ToastPrimitives.Close.displayName;
